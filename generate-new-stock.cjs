@@ -1,12 +1,8 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 
-const excelPath = process.argv[2] || 'C:\\Users\\DELL\\Desktop\\BM\\BM Apple Iphone Store\\BM Apple Iphone Store Stock Management V1.xlsx';
-const outputFile = process.argv[3] || 'stock-import.sql';
-const deleteAll = process.argv[4] !== 'no-delete';
-
-const wb = XLSX.readFile(excelPath);
-const ws = wb.Sheets['Sheet1'];
+const wb = XLSX.readFile('C:\\Users\\DELL\\Desktop\\new Iphoen appple store.xlsx');
+const ws = wb.Sheets[wb.SheetNames[0]];
 const data = XLSX.utils.sheet_to_json(ws);
 
 function esc(val) {
@@ -14,15 +10,11 @@ function esc(val) {
 }
 
 let sql = `-- ============================================\n`;
-sql += `-- BM Apple Iphone Store - Full Stock Import\n`;
-sql += `-- Generated from Excel: BM Apple Iphone Store Stock Management V1.xlsx\n`;
+sql += `-- New Stock Items - Add to existing stock\n`;
+sql += `-- Source: new Iphoen appple store.xlsx\n`;
 sql += `-- Total items: ${data.length}\n`;
 sql += `-- Run this in Supabase SQL Editor\n`;
 sql += `-- ============================================\n\n`;
-
-if (deleteAll) {
-  sql += `DELETE FROM public.stock;\n\n`;
-}
 
 for (const row of data) {
   const code = String(row['Item Code']);
@@ -38,5 +30,5 @@ for (const row of data) {
   sql += `INSERT INTO public.stock (code, name, category, sub_category, brand, sub_brand, model, unit, qty, purchase_price, selling_price) VALUES ('${code}', '${name}', '${category}', '${subCategory}', '${brand}', '${subBrand}', '${model}', '${unit}', ${qty}, 0, 0) ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, category=EXCLUDED.category, sub_category=EXCLUDED.sub_category, brand=EXCLUDED.brand, sub_brand=EXCLUDED.sub_brand, model=EXCLUDED.model, unit=EXCLUDED.unit, qty=EXCLUDED.qty, purchase_price=EXCLUDED.purchase_price, selling_price=EXCLUDED.selling_price;\n`;
 }
 
-fs.writeFileSync(outputFile, sql);
-console.log(`Generated ${outputFile} with ${data.length} items`);
+fs.writeFileSync('new-stock-add.sql', sql);
+console.log(`Generated new-stock-add.sql with ${data.length} items`);
