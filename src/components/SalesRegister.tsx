@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Download, Trash2, Plus, Check } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Download, Trash2, Plus, Check, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,18 @@ export function SalesRegister() {
 
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [printData, setPrintData] = useState<{
+    invoiceNo: string;
+    date: string;
+    customer: string;
+    customerPan: string;
+    hasVatPan: boolean;
+    paymentMethod: PaymentMethod;
+    items: BillItem[];
+    subtotal: number;
+    vat: number;
+    total: number;
+  } | null>(null);
 
   const suggestions = useMemo(() => {
     const t = itemName.trim().toLowerCase();
@@ -122,6 +134,18 @@ export function SalesRegister() {
       toast.error(`Save failed: ${error.message}`);
       return;
     }
+    setPrintData({
+      invoiceNo,
+      date,
+      customer: customer.trim(),
+      customerPan: customerPan.trim(),
+      hasVatPan,
+      paymentMethod,
+      items: [...billItems],
+      subtotal: billSubtotal,
+      vat: billVat,
+      total: billTotal,
+    });
     setCustomer("");
     setCustomerPan("");
     setHasVatPan(false);
@@ -130,7 +154,73 @@ export function SalesRegister() {
     toast.success(`${invoiceNo} saved with ${billItems.length} items`);
   }
 
-  function onExport() {
+  function printInvoice() {
+    if (!printData) return;
+    const w = window.open("", "_blank", "width=800,height=600");
+    if (!w) { toast.error("Pop-up blocked. Allow pop-ups to print."); return; }
+    w.document.write(`<!DOCTYPE html>
+<html><head><title>Invoice ${printData.invoiceNo}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #000; padding: 20px; }
+  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+  .header h1 { font-size: 18px; margin-bottom: 2px; }
+  .header p { font-size: 11px; color: #555; }
+  .info { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 11px; }
+  .info div { flex: 1; }
+  .info .label { font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 11px; }
+  th { background: #f0f0f0; font-weight: bold; }
+  .text-right { text-align: right; }
+  .totals { margin-top: 10px; text-align: right; }
+  .totals .row { margin-bottom: 4px; }
+  .totals .grand { font-size: 14px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; }
+  .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
+  @media print { body { padding: 10px; } }
+</style></head><body>
+<div class="header">
+  <h1>BM Apple Iphone Store</h1>
+  <p>Stock Management &amp; Sales</p>
+</div>
+<div class="info">
+  <div><span class="label">Invoice No:</span> ${printData.invoiceNo}</div>
+  <div><span class="label">Date:</span> ${printData.date}</div>
+  <div><span class="label">Payment:</span> ${printData.paymentMethod}</div>
+</div>
+<div class="info">
+  <div><span class="label">Customer:</span> ${printData.customer}</div>
+  ${printData.hasVatPan ? `<div><span class="label">PAN:</span> ${printData.customerPan}</div>` : ""}
+</div>
+<table>
+  <thead><tr>
+    <th>#</th><th>Item</th><th>Sub Category</th><th>Brand</th><th>Model</th>
+    <th class="text-right">Qty</th><th class="text-right">Rate</th>
+    <th class="text-right">Amount</th><th class="text-right">VAT 13%</th><th class="text-right">Total</th>
+  </tr></thead>
+  <tbody>
+  ${printData.items.map((it, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${it.itemName}</td><td>${it.subCategory}</td><td>${it.brand}</td><td>${it.model}</td>
+    <td class="text-right">${it.qty}</td><td class="text-right">${money(it.rate)}</td>
+    <td class="text-right">${money(it.amount)}</td><td class="text-right">${money(it.vat)}</td>
+    <td class="text-right">${money(it.total)}</td>
+  </tr>`).join("")}
+  </tbody>
+</table>
+<div class="totals">
+  <div class="row">Subtotal: <strong>${money(printData.subtotal)}</strong></div>
+  <div class="row">VAT 13%: <strong>${money(printData.vat)}</strong></div>
+  <div class="row grand">Grand Total: <strong>${money(printData.total)}</strong></div>
+</div>
+<div class="footer">
+  <p>Thank you for your purchase!</p>
+  <p>BM Apple Iphone Store</p>
+</div>
+<script>window.onload=function(){window.print();}</script>
+</body></html>`);
+    w.document.close();
+  }
     if (sales.length === 0) {
       toast.error("No sales to export");
       return;
@@ -177,6 +267,24 @@ export function SalesRegister() {
 
   return (
     <div className="space-y-4">
+      {printData && (
+        <Card className="border-primary bg-primary/5 p-3 sm:p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-primary">Bill saved successfully!</p>
+              <p className="text-xs text-muted-foreground">{printData.invoiceNo} — {printData.customer} — {money(printData.total)}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={printInvoice} size="sm" className="h-8 text-xs sm:text-sm">
+                <Printer className="mr-1 size-3.5 sm:size-4" /> Print Invoice
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPrintData(null)} className="h-8 text-xs sm:text-sm">
+                Close
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
       <Card className="p-3 sm:p-4">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
           <div>
@@ -441,14 +549,51 @@ export function SalesRegister() {
                     {money(g.items.reduce((a, i) => a + i.total, 0))}
                   </td>
                   <td className="p-2.5 text-right">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => deleteInvoice(g.header.invoiceNo)}
-                      className="h-7 w-7"
-                    >
-                      <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          setPrintData({
+                            invoiceNo: g.header.invoiceNo,
+                            date: g.header.date,
+                            customer: g.header.customer,
+                            customerPan: g.header.customerPan,
+                            hasVatPan: g.header.hasVatPan,
+                            paymentMethod: g.header.paymentMethod,
+                            items: g.items.map((s) => ({
+                              itemCode: s.itemCode,
+                              itemName: s.itemName,
+                              category: s.category,
+                              subCategory: s.subCategory,
+                              brand: s.brand,
+                              model: s.model,
+                              qty: s.qty,
+                              rate: s.rate,
+                              amount: s.amount,
+                              vat: s.vat,
+                              total: s.total,
+                            })),
+                            subtotal: g.items.reduce((a, i) => a + i.amount, 0),
+                            vat: g.items.reduce((a, i) => a + i.vat, 0),
+                            total: g.items.reduce((a, i) => a + i.total, 0),
+                          });
+                          setTimeout(() => printInvoice(), 100);
+                        }}
+                        className="h-7 w-7"
+                        title="Print invoice"
+                      >
+                        <Printer className="size-3.5 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteInvoice(g.header.invoiceNo)}
+                        className="h-7 w-7"
+                      >
+                        <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
