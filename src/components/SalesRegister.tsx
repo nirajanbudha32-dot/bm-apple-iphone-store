@@ -221,6 +221,8 @@ export function SalesRegister() {
 </body></html>`);
     w.document.close();
   }
+
+  function onExport() {
     if (sales.length === 0) {
       toast.error("No sales to export");
       return;
