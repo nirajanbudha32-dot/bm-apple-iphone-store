@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { Download, Trash2, Plus, Check, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import {
   type BillItem,
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
+import { useDebounce } from "@/lib/use-debounce";
 
 const money = (n: number) =>
   n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -42,6 +43,7 @@ export function SalesRegister() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
 
   const [itemName, setItemName] = useState("");
+  const debouncedItemName = useDebounce(itemName, 150);
   const [itemQty, setItemQty] = useState(1);
   const [itemRate, setItemRate] = useState(0);
 
@@ -61,7 +63,7 @@ export function SalesRegister() {
   } | null>(null);
 
   const suggestions = useMemo(() => {
-    const t = itemName.trim().toLowerCase();
+    const t = debouncedItemName.trim().toLowerCase();
     if (!t) return [];
     const exact = stock.some((i) => i.name.toLowerCase() === t);
     if (exact) return [];
@@ -71,7 +73,7 @@ export function SalesRegister() {
         .toLowerCase()
         .includes(t),
     ).slice(0, 8);
-  }, [stock, itemName]);
+  }, [stock, debouncedItemName]);
 
   const matched = useMemo(
     () => stock.find((i) => i.name.toLowerCase() === itemName.trim().toLowerCase()),
@@ -155,6 +157,7 @@ export function SalesRegister() {
     setHasVatPan(false);
     setBillItems([]);
     setPaymentMethod("Cash");
+    setSalesPage(0);
     toast.success(`${invoiceNo} saved with ${billItems.length} items`);
   }
 
@@ -270,6 +273,11 @@ export function SalesRegister() {
   }, [sales]);
 
   const grand = sales.reduce((a, s) => a + s.total, 0);
+
+  const SALES_PER_PAGE = 50;
+  const [salesPage, setSalesPage] = useState(0);
+  const totalPages = Math.ceil(groupedSales.length / SALES_PER_PAGE);
+  const pagedSales = groupedSales.slice(salesPage * SALES_PER_PAGE, (salesPage + 1) * SALES_PER_PAGE);
 
   return (
     <div className="space-y-4">
@@ -535,7 +543,7 @@ export function SalesRegister() {
               </tr>
             </thead>
             <tbody>
-              {groupedSales.map((g) => (
+              {pagedSales.map((g) => (
                 <tr key={g.header.invoiceNo} className="border-t border-border">
                   <td className="p-2.5 whitespace-nowrap">{g.header.date}</td>
                   <td className="p-2.5 font-mono font-medium">{g.header.invoiceNo}</td>
@@ -614,6 +622,37 @@ export function SalesRegister() {
           </table>
         </div>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
+          <span>
+            Showing {salesPage * SALES_PER_PAGE + 1}–{Math.min((salesPage + 1) * SALES_PER_PAGE, groupedSales.length)} of {groupedSales.length} invoices
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={salesPage === 0}
+              onClick={() => setSalesPage((p) => p - 1)}
+              className="h-8 text-xs"
+            >
+              Prev
+            </Button>
+            <span className="flex items-center px-2 text-xs">
+              {salesPage + 1} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={salesPage >= totalPages - 1}
+              onClick={() => setSalesPage((p) => p + 1)}
+              className="h-8 text-xs"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <p className="text-right text-xs sm:text-sm text-muted-foreground">
         Grand total sales: <strong className="text-foreground">{money(grand)}</strong>
