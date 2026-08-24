@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, LogOut, PackagePlus, ReceiptText, Truck, Users } from "lucide-react";
+import { BarChart3, Boxes, LogOut, PackageMinus, PackagePlus, ReceiptText, Truck, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { StockManager } from "@/components/StockManager";
 import { SalesRegister } from "@/components/SalesRegister";
 import { StockSummary } from "@/components/StockSummary";
 import { StockOutSummary } from "@/components/StockOutSummary";
+import { StockInSummary } from "@/components/StockInSummary";
 import { PurchaseManager } from "@/components/PurchaseManager";
 import { UserManager } from "@/components/UserManager";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
@@ -99,6 +100,9 @@ function Index() {
           <TabsTrigger value="stock" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Stock
           </TabsTrigger>
+          <TabsTrigger value="stockin" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <PackageMinus className="mr-1.5 size-3.5 sm:size-4" /> Stock In
+          </TabsTrigger>
           <TabsTrigger value="stockout" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <Truck className="mr-1.5 size-3.5 sm:size-4" /> Stock Out
           </TabsTrigger>
@@ -117,6 +121,9 @@ function Index() {
         </TabsContent>
         <TabsContent value="stockout">
           <StockOutSummary />
+        </TabsContent>
+        <TabsContent value="stockin">
+          <StockInSummary />
         </TabsContent>
         <TabsContent value="summary">
           <StockSummary />
