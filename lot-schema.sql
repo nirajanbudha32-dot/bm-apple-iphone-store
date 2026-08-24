@@ -69,10 +69,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT 'LOT-' || LPAD(
-    COALESCE(
-      (SELECT MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)) FROM public.stock_lots),
-      0
-    ) + 1::text,
+    (
+      COALESCE(
+        (SELECT MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)) FROM public.stock_lots),
+        0
+      ) + 1
+    )::text,
     4, '0'
   );
 $$;
