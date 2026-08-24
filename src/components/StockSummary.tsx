@@ -111,7 +111,10 @@ export function StockSummary() {
   const byBrand = useMemo(() => groupBy(stock, (i) => i.brand), [stock]);
   const bySubBrand = useMemo(() => groupBy(stock, (i) => i.subBrand), [stock]);
 
-  const todaySales: Sale[] = useMemo(() => sales.filter((s) => s.date === today), [sales, today]);
+  const todaySales: Sale[] = useMemo(() => {
+    const filtered = sales.filter((s) => s.date === today);
+    return filtered;
+  }, [sales, today]);
   const todayQty = todaySales.reduce((a, s) => a + s.qty, 0);
   const todayAmount = todaySales.reduce((a, s) => a + s.amount, 0);
   const todayVat = todaySales.reduce((a, s) => a + s.vat, 0);
