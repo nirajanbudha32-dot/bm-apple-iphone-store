@@ -20,7 +20,6 @@ import {
   type PaymentMethod,
   type Purchase,
   type StockItem,
-  type StockLot,
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
@@ -57,7 +56,7 @@ const emptyDraft: PurchaseItemDraft = {
 };
 
 export function PurchaseManager() {
-  const { stock, purchases, stockLots } = useStore();
+  const { stock, purchases } = useStore();
 
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [billNo, setBillNo] = useState("");
@@ -246,17 +245,24 @@ export function PurchaseManager() {
     );
   }
 
-  const lotsWithPurchase = useMemo(() => {
-    return stockLots.map((lot) => {
-      const purchase = purchases.find((p) => p.id === lot.purchaseId);
-      return { ...lot, billNo: purchase?.billNo ?? "", paymentMethod: purchase?.paymentMethod ?? "Cash" };
-    });
-  }, [stockLots, purchases]);
-
   const PURCHASES_PER_PAGE = 50;
   const [purchasePage, setPurchasePage] = useState(0);
-  const totalPages = Math.ceil(lotsWithPurchase.length / PURCHASES_PER_PAGE);
-  const pagedLots = lotsWithPurchase.slice(
+  const [purchaseFilter, setPurchaseFilter] = useState("");
+  const debouncedFilter = useDebounce(purchaseFilter, 150);
+
+  const filteredPurchases = useMemo(() => {
+    const t = debouncedFilter.trim().toLowerCase();
+    if (!t) return purchases;
+    return purchases.filter((p) =>
+      [p.date, p.billNo, p.supplier, p.itemName, p.category, p.brand, p.model, p.paymentMethod]
+        .join(" ")
+        .toLowerCase()
+        .includes(t),
+    );
+  }, [purchases, debouncedFilter]);
+
+  const totalPages = Math.ceil(filteredPurchases.length / PURCHASES_PER_PAGE);
+  const pagedPurchases = filteredPurchases.slice(
     purchasePage * PURCHASES_PER_PAGE,
     (purchasePage + 1) * PURCHASES_PER_PAGE,
   );
@@ -480,41 +486,51 @@ export function PurchaseManager() {
       </Card>
 
       <Card className="overflow-hidden p-0">
+        <div className="p-2.5 border-b border-border">
+          <Input
+            placeholder="Search purchases..."
+            value={purchaseFilter}
+            onChange={(e) => { setPurchaseFilter(e.target.value); setPurchasePage(0); }}
+            className="h-9 text-xs sm:text-sm"
+          />
+        </div>
         <div className="max-h-[50vh] overflow-x-auto overflow-y-auto">
           <table className="w-full min-w-[700px] text-xs sm:text-sm">
             <thead className="sticky top-0 bg-secondary text-secondary-foreground">
               <tr className="text-left">
-                <th className="p-2.5">Lot No</th>
                 <th className="p-2.5">Date</th>
-                <th className="p-2.5">Item</th>
-                <th className="p-2.5">Supplier</th>
                 <th className="p-2.5">Bill No</th>
+                <th className="p-2.5">Item</th>
+                <th className="p-2.5">Category</th>
+                <th className="p-2.5">Brand</th>
                 <th className="p-2.5 text-right">Qty</th>
-                <th className="p-2.5 text-right">Price</th>
+                <th className="p-2.5 text-right">Rate</th>
                 <th className="p-2.5 text-right">Amount</th>
+                <th className="p-2.5">Supplier</th>
+                <th className="p-2.5">Payment</th>
                 <th className="p-2.5"></th>
               </tr>
             </thead>
             <tbody>
-              {pagedLots.map((lot) => (
-                <tr key={lot.id} className="border-t border-border">
-                  <td className="p-2.5 font-mono font-medium text-primary">{lot.lotNo}</td>
-                  <td className="p-2.5 whitespace-nowrap">{lot.date}</td>
-                  <td className="p-2.5 font-medium">{lot.itemName}</td>
-                  <td className="p-2.5">{lot.supplier}</td>
-                  <td className="p-2.5 font-mono">{lot.billNo || "-"}</td>
-                  <td className="p-2.5 text-right font-semibold">{lot.qty}</td>
-                  <td className="p-2.5 text-right">{money(lot.purchasePrice)}</td>
-                  <td className="p-2.5 text-right font-medium">{money(lot.qty * lot.purchasePrice)}</td>
+              {pagedPurchases.map((p) => (
+                <tr key={p.id} className="border-t border-border">
+                  <td className="p-2.5 whitespace-nowrap">{p.date}</td>
+                  <td className="p-2.5 font-mono">{p.billNo}</td>
+                  <td className="p-2.5 font-medium">{p.itemName}</td>
+                  <td className="p-2.5">{p.category}</td>
+                  <td className="p-2.5">{p.brand}</td>
+                  <td className="p-2.5 text-right font-semibold">{p.qty}</td>
+                  <td className="p-2.5 text-right">{money(p.rate)}</td>
+                  <td className="p-2.5 text-right font-medium">{money(p.amount)}</td>
+                  <td className="p-2.5">{p.supplier}</td>
+                  <td className="p-2.5">{p.paymentMethod}</td>
                   <td className="p-2.5 text-right">
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        if (lot.purchaseId) {
-                          deletePurchase(lot.purchaseId);
-                          toast.success(`Deleted ${lot.lotNo}`);
-                        }
+                        deletePurchase(p.id);
+                        toast.success(`Deleted purchase ${p.billNo}`);
                       }}
                       className="h-7 w-7"
                     >
@@ -523,10 +539,10 @@ export function PurchaseManager() {
                   </td>
                 </tr>
               ))}
-              {lotsWithPurchase.length === 0 && (
+              {filteredPurchases.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                    No stock lots recorded yet.
+                  <td colSpan={11} className="p-6 text-center text-muted-foreground">
+                    No purchases recorded yet.
                   </td>
                 </tr>
               )}
@@ -538,7 +554,7 @@ export function PurchaseManager() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
           <span>
-            Showing {purchasePage * PURCHASES_PER_PAGE + 1}–{Math.min((purchasePage + 1) * PURCHASES_PER_PAGE, lotsWithPurchase.length)} of {lotsWithPurchase.length} lots
+            Showing {purchasePage * PURCHASES_PER_PAGE + 1}–{Math.min((purchasePage + 1) * PURCHASES_PER_PAGE, filteredPurchases.length)} of {filteredPurchases.length} purchases
           </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={purchasePage === 0} onClick={() => setPurchasePage((p) => p - 1)} className="h-8 text-xs">
