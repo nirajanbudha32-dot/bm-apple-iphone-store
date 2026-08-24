@@ -12,32 +12,39 @@ const money = (n: number) =>
   n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function StockInSummary() {
-  const { purchases } = useStore();
+  const { stockLots, purchases } = useStore();
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
 
+  const lotsWithBill = useMemo(() => {
+    return stockLots.map((lot) => {
+      const purchase = purchases.find((p) => p.id === lot.purchaseId);
+      return { ...lot, billNo: purchase?.billNo ?? "" };
+    });
+  }, [stockLots, purchases]);
+
   const filtered = useMemo(() => {
-    let result = purchases;
-    if (dateFrom) result = result.filter((p) => p.date >= dateFrom);
-    if (dateTo) result = result.filter((p) => p.date <= dateTo);
+    let result = lotsWithBill;
+    if (dateFrom) result = result.filter((l) => l.date >= dateFrom);
+    if (dateTo) result = result.filter((l) => l.date <= dateTo);
     const t = q.trim().toLowerCase();
     if (t) {
       result = result.filter(
-        (p) =>
-          p.itemName.toLowerCase().includes(t) ||
-          p.itemCode.toLowerCase().includes(t) ||
-          p.billNo.toLowerCase().includes(t) ||
-          p.supplier.toLowerCase().includes(t) ||
-          p.subCategory.toLowerCase().includes(t),
+        (l) =>
+          l.itemName.toLowerCase().includes(t) ||
+          l.itemCode.toLowerCase().includes(t) ||
+          l.lotNo.toLowerCase().includes(t) ||
+          l.supplier.toLowerCase().includes(t) ||
+          l.billNo.toLowerCase().includes(t),
       );
     }
     return result;
-  }, [purchases, dateFrom, dateTo, q]);
+  }, [lotsWithBill, dateFrom, dateTo, q]);
 
-  const totalQty = filtered.reduce((a, p) => a + p.qty, 0);
-  const totalAmount = filtered.reduce((a, p) => a + p.amount, 0);
+  const totalQty = filtered.reduce((a, l) => a + l.qty, 0);
+  const totalValue = filtered.reduce((a, l) => a + l.qty * l.purchasePrice, 0);
 
   function onExport() {
     if (filtered.length === 0) {
@@ -45,17 +52,16 @@ export function StockInSummary() {
       return;
     }
     exportRows(
-      filtered.map((p) => ({
-        Date: p.date,
-        "Store Name": "BM iPhone Store",
-        "Item Code": p.itemCode,
-        "Item Name": p.itemName,
-        "Sub Category": p.subCategory,
-        "Qty In": p.qty,
-        "Unit Price": p.rate,
-        Supplier: p.supplier,
-        "Bill No": p.billNo,
-        "Payment Method": p.paymentMethod,
+      filtered.map((l) => ({
+        "Lot No": l.lotNo,
+        Date: l.date,
+        "Item Code": l.itemCode,
+        "Item Name": l.itemName,
+        Supplier: l.supplier,
+        "Bill No": l.billNo,
+        "Qty In": l.qty,
+        "Purchase Price": l.purchasePrice,
+        Value: l.qty * l.purchasePrice,
       })),
       "Stock In",
       `BM_StockIn_${new Date().toISOString().slice(0, 10)}.xlsx`,
@@ -92,7 +98,7 @@ export function StockInSummary() {
               id="si-search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Item, code, bill, supplier..."
+              placeholder="Lot, item, code, supplier..."
               className="h-9 text-xs sm:text-sm"
             />
           </div>
@@ -106,43 +112,43 @@ export function StockInSummary() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
         <div>
-          <span><strong className="text-foreground">{filtered.length}</strong> items</span>
+          <span><strong className="text-foreground">{filtered.length}</strong> lots</span>
           <span className="mx-2">•</span>
           <span><strong className="text-foreground">{totalQty}</strong> units in</span>
         </div>
         <div>
-          Total Value: <strong className="text-foreground">{money(totalAmount)}</strong>
+          Total Value: <strong className="text-foreground">{money(totalValue)}</strong>
         </div>
       </div>
 
       <Card className="overflow-hidden p-0">
         <div className="max-h-[60vh] overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[700px] text-xs sm:text-sm">
+          <table className="w-full min-w-[750px] text-xs sm:text-sm">
             <thead className="sticky top-0 bg-secondary text-secondary-foreground">
               <tr className="text-left">
+                <th className="p-2.5">Lot No</th>
                 <th className="p-2.5">Date</th>
-                <th className="p-2.5">Store Name</th>
                 <th className="p-2.5">Item Code</th>
                 <th className="p-2.5">Item Name</th>
-                <th className="p-2.5">Sub Category</th>
-                <th className="p-2.5 text-right">Qty In</th>
-                <th className="p-2.5 text-right">Unit Price</th>
                 <th className="p-2.5">Supplier</th>
+                <th className="p-2.5 text-right">Qty In</th>
+                <th className="p-2.5 text-right">Purchase Price</th>
+                <th className="p-2.5 text-right">Value</th>
                 <th className="p-2.5">Bill No</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => (
-                <tr key={p.id} className="border-t border-border">
-                  <td className="p-2.5 whitespace-nowrap">{p.date}</td>
-                  <td className="p-2.5">BM iPhone Store</td>
-                  <td className="p-2.5 font-mono">{p.itemCode}</td>
-                  <td className="p-2.5 font-medium">{p.itemName}</td>
-                  <td className="p-2.5">{p.subCategory}</td>
-                  <td className="p-2.5 text-right font-semibold">{p.qty}</td>
-                  <td className="p-2.5 text-right">{money(p.rate)}</td>
-                  <td className="p-2.5">{p.supplier}</td>
-                  <td className="p-2.5 font-mono">{p.billNo || "-"}</td>
+              {filtered.map((l) => (
+                <tr key={l.id} className="border-t border-border">
+                  <td className="p-2.5 font-mono font-medium text-primary">{l.lotNo}</td>
+                  <td className="p-2.5 whitespace-nowrap">{l.date}</td>
+                  <td className="p-2.5 font-mono">{l.itemCode}</td>
+                  <td className="p-2.5 font-medium">{l.itemName}</td>
+                  <td className="p-2.5">{l.supplier}</td>
+                  <td className="p-2.5 text-right font-semibold">{l.qty}</td>
+                  <td className="p-2.5 text-right">{money(l.purchasePrice)}</td>
+                  <td className="p-2.5 text-right font-medium">{money(l.qty * l.purchasePrice)}</td>
+                  <td className="p-2.5 font-mono">{l.billNo || "-"}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
@@ -160,8 +166,8 @@ export function StockInSummary() {
                     Total
                   </td>
                   <td className="p-2.5 text-right">{totalQty}</td>
-                  <td className="p-2.5 text-right">{money(totalAmount)}</td>
-                  <td className="p-2.5" colSpan={2}></td>
+                  <td className="p-2.5 text-right" colSpan={2}>{money(totalValue)}</td>
+                  <td className="p-2.5"></td>
                 </tr>
               </tfoot>
             )}

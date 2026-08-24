@@ -20,6 +20,7 @@ import {
   type PaymentMethod,
   type Purchase,
   type StockItem,
+  type StockLot,
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
@@ -56,7 +57,7 @@ const emptyDraft: PurchaseItemDraft = {
 };
 
 export function PurchaseManager() {
-  const { stock, purchases } = useStore();
+  const { stock, purchases, stockLots } = useStore();
 
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [billNo, setBillNo] = useState("");
@@ -245,24 +246,17 @@ export function PurchaseManager() {
     );
   }
 
-  const groupedPurchases = useMemo(() => {
-    const groups = new Map<string, { header: Purchase; items: Purchase[] }>();
-    for (const p of purchases) {
-      const key = p.billNo || p.id;
-      const existing = groups.get(key);
-      if (existing) {
-        existing.items.push(p);
-      } else {
-        groups.set(key, { header: p, items: [p] });
-      }
-    }
-    return [...groups.values()];
-  }, [purchases]);
+  const lotsWithPurchase = useMemo(() => {
+    return stockLots.map((lot) => {
+      const purchase = purchases.find((p) => p.id === lot.purchaseId);
+      return { ...lot, billNo: purchase?.billNo ?? "", paymentMethod: purchase?.paymentMethod ?? "Cash" };
+    });
+  }, [stockLots, purchases]);
 
   const PURCHASES_PER_PAGE = 50;
   const [purchasePage, setPurchasePage] = useState(0);
-  const totalPages = Math.ceil(groupedPurchases.length / PURCHASES_PER_PAGE);
-  const pagedPurchases = groupedPurchases.slice(
+  const totalPages = Math.ceil(lotsWithPurchase.length / PURCHASES_PER_PAGE);
+  const pagedLots = lotsWithPurchase.slice(
     purchasePage * PURCHASES_PER_PAGE,
     (purchasePage + 1) * PURCHASES_PER_PAGE,
   );
@@ -487,47 +481,40 @@ export function PurchaseManager() {
 
       <Card className="overflow-hidden p-0">
         <div className="max-h-[50vh] overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[650px] text-xs sm:text-sm">
+          <table className="w-full min-w-[700px] text-xs sm:text-sm">
             <thead className="sticky top-0 bg-secondary text-secondary-foreground">
               <tr className="text-left">
+                <th className="p-2.5">Lot No</th>
                 <th className="p-2.5">Date</th>
-                <th className="p-2.5">Bill No</th>
+                <th className="p-2.5">Item</th>
                 <th className="p-2.5">Supplier</th>
-                <th className="p-2.5">Payment</th>
-                <th className="p-2.5">Items</th>
-                <th className="p-2.5 text-right">Total</th>
+                <th className="p-2.5">Bill No</th>
+                <th className="p-2.5 text-right">Qty</th>
+                <th className="p-2.5 text-right">Price</th>
+                <th className="p-2.5 text-right">Amount</th>
                 <th className="p-2.5"></th>
               </tr>
             </thead>
             <tbody>
-              {pagedPurchases.map((g) => (
-                <tr key={g.header.id} className="border-t border-border">
-                  <td className="p-2.5 whitespace-nowrap">{g.header.date}</td>
-                  <td className="p-2.5 font-mono font-medium">{g.header.billNo || "-"}</td>
-                  <td className="p-2.5">{g.header.supplier}</td>
-                  <td className="p-2.5">
-                    <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium">
-                      {g.header.paymentMethod}
-                    </span>
-                  </td>
-                  <td className="p-2.5">
-                    {g.items.length} item{g.items.length > 1 ? "s" : ""}
-                    <span className="ml-1 text-xs text-muted-foreground">
-                      ({g.items.reduce((a, i) => a + i.qty, 0)} pcs)
-                    </span>
-                  </td>
-                  <td className="p-2.5 text-right font-medium">
-                    {money(g.items.reduce((a, i) => a + i.amount, 0))}
-                  </td>
+              {pagedLots.map((lot) => (
+                <tr key={lot.id} className="border-t border-border">
+                  <td className="p-2.5 font-mono font-medium text-primary">{lot.lotNo}</td>
+                  <td className="p-2.5 whitespace-nowrap">{lot.date}</td>
+                  <td className="p-2.5 font-medium">{lot.itemName}</td>
+                  <td className="p-2.5">{lot.supplier}</td>
+                  <td className="p-2.5 font-mono">{lot.billNo || "-"}</td>
+                  <td className="p-2.5 text-right font-semibold">{lot.qty}</td>
+                  <td className="p-2.5 text-right">{money(lot.purchasePrice)}</td>
+                  <td className="p-2.5 text-right font-medium">{money(lot.qty * lot.purchasePrice)}</td>
                   <td className="p-2.5 text-right">
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        for (const item of g.items) {
-                          deletePurchase(item.id);
+                        if (lot.purchaseId) {
+                          deletePurchase(lot.purchaseId);
+                          toast.success(`Deleted ${lot.lotNo}`);
                         }
-                        toast.success(`Deleted ${g.header.billNo || "purchase"}`);
                       }}
                       className="h-7 w-7"
                     >
@@ -536,10 +523,10 @@ export function PurchaseManager() {
                   </td>
                 </tr>
               ))}
-              {groupedPurchases.length === 0 && (
+              {lotsWithPurchase.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-muted-foreground">
-                    No purchases recorded yet.
+                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
+                    No stock lots recorded yet.
                   </td>
                 </tr>
               )}
@@ -551,7 +538,7 @@ export function PurchaseManager() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
           <span>
-            Showing {purchasePage * PURCHASES_PER_PAGE + 1}–{Math.min((purchasePage + 1) * PURCHASES_PER_PAGE, groupedPurchases.length)} of {groupedPurchases.length} bills
+            Showing {purchasePage * PURCHASES_PER_PAGE + 1}–{Math.min((purchasePage + 1) * PURCHASES_PER_PAGE, lotsWithPurchase.length)} of {lotsWithPurchase.length} lots
           </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={purchasePage === 0} onClick={() => setPurchasePage((p) => p - 1)} className="h-8 text-xs">

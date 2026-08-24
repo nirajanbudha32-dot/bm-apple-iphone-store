@@ -72,12 +72,31 @@ export type Purchase = {
   note: string;
 };
 
+export type StockLot = {
+  id: string;
+  lotNo: string;
+  purchaseId: string | null;
+  itemCode: string;
+  itemName: string;
+  date: string;
+  supplier: string;
+  qty: number;
+  purchasePrice: number;
+};
+
+export type SaleAllocation = {
+  id: string;
+  saleId: string;
+  lotId: string;
+  qtyTaken: number;
+};
+
 export const VAT_RATE = 0.13;
 
-type State = { stock: StockItem[]; sales: Sale[]; purchases: Purchase[] };
+type State = { stock: StockItem[]; sales: Sale[]; purchases: Purchase[]; stockLots: StockLot[]; saleAllocations: SaleAllocation[] };
 
 const listeners = new Set<() => void>();
-let state: State = { stock: [], sales: [], purchases: [] };
+let state: State = { stock: [], sales: [], purchases: [], stockLots: [], saleAllocations: [] };
 let loaded = false;
 
 function emit() {
@@ -140,6 +159,29 @@ function mapPurchaseRow(r: Record<string, unknown>): Purchase {
     amount: r['amount'] as number,
     paymentMethod: (r['payment_method'] as PaymentMethod) ?? "Cash",
     note: (r['note'] as string) ?? "",
+  };
+}
+
+function mapStockLotRow(r: Record<string, unknown>): StockLot {
+  return {
+    id: r['id'] as string,
+    lotNo: r['lot_no'] as string,
+    purchaseId: (r['purchase_id'] as string) ?? null,
+    itemCode: r['item_code'] as string,
+    itemName: r['item_name'] as string,
+    date: r['date'] as string,
+    supplier: r['supplier'] as string,
+    qty: r['qty'] as number,
+    purchasePrice: r['purchase_price'] as number,
+  };
+}
+
+function mapSaleAllocationRow(r: Record<string, unknown>): SaleAllocation {
+  return {
+    id: r['id'] as string,
+    saleId: r['sale_id'] as string,
+    lotId: r['lot_id'] as string,
+    qtyTaken: r['qty_taken'] as number,
   };
 }
 
@@ -206,41 +248,91 @@ export async function addBill(
     created_by: user?.id ?? null,
   }));
 
-  const { error } = await supabase.from("sales").insert(rows);
+  const { data: insertedSales, error: salesError } = await supabase.from("sales").insert(rows).select("id, item_name, qty");
 
-  if (!error) {
-    await Promise.all(
-      items.map((item) =>
-        supabase.rpc("decrement_stock", { item_name: item.itemName, qty_sold: item.qty })
-      )
-    );
+  if (!salesError && insertedSales) {
+    const affectedItems = new Set<string>();
+    for (const inserted of insertedSales) {
+      await supabase.rpc("fifo_deduct", {
+        p_item_name: inserted.item_name,
+        p_qty: inserted.qty,
+        p_sale_id: inserted.id,
+      });
+      affectedItems.add(inserted.item_name);
+    }
+    for (const itemName of affectedItems) {
+      const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
+      const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
+      await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
+    }
     await reload();
   }
-  return { error };
+  return { error: salesError };
 }
 
 export async function deleteSale(id: string) {
   const sale = state.sales.find((s) => s.id === id);
-  if (sale) {
-    await Promise.all([
-      supabase.from("sales").delete().eq("id", id),
-      supabase.rpc("increment_stock", { item_name: sale.itemName, qty_returned: sale.qty }),
-    ]);
-    await reload();
+  if (!sale) return;
+
+  const { data: allocations } = await supabase
+    .from("sale_lot_allocations")
+    .select("lot_id, qty_taken")
+    .eq("sale_id", id);
+
+  if (allocations && allocations.length > 0) {
+    for (const alloc of allocations) {
+      const lotId = alloc['lot_id'] as string;
+      const qtyTaken = alloc['qty_taken'] as number;
+      const lot = state.stockLots.find((l) => l.id === lotId);
+      if (lot) {
+        await supabase.from("stock_lots").update({ qty: lot.qty + qtyTaken }).eq("id", lotId);
+      }
+    }
+    await supabase.from("sale_lot_allocations").delete().eq("sale_id", id);
   }
+
+  await supabase.from("sales").delete().eq("id", id);
+
+  const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", sale.itemName);
+  const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
+  await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", sale.itemName);
+
+  await reload();
 }
 
 export async function deleteInvoice(invoiceNo: string) {
   const items = state.sales.filter((s) => s.invoiceNo === invoiceNo);
-  if (items.length > 0) {
-    await Promise.all([
-      supabase.from("sales").delete().eq("invoice_no", invoiceNo),
-      ...items.map((item) =>
-        supabase.rpc("increment_stock", { item_name: item.itemName, qty_returned: item.qty })
-      ),
-    ]);
-    await reload();
+  if (items.length === 0) return;
+
+  for (const sale of items) {
+    const { data: allocations } = await supabase
+      .from("sale_lot_allocations")
+      .select("lot_id, qty_taken")
+      .eq("sale_id", sale.id);
+
+    if (allocations && allocations.length > 0) {
+      for (const alloc of allocations) {
+        const lotId = alloc['lot_id'] as string;
+        const qtyTaken = alloc['qty_taken'] as number;
+        const lot = state.stockLots.find((l) => l.id === lotId);
+        if (lot) {
+          await supabase.from("stock_lots").update({ qty: lot.qty + qtyTaken }).eq("id", lotId);
+        }
+      }
+      await supabase.from("sale_lot_allocations").delete().eq("sale_id", sale.id);
+    }
   }
+
+  await supabase.from("sales").delete().eq("invoice_no", invoiceNo);
+
+  const affectedItems = new Set(items.map((i) => i.itemName));
+  for (const itemName of affectedItems) {
+    const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
+    const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
+    await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
+  }
+
+  await reload();
 }
 
 export async function upsertStock(item: StockItem, originalCode?: string) {
@@ -304,7 +396,7 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { error } = await supabase.from("purchases").insert({
+  const { data: inserted, error } = await supabase.from("purchases").insert({
     bill_no: entry.billNo,
     date: entry.date,
     supplier: entry.supplier,
@@ -320,9 +412,23 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
     payment_method: entry.paymentMethod,
     note: entry.note,
     created_by: user?.id ?? null,
-  });
+  }).select("id").single();
 
-  if (!error) {
+  if (!error && inserted) {
+    const { data: lotNoResult } = await supabase.rpc("next_lot_no");
+    const lotNo = lotNoResult as string;
+
+    await supabase.from("stock_lots").insert({
+      lot_no: lotNo,
+      purchase_id: inserted.id,
+      item_code: entry.itemCode,
+      item_name: entry.itemName,
+      date: entry.date,
+      supplier: entry.supplier,
+      qty: entry.qty,
+      purchase_price: entry.rate,
+    });
+
     await applyStockDelta(entry, entry.qty);
     await reload();
   }
@@ -332,6 +438,12 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
 export async function deletePurchase(id: string) {
   const p = state.purchases.find((x) => x.id === id);
   if (!p) return;
+
+  const lot = state.stockLots.find((l) => l.purchaseId === id);
+  if (lot) {
+    await supabase.from("stock_lots").delete().eq("id", lot.id);
+  }
+
   await supabase.from("purchases").delete().eq("id", id);
   await applyStockDelta(p, -p.qty);
   await reload();
@@ -368,16 +480,20 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number) {
 }
 
 async function reload() {
-  const [stockRes, salesRes, purchasesRes] = await Promise.all([
+  const [stockRes, salesRes, purchasesRes, lotsRes, allocRes] = await Promise.all([
     supabase.from("stock").select("*").order("name"),
     supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(5000),
     supabase.from("purchases").select("*").order("created_at", { ascending: false }).limit(5000),
+    supabase.from("stock_lots").select("*").order("created_at", { ascending: false }).limit(10000),
+    supabase.from("sale_lot_allocations").select("*").limit(10000),
   ]);
 
   state = {
     stock: (stockRes.data ?? []).map(mapStockRow),
     sales: (salesRes.data ?? []).map(mapSaleRow),
     purchases: (purchasesRes.data ?? []).map(mapPurchaseRow),
+    stockLots: (lotsRes.data ?? []).map(mapStockLotRow),
+    saleAllocations: (allocRes.data ?? []).map(mapSaleAllocationRow),
   };
   emit();
 }

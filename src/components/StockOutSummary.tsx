@@ -12,14 +12,28 @@ const money = (n: number) =>
   n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function StockOutSummary() {
-  const { sales } = useStore();
+  const { sales, stockLots, saleAllocations } = useStore();
+
+  const salesWithLots = useMemo(() => {
+    return sales.map((s) => {
+      const allocs = saleAllocations.filter((a) => a.saleId === s.id);
+      const lotNos = allocs
+        .map((a) => {
+          const lot = stockLots.find((l) => l.id === a.lotId);
+          return lot ? `${lot.lotNo}(${a.qtyTaken})` : null;
+        })
+        .filter(Boolean)
+        .join(", ");
+      return { ...s, lotInfo: lotNos || "-" };
+    });
+  }, [sales, stockLots, saleAllocations]);
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
-    let result = sales;
+    let result = salesWithLots;
     if (dateFrom) result = result.filter((s) => s.date >= dateFrom);
     if (dateTo) result = result.filter((s) => s.date <= dateTo);
     const t = q.trim().toLowerCase();
@@ -30,11 +44,12 @@ export function StockOutSummary() {
           s.itemCode.toLowerCase().includes(t) ||
           s.invoiceNo.toLowerCase().includes(t) ||
           s.customer.toLowerCase().includes(t) ||
-          s.subCategory.toLowerCase().includes(t),
+          s.subCategory.toLowerCase().includes(t) ||
+          s.lotInfo.toLowerCase().includes(t),
       );
     }
     return result;
-  }, [sales, dateFrom, dateTo, q]);
+  }, [salesWithLots, dateFrom, dateTo, q]);
 
   const totalQty = filtered.reduce((a, s) => a + s.qty, 0);
   const totalAmount = filtered.reduce((a, s) => a + s.amount, 0);
@@ -125,7 +140,7 @@ export function StockOutSummary() {
                 <th className="p-2.5">Store Name</th>
                 <th className="p-2.5">Item Code</th>
                 <th className="p-2.5">Item Name</th>
-                <th className="p-2.5">Sub Category</th>
+                <th className="p-2.5">Lot No</th>
                 <th className="p-2.5 text-right">Qty Out</th>
                 <th className="p-2.5 text-right">Unit Price</th>
                 <th className="p-2.5">Customer</th>
@@ -139,7 +154,7 @@ export function StockOutSummary() {
                   <td className="p-2.5">BM iPhone Store</td>
                   <td className="p-2.5 font-mono">{s.itemCode}</td>
                   <td className="p-2.5 font-medium">{s.itemName}</td>
-                  <td className="p-2.5">{s.subCategory}</td>
+                  <td className="p-2.5 font-mono text-primary text-[11px]">{s.lotInfo}</td>
                   <td className="p-2.5 text-right font-semibold">{s.qty}</td>
                   <td className="p-2.5 text-right">{money(s.rate)}</td>
                   <td className="p-2.5">{s.customer}</td>
