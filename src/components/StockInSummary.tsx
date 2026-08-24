@@ -18,15 +18,26 @@ export function StockInSummary() {
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
 
-  const lotsWithBill = useMemo(() => {
-    return stockLots.map((lot) => {
-      const purchase = purchases.find((p) => p.id === lot.purchaseId);
-      return { ...lot, billNo: purchase?.billNo ?? "" };
+  const purchaseRows = useMemo(() => {
+    return purchases.map((p) => {
+      const lot = stockLots.find((l) => l.purchaseId === p.id);
+      return {
+        id: p.id,
+        lotNo: lot?.lotNo ?? "-",
+        date: p.date,
+        itemCode: p.itemCode,
+        itemName: p.itemName,
+        supplier: p.supplier,
+        billNo: p.billNo,
+        qty: p.qty,
+        purchasePrice: p.rate,
+        value: p.amount,
+      };
     });
-  }, [stockLots, purchases]);
+  }, [purchases, stockLots]);
 
   const filtered = useMemo(() => {
-    let result = lotsWithBill;
+    let result = purchaseRows;
     if (dateFrom) result = result.filter((l) => l.date >= dateFrom);
     if (dateTo) result = result.filter((l) => l.date <= dateTo);
     const t = q.trim().toLowerCase();
@@ -41,7 +52,7 @@ export function StockInSummary() {
       );
     }
     return result;
-  }, [lotsWithBill, dateFrom, dateTo, q]);
+  }, [purchaseRows, dateFrom, dateTo, q]);
 
   const totalQty = filtered.reduce((a, l) => a + l.qty, 0);
   const totalValue = filtered.reduce((a, l) => a + l.qty * l.purchasePrice, 0);
