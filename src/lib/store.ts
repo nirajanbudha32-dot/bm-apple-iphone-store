@@ -496,14 +496,15 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number) {
     .maybeSingle();
 
   if (data) {
-    const current = Number((data as Record<string, unknown>)['qty'] ?? 0);
-    await supabase
-      .from("stock")
-      .update({ qty: Math.max(0, current + delta), updated_at: new Date().toISOString() })
-      .eq("code", entry.itemCode);
+    const { error } = await supabase.rpc("increment_stock_by_code", {
+      p_code: entry.itemCode,
+      p_qty: delta,
+    });
+    if (error) console.error("increment_stock_by_code failed:", error.message);
   } else if (delta > 0) {
-    await supabase.from("stock").insert({
-      code: entry.itemCode || (await nextItemCode()),
+    const code = entry.itemCode || (await nextItemCode());
+    const { error } = await supabase.from("stock").insert({
+      code,
       name: entry.itemName,
       category: entry.category,
       sub_category: entry.subCategory,
@@ -515,6 +516,7 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number) {
       purchase_price: entry.rate,
       selling_price: 0,
     });
+    if (error) console.error("stock insert failed:", error.message);
   }
 }
 
