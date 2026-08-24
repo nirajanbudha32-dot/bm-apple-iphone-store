@@ -38,6 +38,8 @@ export type Sale = {
   invoiceNo: string;
   date: string;
   customer: string;
+  customerPan: string;
+  hasVatPan: boolean;
   itemName: string;
   itemCode: string;
   category: string;
@@ -104,6 +106,8 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     invoiceNo: r['invoice_no'] as string,
     date: r['date'] as string,
     customer: r['customer'] as string,
+    customerPan: (r['customer_pan'] as string) ?? "",
+    hasVatPan: (r['has_vat_pan'] as boolean) ?? false,
     itemName: r['item_name'] as string,
     itemCode: r['item_code'] as string,
     category: r['category'] as string,
@@ -172,6 +176,8 @@ export async function addBill(
   invoiceNo: string,
   date: string,
   customer: string,
+  customerPan: string,
+  hasVatPan: boolean,
   paymentMethod: PaymentMethod,
   items: BillItem[],
 ) {
@@ -183,6 +189,8 @@ export async function addBill(
     invoice_no: invoiceNo,
     date,
     customer,
+    customer_pan: customerPan,
+    has_vat_pan: hasVatPan,
     item_name: item.itemName,
     item_code: item.itemCode,
     category: item.category,

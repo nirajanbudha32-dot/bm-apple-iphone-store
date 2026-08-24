@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Trash2, Plus } from "lucide-react";
+import { Download, Trash2, Plus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,8 @@ export function SalesRegister() {
 
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [customer, setCustomer] = useState("");
+  const [customerPan, setCustomerPan] = useState("");
+  const [hasVatPan, setHasVatPan] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
 
   const [itemName, setItemName] = useState("");
@@ -114,13 +116,15 @@ export function SalesRegister() {
       return;
     }
     setSaving(true);
-    const { error } = await addBill(invoiceNo, date, customer.trim(), paymentMethod, billItems);
+    const { error } = await addBill(invoiceNo, date, customer.trim(), customerPan.trim(), hasVatPan, paymentMethod, billItems);
     setSaving(false);
     if (error) {
       toast.error(`Save failed: ${error.message}`);
       return;
     }
     setCustomer("");
+    setCustomerPan("");
+    setHasVatPan(false);
     setBillItems([]);
     setPaymentMethod("Cash");
     toast.success(`${invoiceNo} saved with ${billItems.length} items`);
@@ -136,6 +140,8 @@ export function SalesRegister() {
         Date: s.date,
         "Invoice No": s.invoiceNo,
         Customer: s.customer,
+        "PAN Number": s.customerPan,
+        "Has VAT/PAN": s.hasVatPan ? "Yes" : "No",
         "Item Code": s.itemCode,
         Item: s.itemName,
         "Sub Category": s.subCategory,
@@ -190,6 +196,39 @@ export function SalesRegister() {
               placeholder="Customer name"
               className="h-9 text-xs sm:text-sm"
             />
+          </div>
+          <div>
+            <Label htmlFor="s-pan" className="text-xs sm:text-sm">Customer PAN</Label>
+            <Input
+              id="s-pan"
+              value={customerPan}
+              onChange={(e) => setCustomerPan(e.target.value)}
+              placeholder="PAN number (optional)"
+              disabled={!hasVatPan}
+              className="h-9 text-xs sm:text-sm"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !hasVatPan;
+                setHasVatPan(next);
+                if (!next) setCustomerPan("");
+              }}
+              className={`flex h-9 items-center gap-2 rounded-md border px-3 text-xs sm:text-sm transition-colors ${
+                hasVatPan
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-background text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              <div className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
+                hasVatPan ? "border-primary bg-primary" : "border-muted-foreground"
+              }`}>
+                {hasVatPan && <Check className="size-3" />}
+              </div>
+              VAT / PAN
+            </button>
           </div>
           <div>
             <Label className="text-xs sm:text-sm">Payment Method</Label>
