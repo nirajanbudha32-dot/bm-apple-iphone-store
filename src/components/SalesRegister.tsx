@@ -47,7 +47,12 @@ export function SalesRegister() {
     if (!t) return [];
     const exact = stock.some((i) => i.name.toLowerCase() === t);
     if (exact) return [];
-    return stock.filter((i) => i.name.toLowerCase().includes(t)).slice(0, 8);
+    return stock.filter((i) =>
+      [i.name, i.subCategory, i.brand, i.model, i.code]
+        .join(" ")
+        .toLowerCase()
+        .includes(t),
+    ).slice(0, 8);
   }, [stock, itemName]);
 
   const matched = useMemo(
@@ -230,7 +235,7 @@ export function SalesRegister() {
                       >
                         <span className="font-medium">{s.name}</span>
                         <span className="block text-[11px] text-muted-foreground">
-                          {s.category} · {s.brand} · stock {s.qty}
+                          {s.subCategory} · {s.category} · {s.brand} · stock {s.qty}
                         </span>
                       </button>
                     </li>
