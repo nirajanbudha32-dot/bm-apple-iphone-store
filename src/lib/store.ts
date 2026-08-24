@@ -209,9 +209,11 @@ export async function addBill(
   const { error } = await supabase.from("sales").insert(rows);
 
   if (!error) {
-    for (const item of items) {
-      await supabase.rpc("decrement_stock", { item_name: item.itemName, qty_sold: item.qty });
-    }
+    await Promise.all(
+      items.map((item) =>
+        supabase.rpc("decrement_stock", { item_name: item.itemName, qty_sold: item.qty })
+      )
+    );
     await reload();
   }
   return { error };
@@ -220,8 +222,10 @@ export async function addBill(
 export async function deleteSale(id: string) {
   const sale = state.sales.find((s) => s.id === id);
   if (sale) {
-    await supabase.from("sales").delete().eq("id", id);
-    await supabase.rpc("increment_stock", { item_name: sale.itemName, qty_returned: sale.qty });
+    await Promise.all([
+      supabase.from("sales").delete().eq("id", id),
+      supabase.rpc("increment_stock", { item_name: sale.itemName, qty_returned: sale.qty }),
+    ]);
     await reload();
   }
 }
@@ -229,10 +233,12 @@ export async function deleteSale(id: string) {
 export async function deleteInvoice(invoiceNo: string) {
   const items = state.sales.filter((s) => s.invoiceNo === invoiceNo);
   if (items.length > 0) {
-    await supabase.from("sales").delete().eq("invoice_no", invoiceNo);
-    for (const item of items) {
-      await supabase.rpc("increment_stock", { item_name: item.itemName, qty_returned: item.qty });
-    }
+    await Promise.all([
+      supabase.from("sales").delete().eq("invoice_no", invoiceNo),
+      ...items.map((item) =>
+        supabase.rpc("increment_stock", { item_name: item.itemName, qty_returned: item.qty })
+      ),
+    ]);
     await reload();
   }
 }
@@ -364,8 +370,8 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number) {
 async function reload() {
   const [stockRes, salesRes, purchasesRes] = await Promise.all([
     supabase.from("stock").select("*").order("name"),
-    supabase.from("sales").select("*").order("created_at", { ascending: false }),
-    supabase.from("purchases").select("*").order("created_at", { ascending: false }),
+    supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(5000),
+    supabase.from("purchases").select("*").order("created_at", { ascending: false }).limit(5000),
   ]);
 
   state = {

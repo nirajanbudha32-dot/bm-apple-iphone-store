@@ -27,6 +27,10 @@ import { exportRows } from "@/lib/excel";
 const money = (n: number) =>
   n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+function esc(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export function SalesRegister() {
   const { stock, sales } = useStore();
   const invoiceNo = nextInvoiceNo(sales);
@@ -74,9 +78,9 @@ export function SalesRegister() {
     [stock, itemName],
   );
 
-  const billSubtotal = billItems.reduce((a, i) => a + i.amount, 0);
-  const billVat = billItems.reduce((a, i) => a + i.vat, 0);
-  const billTotal = billItems.reduce((a, i) => a + i.total, 0);
+  const billSubtotal = useMemo(() => billItems.reduce((a, i) => a + i.amount, 0), [billItems]);
+  const billVat = useMemo(() => billItems.reduce((a, i) => a + i.vat, 0), [billItems]);
+  const billTotal = useMemo(() => billItems.reduce((a, i) => a + i.total, 0), [billItems]);
 
   function pick(name: string) {
     const item = stock.find((i) => i.name === name);
@@ -184,13 +188,13 @@ export function SalesRegister() {
   <p>Stock Management &amp; Sales</p>
 </div>
 <div class="info">
-  <div><span class="label">Invoice No:</span> ${printData.invoiceNo}</div>
-  <div><span class="label">Date:</span> ${printData.date}</div>
-  <div><span class="label">Payment:</span> ${printData.paymentMethod}</div>
+  <div><span class="label">Invoice No:</span> ${esc(printData.invoiceNo)}</div>
+  <div><span class="label">Date:</span> ${esc(printData.date)}</div>
+  <div><span class="label">Payment:</span> ${esc(printData.paymentMethod)}</div>
 </div>
 <div class="info">
-  <div><span class="label">Customer:</span> ${printData.customer}</div>
-  ${printData.hasVatPan ? `<div><span class="label">PAN:</span> ${printData.customerPan}</div>` : ""}
+  <div><span class="label">Customer:</span> ${esc(printData.customer)}</div>
+  ${printData.hasVatPan ? `<div><span class="label">PAN:</span> ${esc(printData.customerPan)}</div>` : ""}
 </div>
 <table>
   <thead><tr>
@@ -201,7 +205,7 @@ export function SalesRegister() {
   <tbody>
   ${printData.items.map((it, i) => `<tr>
     <td>${i + 1}</td>
-    <td>${it.itemName}</td><td>${it.subCategory}</td><td>${it.brand}</td><td>${it.model}</td>
+    <td>${esc(it.itemName)}</td><td>${esc(it.subCategory)}</td><td>${esc(it.brand)}</td><td>${esc(it.model)}</td>
     <td class="text-right">${it.qty}</td><td class="text-right">${money(it.rate)}</td>
     <td class="text-right">${money(it.amount)}</td><td class="text-right">${money(it.vat)}</td>
     <td class="text-right">${money(it.total)}</td>
