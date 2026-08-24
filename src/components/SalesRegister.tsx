@@ -72,7 +72,7 @@ export function SalesRegister() {
         .join(" ")
         .toLowerCase()
         .includes(t),
-    ).slice(0, 8);
+    );
   }, [stock, debouncedItemName]);
 
   const matched = useMemo(
