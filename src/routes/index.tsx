@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, LogOut, ReceiptText, Truck, Users } from "lucide-react";
+import { BarChart3, Boxes, LogOut, PackagePlus, ReceiptText, Truck, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { StockManager } from "@/components/StockManager";
 import { SalesRegister } from "@/components/SalesRegister";
 import { StockSummary } from "@/components/StockSummary";
 import { StockOutSummary } from "@/components/StockOutSummary";
+import { PurchaseManager } from "@/components/PurchaseManager";
 import { UserManager } from "@/components/UserManager";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
 
@@ -88,9 +89,12 @@ function Index() {
       </header>
 
       <Tabs defaultValue="sales">
-        <TabsList className="mb-6 grid h-auto w-full grid-cols-2 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
+        <TabsList className="mb-6 grid h-auto w-full grid-cols-3 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
           <TabsTrigger value="sales" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <ReceiptText className="mr-1.5 size-3.5 sm:size-4" /> Sales register
+          </TabsTrigger>
+          <TabsTrigger value="purchases" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <PackagePlus className="mr-1.5 size-3.5 sm:size-4" /> Purchases
           </TabsTrigger>
           <TabsTrigger value="stock" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Stock
@@ -104,6 +108,9 @@ function Index() {
         </TabsList>
         <TabsContent value="sales">
           <SalesRegister />
+        </TabsContent>
+        <TabsContent value="purchases">
+          <PurchaseManager />
         </TabsContent>
         <TabsContent value="stock">
           <StockManager role={isAdmin ? "admin" : "salesman"} />
