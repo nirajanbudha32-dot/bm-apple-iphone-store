@@ -219,71 +219,137 @@ export function SalesRegister() {
     const w = window.open("", "_blank", "width=800,height=600");
     if (!w) { toast.error("Pop-up blocked. Allow pop-ups to print."); return; }
     w.document.write(`<!DOCTYPE html>
-<html><head><title>Invoice ${printData.invoiceNo}</title>
+<html><head><title>Invoice ${esc(printData.invoiceNo)}</title>
 <style>
+  @page { margin: 15mm 20mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #000; padding: 20px; }
-  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
-  .header h1 { font-size: 18px; margin-bottom: 2px; }
-  .header p { font-size: 11px; color: #555; }
-  .info { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 11px; }
-  .info div { flex: 1; }
-  .info .label { font-weight: bold; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 11px; }
-  th { background: #f0f0f0; font-weight: bold; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 11.5px; color: #1f2937; padding: 30px 40px; line-height: 1.5; }
+
+  .header { text-align: center; margin-bottom: 24px; }
+  .company-name { font-size: 22px; font-weight: 700; color: #16a34a; letter-spacing: 0.5px; }
+  .company-tagline { font-size: 11px; color: #6b7280; margin-top: 2px; letter-spacing: 0.3px; }
+  .header-bar { width: 60px; height: 3px; background: #16a34a; margin: 10px auto 0; border-radius: 2px; }
+
+  .info-grid { display: flex; gap: 20px; margin-bottom: 20px; }
+  .info-card { flex: 1; border: 1px solid #e5e7eb; border-left: 3px solid #16a34a; border-radius: 6px; padding: 12px 14px; background: #fafafa; }
+  .info-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #16a34a; margin-bottom: 6px; }
+  .info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
+  .info-row .lbl { color: #6b7280; }
+  .info-row .val { font-weight: 600; color: #111827; }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border-radius: 6px; overflow: hidden; border: 1px solid #e5e7eb; }
+  thead th { background: #16a34a; color: #ffffff; font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 8px; text-align: left; border: none; }
+  tbody td { padding: 7px 8px; font-size: 11px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  tbody tr:nth-child(even) { background: #f8faf9; }
+  tbody tr:last-child td { border-bottom: 1px solid #e5e7eb; }
   .text-right { text-align: right; }
-  .totals { margin-top: 10px; text-align: right; }
-  .totals .row { margin-bottom: 4px; }
-  .totals .grand { font-size: 14px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; }
-  .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
-  @media print { body { padding: 10px; } }
+  .text-center { text-align: center; }
+  .row-num { color: #9ca3af; font-weight: 500; }
+
+  .summary-section { display: flex; justify-content: flex-end; gap: 30px; margin-bottom: 20px; }
+  .totals-box { width: 280px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
+  .totals-header { background: #f0fdf4; padding: 8px 14px; font-weight: 700; font-size: 11px; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb; }
+  .totals-body { padding: 4px 0; }
+  .totals-row { display: flex; justify-content: space-between; padding: 5px 14px; font-size: 11px; }
+  .totals-row .t-label { color: #6b7280; }
+  .totals-row .t-value { font-weight: 600; }
+  .totals-divider { border-top: 1px solid #e5e7eb; margin: 0; }
+  .grand-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #16a34a; color: #ffffff; font-size: 13px; font-weight: 700; }
+  .payment-row { display: flex; justify-content: space-between; padding: 5px 14px; font-size: 11px; border-top: 1px solid #f0f0f0; }
+  .badge-paid { display: inline-block; background: #dcfce7; color: #15803d; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .badge-remaining { display: inline-block; background: #fee2e2; color: #dc2626; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+
+  .remarks-section { margin-bottom: 20px; padding: 10px 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 11px; }
+  .remarks-section .r-label { font-weight: 700; color: #374151; }
+  .remarks-section .r-value { color: #6b7280; margin-left: 4px; }
+
+  .footer { text-align: center; padding-top: 16px; border-top: 2px solid #e5e7eb; }
+  .footer-thanks { font-size: 13px; font-weight: 600; color: #16a34a; margin-bottom: 3px; }
+  .footer-note { font-size: 9.5px; color: #9ca3af; font-style: italic; }
+
+  @media print {
+    body { padding: 0; }
+    .info-card { break-inside: avoid; }
+    table { break-inside: auto; }
+    tr { break-inside: avoid; }
+    .footer { margin-top: 20px; }
+  }
 </style></head><body>
+
 <div class="header">
-  <h1>BM Apple Iphone Store</h1>
-  <p>Stock Management &amp; Sales</p>
+  <div class="company-name">BM Apple iPhone Store</div>
+  <div class="company-tagline">Stock Management &amp; Sales</div>
+  <div class="header-bar"></div>
 </div>
-<div class="info">
-  <div><span class="label">Invoice No:</span> ${esc(printData.invoiceNo)}</div>
-  <div><span class="label">Date:</span> ${esc(printData.date)}</div>
-  <div><span class="label">Payment:</span> ${esc(printData.paymentMethod)} (${esc(printData.saleType)})</div>
+
+<div class="info-grid">
+  <div class="info-card">
+    <div class="info-label">Invoice To</div>
+    <div class="info-row"><span class="lbl">Customer</span><span class="val">${esc(printData.customer)}</span></div>
+    ${printData.hasVatPan ? `<div class="info-row"><span class="lbl">PAN Number</span><span class="val">${esc(printData.customerPan)}</span></div>` : ""}
+  </div>
+  <div class="info-card">
+    <div class="info-label">Invoice Details</div>
+    <div class="info-row"><span class="lbl">Invoice No</span><span class="val">${esc(printData.invoiceNo)}</span></div>
+    <div class="info-row"><span class="lbl">Date</span><span class="val">${esc(printData.date)}</span></div>
+    <div class="info-row"><span class="lbl">Payment</span><span class="val">${esc(printData.paymentMethod)} (${esc(printData.saleType)})</span></div>
+  </div>
 </div>
-<div class="info">
-  <div><span class="label">Customer:</span> ${esc(printData.customer)}</div>
-  ${printData.hasVatPan ? `<div><span class="label">PAN:</span> ${esc(printData.customerPan)}</div>` : ""}
-</div>
+
 <table>
   <thead><tr>
-    <th>#</th><th>Item</th><th>Sub Category</th><th>Brand</th><th>Model</th>
-    <th class="text-right">Qty</th><th class="text-right">Rate</th>
-    <th class="text-right">Disc</th><th class="text-right">Amount</th>
-    <th class="text-right">VAT 13%</th><th class="text-right">Total</th>
+    <th class="text-center" style="width:32px">#</th>
+    <th>Item</th>
+    <th>Sub Category</th>
+    <th>Brand</th>
+    <th>Model</th>
+    <th class="text-right" style="width:42px">Qty</th>
+    <th class="text-right" style="width:72px">Rate</th>
+    <th class="text-right" style="width:62px">Disc</th>
+    <th class="text-right" style="width:78px">Amount</th>
+    <th class="text-right" style="width:68px">VAT 13%</th>
+    <th class="text-right" style="width:82px">Total</th>
   </tr></thead>
   <tbody>
   ${printData.items.map((it, i) => `<tr>
-    <td>${i + 1}</td>
-    <td>${esc(it.itemName)}</td><td>${esc(it.subCategory)}</td><td>${esc(it.brand)}</td><td>${esc(it.model)}</td>
-    <td class="text-right">${it.qty}</td><td class="text-right">${money(it.rate)}</td>
+    <td class="text-center row-num">${i + 1}</td>
+    <td>${esc(it.itemName)}</td>
+    <td>${esc(it.subCategory)}</td>
+    <td>${esc(it.brand)}</td>
+    <td>${esc(it.model)}</td>
+    <td class="text-right">${it.qty}</td>
+    <td class="text-right">${money(it.rate)}</td>
     <td class="text-right">${it.discount > 0 ? money(it.discount) : "-"}</td>
-    <td class="text-right">${money(it.amount)}</td><td class="text-right">${money(it.vat)}</td>
-    <td class="text-right">${money(it.total)}</td>
+    <td class="text-right">${money(it.amount)}</td>
+    <td class="text-right">${money(it.vat)}</td>
+    <td class="text-right" style="font-weight:600">${money(it.total)}</td>
   </tr>`).join("")}
   </tbody>
 </table>
-<div class="totals">
-  <div class="row">Subtotal: <strong>${money(printData.subtotal)}</strong></div>
-  ${printData.headerDiscount > 0 ? `<div class="row">Discount: <strong>-${money(printData.headerDiscount)}</strong></div>` : ""}
-  ${printData.otherCharges > 0 ? `<div class="row">Other Charges: <strong>${money(printData.otherCharges)}</strong></div>` : ""}
-  <div class="row">VAT 13%: <strong>${money(printData.vat)}</strong></div>
-  <div class="row grand">Grand Total: <strong>${money(printData.total)}</strong></div>
-  <div class="row">Paid: <strong>${money(printData.paidAmount)}</strong></div>
-  ${printData.remaining > 0 ? `<div class="row" style="color:red">Remaining: <strong>${money(printData.remaining)}</strong></div>` : ""}
+
+<div class="summary-section">
+  <div class="totals-box">
+    <div class="totals-header">Summary</div>
+    <div class="totals-body">
+      <div class="totals-row"><span class="t-label">Subtotal</span><span class="t-value">${money(printData.subtotal)}</span></div>
+      ${printData.headerDiscount > 0 ? `<div class="totals-row"><span class="t-label">Discount</span><span class="t-value" style="color:#dc2626">-${money(printData.headerDiscount)}</span></div>` : ""}
+      ${printData.otherCharges > 0 ? `<div class="totals-row"><span class="t-label">Other Charges</span><span class="t-value">${money(printData.otherCharges)}</span></div>` : ""}
+      <div class="totals-row"><span class="t-label">VAT (13%)</span><span class="t-value">${money(printData.vat)}</span></div>
+    </div>
+    <div class="totals-divider"></div>
+    <div class="grand-row"><span>GRAND TOTAL</span><span>${money(printData.total)}</span></div>
+    <div class="payment-row"><span style="color:#6b7280">Paid Amount</span><span style="font-weight:600">${money(printData.paidAmount)}</span></div>
+    ${printData.remaining > 0 ? `<div class="payment-row"><span style="color:#6b7280">Remaining</span><span class="badge-remaining">${money(printData.remaining)}</span></div>` : `<div class="payment-row"><span style="color:#6b7280">Status</span><span class="badge-paid">PAID IN FULL</span></div>`}
+  </div>
 </div>
-${printData.remarks ? `<div style="margin-top:10px;font-size:11px;"><strong>Remarks:</strong> ${esc(printData.remarks)}</div>` : ""}
+
+${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remarks:</span><span class="r-value">${esc(printData.remarks)}</span></div>` : ""}
+
 <div class="footer">
-  <p>Thank you for your purchase!</p>
-  <p>BM Apple Iphone Store</p>
+  <div class="footer-thanks">Thank you for your purchase!</div>
+  <div class="footer-note">This is a computer-generated invoice. BM Apple iPhone Store</div>
 </div>
+
 <script>window.onload=function(){window.print();}</script>
 </body></html>`);
     w.document.close();
