@@ -717,8 +717,17 @@ export async function addPurchaseHeader(
 ): Promise<{ error?: string; headerId?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Generate purchase_no server-side to avoid duplicates
+  let purchaseNo = header.purchaseNo;
+  try {
+    const { data: noResult, error: noErr } = await supabase.rpc("next_purchase_no");
+    if (!noErr && noResult) {
+      purchaseNo = noResult as string;
+    }
+  } catch (_) {}
+
   const { data: inserted, error } = await supabase.from("purchase_headers").insert({
-    purchase_no: header.purchaseNo,
+    purchase_no: purchaseNo,
     supplier_invoice_no: header.supplierInvoiceNo,
     date: header.date,
     supplier_name: header.supplierName,

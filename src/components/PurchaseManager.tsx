@@ -14,12 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
+  import {
   addPurchaseHeader,
   deletePurchaseHeader,
   addPurchaseAttachment,
   useStore,
-  nextPurchaseNo,
   PAYMENT_METHODS,
   VAT_RATE,
   type PaymentMethod,
@@ -139,8 +138,6 @@ export function PurchaseManager() {
     () => stock.find((i) => i.name.toLowerCase() === itemName.trim().toLowerCase()),
     [stock, itemName],
   );
-
-  const purchaseNo = useMemo(() => nextPurchaseNo(purchaseHeaders), [purchaseHeaders]);
 
   const draftAmounts = useMemo(
     () => calcItemAmounts(draftQty, draftRate, draftDiscount, 13),
@@ -335,7 +332,7 @@ export function PurchaseManager() {
     });
 
     const header: Omit<PurchaseHeader, "id" | "createdAt"> = {
-      purchaseNo,
+      purchaseNo: "",
       supplierInvoiceNo: supplierInvoiceNo.trim(),
       date,
       supplierName: supplierName.trim(),
@@ -379,7 +376,7 @@ export function PurchaseManager() {
       }
     }
 
-    toast.success(`Purchase ${purchaseNo} saved with ${purchaseItemsDraft.length} items`);
+    toast.success(`Purchase saved with ${purchaseItemsDraft.length} items`);
     setSupplierName("");
     setSupplierInvoiceNo("");
     setSupplierAddress("");
@@ -479,7 +476,7 @@ export function PurchaseManager() {
           </div>
           <div>
             <Label className="text-xs sm:text-sm">Purchase No</Label>
-            <Input value={purchaseNo} readOnly className="h-9 text-xs sm:text-sm bg-muted/50 font-mono" />
+            <Input value="Auto-generated" readOnly className="h-9 text-xs sm:text-sm bg-muted/50 font-mono" />
           </div>
           <div>
             <Label className="text-xs sm:text-sm">Supplier Invoice No</Label>
