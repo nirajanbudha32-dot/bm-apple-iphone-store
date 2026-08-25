@@ -34,10 +34,15 @@ export function StockInSummary() {
     for (const h of purchaseHeaders) {
       const items = purchaseItems.filter((pi) => pi.purchaseHeaderId === h.id);
       for (const item of items) {
-        const lot = stockLots.find((l) => l.purchaseId === item.id);
+        const lot = stockLots.find(
+          (l) =>
+            l.purchaseId === item.id ||
+            l.lotNo === item.lotNo ||
+            (l.purchaseId === h.id && (l.itemCode === item.itemCode || l.itemName === item.itemName))
+        );
         rows.push({
           id: item.id,
-          lotNo: lot?.lotNo ?? item.lotNo ?? "-",
+          lotNo: lot?.lotNo || item.lotNo || "-",
           date: h.date,
           itemCode: item.itemCode,
           itemName: item.itemName,
@@ -53,10 +58,15 @@ export function StockInSummary() {
     // Legacy flat purchases (only if not already covered by new headers)
     if (purchaseHeaders.length === 0) {
       for (const p of purchases) {
-        const lot = stockLots.find((l) => l.purchaseId === p.id);
+        const lot = stockLots.find(
+          (l) =>
+            l.purchaseId === p.id ||
+            l.lotNo === p.billNo ||
+            (l.itemCode === p.itemCode && l.date === p.date)
+        );
         rows.push({
           id: p.id,
-          lotNo: lot?.lotNo ?? "-",
+          lotNo: lot?.lotNo || "-",
           date: p.date,
           itemCode: p.itemCode,
           itemName: p.itemName,

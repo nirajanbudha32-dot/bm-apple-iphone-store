@@ -27,19 +27,31 @@ type LotRow = {
 };
 
 export function LotStockReport() {
-  const { stockLots, sales, purchases, saleAllocations, stockAdjustments } = useStore();
+  const { stockLots, sales, purchases, purchaseHeaders, purchaseItems, stock, saleAllocations, stockAdjustments } = useStore();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const lotData = useMemo((): LotRow[] => {
+    const headerMap = new Map(purchaseHeaders.map((h) => [h.id, h]));
+    const itemMap = new Map(purchaseItems.map((pi) => [pi.id, pi]));
     const purchaseMap = new Map(purchases.map((p) => [p.id, p]));
+    const stockMap = new Map(stock.map((s) => [s.name, s]));
+
     return stockLots.map((lot) => {
+      const header = headerMap.get(lot.purchaseId ?? "");
+      const pItem = itemMap.get(lot.purchaseId ?? "");
       const purchase = purchaseMap.get(lot.purchaseId ?? "");
+      const stockItem = stockMap.get(lot.itemName);
+
+      const billNo = header?.purchaseNo || (pItem ? headerMap.get(pItem.purchaseHeaderId)?.purchaseNo : "") || purchase?.billNo || "";
+      const category = pItem?.category || purchase?.category || stockItem?.category || "";
+      const brand = pItem?.brand || purchase?.brand || stockItem?.brand || "";
+
       const allocs = saleAllocations.filter((a) => a.lotId === lot.id);
       const sold = allocs.reduce((a, c) => a + c.qtyTaken, 0);
       const adjustments = stockAdjustments.filter((a) => a.lotId === lot.id);
       const adjQty = adjustments.reduce((a, c) => a + c.qtyAdjusted, 0);
-      const originalReceived = purchase?.qty ?? lot.qty + sold - adjQty;
+      const originalReceived = pItem?.qty ?? purchase?.qty ?? lot.qty + sold - adjQty;
       const available = lot.qty;
       let status: "OPEN" | "PARTIAL" | "SOLD" = "OPEN";
       if (available <= 0) status = "SOLD";
@@ -49,8 +61,8 @@ export function LotStockReport() {
         lotNo: lot.lotNo,
         itemCode: lot.itemCode,
         itemName: lot.itemName,
-        category: purchase?.category ?? "",
-        brand: purchase?.brand ?? "",
+        category,
+        brand,
         date: lot.date,
         received: originalReceived,
         sold,
@@ -58,10 +70,10 @@ export function LotStockReport() {
         purchasePrice: lot.purchasePrice,
         cost: originalReceived * lot.purchasePrice,
         status,
-        billNo: purchase?.billNo ?? "",
+        billNo,
       };
     });
-  }, [stockLots, saleAllocations, purchases, stockAdjustments]);
+  }, [stockLots, saleAllocations, purchases, purchaseHeaders, purchaseItems, stock, stockAdjustments]);
 
   const filtered = useMemo(() => {
     let result = lotData;

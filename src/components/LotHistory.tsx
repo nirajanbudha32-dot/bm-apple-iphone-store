@@ -16,7 +16,7 @@ type HistoryEntry = {
 };
 
 export function LotHistory() {
-  const { stockLots, purchases, sales, saleAllocations, stockAdjustments } = useStore();
+  const { stockLots, purchases, purchaseHeaders, purchaseItems, sales, saleAllocations, stockAdjustments } = useStore();
   const [selectedLotId, setSelectedLotId] = useState("");
   const [q, setQ] = useState("");
 
@@ -28,6 +28,8 @@ export function LotHistory() {
   }, [stockLots, q]);
 
   const purchaseMap = useMemo(() => new Map(purchases.map((p) => [p.id, p])), [purchases]);
+  const headerMap = useMemo(() => new Map(purchaseHeaders.map((h) => [h.id, h])), [purchaseHeaders]);
+  const itemMap = useMemo(() => new Map(purchaseItems.map((pi) => [pi.id, pi])), [purchaseItems]);
   const saleMap = useMemo(() => new Map(sales.map((s) => [s.id, s])), [sales]);
 
   const history = useMemo((): HistoryEntry[] => {
@@ -38,14 +40,19 @@ export function LotHistory() {
     const entries: HistoryEntry[] = [];
 
     const purchase = purchaseMap.get(lot.purchaseId ?? "");
+    const header = headerMap.get(lot.purchaseId ?? "");
+    const pItem = itemMap.get(lot.purchaseId ?? "");
+    const billNo = header?.purchaseNo || (pItem ? headerMap.get(pItem.purchaseHeaderId)?.purchaseNo : "") || purchase?.billNo || "";
+    const receivedQty = pItem?.qty ?? purchase?.qty ?? lot.qty;
+
     entries.push({
       date: lot.date,
-      transaction: purchase ? `Purchase ${purchase.billNo}` : "Purchase",
+      transaction: billNo ? `Purchase ${billNo}` : "Purchase",
       type: "purchase",
-      qtyIn: purchase?.qty ?? lot.qty,
+      qtyIn: receivedQty,
       qtyOut: 0,
       balance: 0,
-      reference: purchase?.billNo ?? "",
+      reference: billNo,
     });
 
     const allocs = saleAllocations.filter((a) => a.lotId === lot.id);

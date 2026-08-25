@@ -847,6 +847,20 @@ export async function addPurchaseHeader(
     if (stockResult.error) return { error: stockResult.error };
     const resolvedItemCode = stockResult.itemCode || item.itemCode;
 
+    // Create stock lot automatically
+    let lotNo = item.lotNo?.trim();
+    if (!lotNo) {
+      try {
+        const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
+        if (!lotErr && lotNoResult) {
+          lotNo = lotNoResult as string;
+        }
+      } catch (_) {}
+      if (!lotNo) {
+        lotNo = await getNextLotNo();
+      }
+    }
+
     const { data: insertedItem, error: itemErr } = await supabase.from("purchase_items").insert({
       purchase_header_id: headerId,
       sn: item.sn,
@@ -865,38 +879,27 @@ export async function addPurchaseHeader(
       vat_rate: item.vatRate,
       vat_amount: item.vatAmount,
       total: item.total,
-      lot_no: item.lotNo,
+      lot_no: lotNo,
     }).select("id").single();
 
     if (itemErr) return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
+
+    const itemId = (insertedItem as Record<string, unknown>)['id'] as string;
 
     // Insert IMEIs if any
     const imeis = imeisByItem[i] || [];
     if (imeis.length > 0 && insertedItem) {
       const imeiRows = imeis.map((imei) => ({
-        purchase_item_id: (insertedItem as Record<string, unknown>)['id'] as string,
+        purchase_item_id: itemId,
         imei,
       }));
       const { error: imeiErr } = await supabase.from("purchase_item_imeis").insert(imeiRows);
       if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
     }
 
-    // Create stock lot automatically
-    let lotNo = "";
-    try {
-      const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
-      if (!lotErr && lotNoResult) {
-        lotNo = lotNoResult as string;
-      }
-    } catch (_) {}
-
-    if (!lotNo) {
-      lotNo = await getNextLotNo();
-    }
-
     const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
       lot_no: lotNo,
-      purchase_id: headerId,
+      purchase_id: itemId,
       item_code: resolvedItemCode,
       item_name: item.itemName,
       date: header.date,
@@ -916,38 +919,28 @@ export async function addPurchaseHeader(
 
 export async function deletePurchaseHeader(id: string): Promise<{ error?: string }> {
   try {
-    // Find purchase items for this header
     const items = state.purchaseItems.filter((pi) => pi.purchaseHeaderId === id);
     for (const item of items) {
-      // Find and delete associated lots
-      const lots = state.stockLots.filter((l) => l.purchaseId === item.id);
+      const lots = state.stockLots.filter((l) => l.purchaseId === item.id || l.purchaseId === id);
       for (const lot of lots) {
         try {
-          await supabase.from("sale_lot_allocations").delete().eq("lot_id", lot.id);
           await supabase.from("stock_lots").delete().eq("id", lot.id);
         } catch (_) {}
       }
-      // Restore stock
-      if (item.itemCode) {
-        try {
-          const { data } = await supabase.from("stock").select("qty").eq("code", item.itemCode).maybeSingle();
-          if (data) {
-            const current = Number((data as Record<string, unknown>)['qty'] ?? 0);
-            await supabase.from("stock").update({ qty: Math.max(0, current - item.qty), updated_at: new Date().toISOString() }).eq("code", item.itemCode);
-          }
-        } catch (_) {}
-      }
-      // Delete IMEIs
+      try {
+        const { data } = await supabase.from("stock").select("qty").eq("code", item.itemCode).maybeSingle();
+        if (data) {
+          const current = Number((data as Record<string, unknown>)['qty'] ?? 0);
+          await supabase.from("stock").update({ qty: Math.max(0, current - item.qty), updated_at: new Date().toISOString() }).eq("code", item.itemCode);
+        }
+      } catch (_) {}
       try {
         await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", item.id);
       } catch (_) {}
     }
 
-    // Delete purchase items
     await supabase.from("purchase_items").delete().eq("purchase_header_id", id);
-    // Delete attachments
     await supabase.from("purchase_attachments").delete().eq("purchase_header_id", id);
-    // Delete header
     await supabase.from("purchase_headers").delete().eq("id", id);
 
     await reload();
