@@ -656,6 +656,43 @@ export async function nextItemCode(): Promise<string> {
   return String(candidate);
 }
 
+export async function calculateMaxLotNo(): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc("next_lot_no");
+    if (!error && data) {
+      const n = Number(String(data).replace(/\D/g, ""));
+      if (Number.isFinite(n) && n > 0) return n - 1;
+    }
+  } catch (_) {}
+
+  // Fallback: query from stock_lots table
+  const { data: allLots } = await supabase.from("stock_lots").select("lot_no");
+  let max = 0;
+  if (allLots && allLots.length > 0) {
+    for (const row of allLots) {
+      const lotStr = String((row as Record<string, unknown>)["lot_no"] ?? "");
+      const n = parseInt(lotStr.replace(/\D/g, ""), 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  } else if (state.stockLots && state.stockLots.length > 0) {
+    for (const lot of state.stockLots) {
+      const n = parseInt(String(lot.lotNo).replace(/\D/g, ""), 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return max;
+}
+
+export async function getNextLotNo(): Promise<string> {
+  const max = await calculateMaxLotNo();
+  let candidate = max + 1;
+  const existingLots = new Set(state.stockLots.map((l) => String(l.lotNo).trim()));
+  while (existingLots.has(`LOT-${String(candidate).padStart(4, "0")}`)) {
+    candidate++;
+  }
+  return `LOT-${String(candidate).padStart(4, "0")}`;
+}
+
 export async function addPurchase(entry: Omit<Purchase, "id">) {
   const {
     data: { user },
@@ -686,29 +723,32 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
   if (error) return { error };
 
   if (inserted) {
-    let lotError = false;
+    let lotNo = "";
     try {
       const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
       if (!lotErr && lotNoResult) {
-        const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
-          lot_no: lotNoResult as string,
-          purchase_id: inserted.id,
-          item_code: resolvedItemCode,
-          item_name: entry.itemName,
-          date: entry.date,
-          supplier: entry.supplier,
-          qty: entry.qty,
-          purchase_price: entry.rate,
-        });
-        if (lotInsertErr) lotError = true;
-      } else {
-        lotError = true;
+        lotNo = lotNoResult as string;
       }
-    } catch (_) {
-      lotError = true;
+    } catch (_) {}
+
+    if (!lotNo) {
+      lotNo = await getNextLotNo();
     }
 
-    if (lotError) return { error: new Error("Stock updated but lot tracking failed. Lot schema may not be installed.") };
+    const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
+      lot_no: lotNo,
+      purchase_id: inserted.id,
+      item_code: resolvedItemCode,
+      item_name: entry.itemName,
+      date: entry.date,
+      supplier: entry.supplier,
+      qty: entry.qty,
+      purchase_price: entry.rate,
+    });
+
+    if (lotInsertErr) {
+      console.warn("Stock lot insert warning:", lotInsertErr.message);
+    }
     await reload();
   }
   return { error: null };
@@ -841,30 +881,33 @@ export async function addPurchaseHeader(
       if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
     }
 
-    // Create stock lot
-    let lotError = false;
+    // Create stock lot automatically
+    let lotNo = "";
     try {
       const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
       if (!lotErr && lotNoResult) {
-        const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
-          lot_no: lotNoResult as string,
-          purchase_id: headerId,
-          item_code: resolvedItemCode,
-          item_name: item.itemName,
-          date: header.date,
-          supplier: header.supplierName,
-          qty: item.qty,
-          purchase_price: item.rate,
-        });
-        if (lotInsertErr) lotError = true;
-      } else {
-        lotError = true;
+        lotNo = lotNoResult as string;
       }
-    } catch (_) {
-      lotError = true;
+    } catch (_) {}
+
+    if (!lotNo) {
+      lotNo = await getNextLotNo();
     }
 
-    if (lotError) return { error: "Stock updated but lot tracking failed for " + item.itemName };
+    const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
+      lot_no: lotNo,
+      purchase_id: headerId,
+      item_code: resolvedItemCode,
+      item_name: item.itemName,
+      date: header.date,
+      supplier: header.supplierName,
+      qty: item.qty,
+      purchase_price: item.rate,
+    });
+
+    if (lotInsertErr) {
+      console.warn("Stock lot insert warning for " + item.itemName, lotInsertErr.message);
+    }
   }
 
   await reload();
