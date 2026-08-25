@@ -49,7 +49,7 @@ export function LotHistory() {
     });
 
     const allocs = saleAllocations.filter((a) => a.lotId === lot.id);
-    let runningBalance = entries[0].qtyIn;
+    let runningBalance = entries[0]?.qtyIn ?? 0;
     for (const alloc of allocs) {
       const sale = saleMap.get(alloc.saleId);
       runningBalance -= alloc.qtyTaken;

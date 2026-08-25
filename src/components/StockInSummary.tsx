@@ -10,29 +10,67 @@ import { exportRows } from "@/lib/excel";
 import { money } from "@/lib/utils";
 
 export function StockInSummary() {
-  const { stockLots, purchases } = useStore();
+  const { stockLots, purchases, purchaseHeaders, purchaseItems } = useStore();
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
 
   const purchaseRows = useMemo(() => {
-    return purchases.map((p) => {
-      const lot = stockLots.find((l) => l.purchaseId === p.id);
-      return {
-        id: p.id,
-        lotNo: lot?.lotNo ?? "-",
-        date: p.date,
-        itemCode: p.itemCode,
-        itemName: p.itemName,
-        supplier: p.supplier,
-        billNo: p.billNo,
-        qty: p.qty,
-        purchasePrice: p.rate,
-        value: p.amount,
-      };
-    });
-  }, [purchases, stockLots]);
+    const rows: {
+      id: string;
+      lotNo: string;
+      date: string;
+      itemCode: string;
+      itemName: string;
+      supplier: string;
+      billNo: string;
+      qty: number;
+      purchasePrice: number;
+      value: number;
+    }[] = [];
+
+    // New purchase_headers + purchase_items
+    for (const h of purchaseHeaders) {
+      const items = purchaseItems.filter((pi) => pi.purchaseHeaderId === h.id);
+      for (const item of items) {
+        const lot = stockLots.find((l) => l.purchaseId === item.id);
+        rows.push({
+          id: item.id,
+          lotNo: lot?.lotNo ?? item.lotNo ?? "-",
+          date: h.date,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          supplier: h.supplierName,
+          billNo: h.purchaseNo,
+          qty: item.qty,
+          purchasePrice: item.rate,
+          value: item.amount,
+        });
+      }
+    }
+
+    // Legacy flat purchases (only if not already covered by new headers)
+    if (purchaseHeaders.length === 0) {
+      for (const p of purchases) {
+        const lot = stockLots.find((l) => l.purchaseId === p.id);
+        rows.push({
+          id: p.id,
+          lotNo: lot?.lotNo ?? "-",
+          date: p.date,
+          itemCode: p.itemCode,
+          itemName: p.itemName,
+          supplier: p.supplier,
+          billNo: p.billNo,
+          qty: p.qty,
+          purchasePrice: p.rate,
+          value: p.amount,
+        });
+      }
+    }
+
+    return rows;
+  }, [purchases, purchaseHeaders, purchaseItems, stockLots]);
 
   const filtered = useMemo(() => {
     let result = purchaseRows;

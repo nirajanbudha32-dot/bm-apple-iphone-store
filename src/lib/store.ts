@@ -103,12 +103,96 @@ export type StockAdjustment = {
   createdAt: string;
 };
 
+export type PurchaseHeader = {
+  id: string;
+  purchaseNo: string;
+  supplierInvoiceNo: string;
+  date: string;
+  supplierName: string;
+  supplierAddress: string;
+  supplierPan: string;
+  supplierVat: string;
+  purchaseType: "Cash" | "Credit";
+  dueDate: string;
+  remarks: string;
+  paymentMethod: PaymentMethod;
+  grossAmount: number;
+  discount: number;
+  taxableAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  otherCharges: number;
+  grandTotal: number;
+  paidAmount: number;
+  remainingBalance: number;
+  createdAt: string;
+};
+
+export type PurchaseItem = {
+  id: string;
+  purchaseHeaderId: string;
+  sn: number;
+  itemCode: string;
+  itemName: string;
+  category: string;
+  subCategory: string;
+  brand: string;
+  model: string;
+  unit: string;
+  qty: number;
+  rate: number;
+  discount: number;
+  amount: number;
+  taxableAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  total: number;
+  lotNo: string;
+};
+
+export type PurchaseItemImei = {
+  id: string;
+  purchaseItemId: string;
+  imei: string;
+};
+
+export type PurchaseAttachment = {
+  id: string;
+  purchaseHeaderId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  fileData: string;
+};
+
 export const VAT_RATE = 0.13;
 
-type State = { stock: StockItem[]; sales: Sale[]; purchases: Purchase[]; stockLots: StockLot[]; saleAllocations: SaleAllocation[]; stockAdjustments: StockAdjustment[] };
+type State = {
+  stock: StockItem[];
+  sales: Sale[];
+  purchases: Purchase[];
+  stockLots: StockLot[];
+  saleAllocations: SaleAllocation[];
+  stockAdjustments: StockAdjustment[];
+  purchaseHeaders: PurchaseHeader[];
+  purchaseItems: PurchaseItem[];
+  purchaseImeis: PurchaseItemImei[];
+  purchaseAttachments: PurchaseAttachment[];
+};
 
 const listeners = new Set<() => void>();
-let state: State = { stock: [], sales: [], purchases: [], stockLots: [], saleAllocations: [], stockAdjustments: [] };
+let state: State = {
+  stock: [],
+  sales: [],
+  purchases: [],
+  stockLots: [],
+  saleAllocations: [],
+  stockAdjustments: [],
+  purchaseHeaders: [],
+  purchaseItems: [],
+  purchaseImeis: [],
+  purchaseAttachments: [],
+};
 let loaded = false;
 
 function emit() {
@@ -208,6 +292,76 @@ function mapStockAdjustmentRow(r: Record<string, unknown>): StockAdjustment {
     qtyAdjusted: r['qty_adjusted'] as number,
     reason: r['reason'] as string,
     createdAt: r['created_at'] as string,
+  };
+}
+
+function mapPurchaseHeaderRow(r: Record<string, unknown>): PurchaseHeader {
+  return {
+    id: r['id'] as string,
+    purchaseNo: r['purchase_no'] as string,
+    supplierInvoiceNo: (r['supplier_invoice_no'] as string) ?? "",
+    date: r['date'] as string,
+    supplierName: (r['supplier_name'] as string) ?? "",
+    supplierAddress: (r['supplier_address'] as string) ?? "",
+    supplierPan: (r['supplier_pan'] as string) ?? "",
+    supplierVat: (r['supplier_vat'] as string) ?? "",
+    purchaseType: (r['purchase_type'] as "Cash" | "Credit") ?? "Cash",
+    dueDate: (r['due_date'] as string) ?? "",
+    remarks: (r['remarks'] as string) ?? "",
+    paymentMethod: (r['payment_method'] as PaymentMethod) ?? "Cash",
+    grossAmount: Number(r['gross_amount'] ?? 0),
+    discount: Number(r['discount'] ?? 0),
+    taxableAmount: Number(r['taxable_amount'] ?? 0),
+    vatRate: Number(r['vat_rate'] ?? 13),
+    vatAmount: Number(r['vat_amount'] ?? 0),
+    otherCharges: Number(r['other_charges'] ?? 0),
+    grandTotal: Number(r['grand_total'] ?? 0),
+    paidAmount: Number(r['paid_amount'] ?? 0),
+    remainingBalance: Number(r['remaining_balance'] ?? 0),
+    createdAt: r['created_at'] as string,
+  };
+}
+
+function mapPurchaseItemRow(r: Record<string, unknown>): PurchaseItem {
+  return {
+    id: r['id'] as string,
+    purchaseHeaderId: r['purchase_header_id'] as string,
+    sn: Number(r['sn'] ?? 1),
+    itemCode: (r['item_code'] as string) ?? "",
+    itemName: r['item_name'] as string,
+    category: (r['category'] as string) ?? "",
+    subCategory: (r['sub_category'] as string) ?? "",
+    brand: (r['brand'] as string) ?? "",
+    model: (r['model'] as string) ?? "",
+    unit: (r['unit'] as string) ?? "PCS",
+    qty: Number(r['qty'] ?? 0),
+    rate: Number(r['rate'] ?? 0),
+    discount: Number(r['discount'] ?? 0),
+    amount: Number(r['amount'] ?? 0),
+    taxableAmount: Number(r['taxable_amount'] ?? 0),
+    vatRate: Number(r['vat_rate'] ?? 13),
+    vatAmount: Number(r['vat_amount'] ?? 0),
+    total: Number(r['total'] ?? 0),
+    lotNo: (r['lot_no'] as string) ?? "",
+  };
+}
+
+function mapPurchaseImeiRow(r: Record<string, unknown>): PurchaseItemImei {
+  return {
+    id: r['id'] as string,
+    purchaseItemId: r['purchase_item_id'] as string,
+    imei: r['imei'] as string,
+  };
+}
+
+function mapPurchaseAttachmentRow(r: Record<string, unknown>): PurchaseAttachment {
+  return {
+    id: r['id'] as string,
+    purchaseHeaderId: r['purchase_header_id'] as string,
+    fileName: r['file_name'] as string,
+    fileType: (r['file_type'] as string) ?? "",
+    fileSize: Number(r['file_size'] ?? 0),
+    fileData: (r['file_data'] as string) ?? "",
   };
 }
 
@@ -519,6 +673,197 @@ export async function deletePurchase(id: string) {
   await reload();
 }
 
+export function nextPurchaseNo(headers: PurchaseHeader[]) {
+  const max = headers.reduce((acc, h) => {
+    const n = Number(h.purchaseNo.replace(/\D/g, ""));
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  return `PUR-${String(max + 1).padStart(4, "0")}`;
+}
+
+export async function addPurchaseHeader(
+  header: Omit<PurchaseHeader, "id" | "createdAt">,
+  items: Omit<PurchaseItem, "id" | "purchaseHeaderId">[],
+  imeisByItem: Record<number, string[]>,
+): Promise<{ error?: string; headerId?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: inserted, error } = await supabase.from("purchase_headers").insert({
+    purchase_no: header.purchaseNo,
+    supplier_invoice_no: header.supplierInvoiceNo,
+    date: header.date,
+    supplier_name: header.supplierName,
+    supplier_address: header.supplierAddress,
+    supplier_pan: header.supplierPan,
+    supplier_vat: header.supplierVat,
+    purchase_type: header.purchaseType,
+    due_date: header.dueDate,
+    remarks: header.remarks,
+    payment_method: header.paymentMethod,
+    gross_amount: header.grossAmount,
+    discount: header.discount,
+    taxable_amount: header.taxableAmount,
+    vat_rate: header.vatRate,
+    vat_amount: header.vatAmount,
+    other_charges: header.otherCharges,
+    grand_total: header.grandTotal,
+    paid_amount: header.paidAmount,
+    remaining_balance: header.remainingBalance,
+    created_by: user?.id ?? null,
+  }).select("id").single();
+
+  if (error) return { error: error.message };
+  const headerId = inserted!.id as string;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]!;
+    const { data: insertedItem, error: itemErr } = await supabase.from("purchase_items").insert({
+      purchase_header_id: headerId,
+      sn: item.sn,
+      item_code: item.itemCode,
+      item_name: item.itemName,
+      category: item.category,
+      sub_category: item.subCategory,
+      brand: item.brand,
+      model: item.model,
+      unit: item.unit,
+      qty: item.qty,
+      rate: item.rate,
+      discount: item.discount,
+      amount: item.amount,
+      taxable_amount: item.taxableAmount,
+      vat_rate: item.vatRate,
+      vat_amount: item.vatAmount,
+      total: item.total,
+      lot_no: item.lotNo,
+    }).select("id").single();
+
+    if (itemErr) return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
+
+    // Insert IMEIs if any
+    const imeis = imeisByItem[i] || [];
+    if (imeis.length > 0 && insertedItem) {
+      const imeiRows = imeis.map((imei) => ({
+        purchase_item_id: (insertedItem as Record<string, unknown>)['id'] as string,
+        imei,
+      }));
+      const { error: imeiErr } = await supabase.from("purchase_item_imeis").insert(imeiRows);
+      if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
+    }
+
+    // Create stock lot
+    let lotError = false;
+    try {
+      const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
+      if (!lotErr && lotNoResult) {
+        const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
+          lot_no: lotNoResult as string,
+          purchase_id: (insertedItem as Record<string, unknown>)['id'] as string,
+          item_code: item.itemCode,
+          item_name: item.itemName,
+          date: header.date,
+          supplier: header.supplierName,
+          qty: item.qty,
+          purchase_price: item.rate,
+        });
+        if (lotInsertErr) lotError = true;
+      } else {
+        lotError = true;
+      }
+    } catch (_) {
+      lotError = true;
+    }
+
+    // Update stock
+    const stockResult = await applyStockDelta(
+      {
+        billNo: header.purchaseNo,
+        date: header.date,
+        supplier: header.supplierName,
+        itemCode: item.itemCode,
+        itemName: item.itemName,
+        category: item.category,
+        subCategory: item.subCategory,
+        brand: item.brand,
+        model: item.model,
+        qty: item.qty,
+        rate: item.rate,
+        amount: item.amount,
+        paymentMethod: header.paymentMethod,
+        note: "",
+      },
+      item.qty,
+    );
+    if (stockResult.error) return { error: stockResult.error };
+    if (lotError) return { error: "Stock updated but lot tracking failed for " + item.itemName };
+  }
+
+  await reload();
+  return { headerId };
+}
+
+export async function deletePurchaseHeader(id: string): Promise<{ error?: string }> {
+  try {
+    // Find purchase items for this header
+    const items = state.purchaseItems.filter((pi) => pi.purchaseHeaderId === id);
+    for (const item of items) {
+      // Find and delete associated lots
+      const lots = state.stockLots.filter((l) => l.purchaseId === item.id);
+      for (const lot of lots) {
+        try {
+          await supabase.from("sale_lot_allocations").delete().eq("lot_id", lot.id);
+          await supabase.from("stock_lots").delete().eq("id", lot.id);
+        } catch (_) {}
+      }
+      // Restore stock
+      if (item.itemCode) {
+        try {
+          const { data } = await supabase.from("stock").select("qty").eq("code", item.itemCode).maybeSingle();
+          if (data) {
+            const current = Number((data as Record<string, unknown>)['qty'] ?? 0);
+            await supabase.from("stock").update({ qty: Math.max(0, current - item.qty), updated_at: new Date().toISOString() }).eq("code", item.itemCode);
+          }
+        } catch (_) {}
+      }
+      // Delete IMEIs
+      try {
+        await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", item.id);
+      } catch (_) {}
+    }
+
+    // Delete purchase items
+    await supabase.from("purchase_items").delete().eq("purchase_header_id", id);
+    // Delete attachments
+    await supabase.from("purchase_attachments").delete().eq("purchase_header_id", id);
+    // Delete header
+    await supabase.from("purchase_headers").delete().eq("id", id);
+
+    await reload();
+    return {};
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+export async function addPurchaseAttachment(
+  headerId: string,
+  fileName: string,
+  fileType: string,
+  fileSize: number,
+  fileData: string,
+): Promise<{ error?: string }> {
+  const { error } = await supabase.from("purchase_attachments").insert({
+    purchase_header_id: headerId,
+    file_name: fileName,
+    file_type: fileType,
+    file_size: fileSize,
+    file_data: fileData,
+  });
+  if (error) return { error: error.message };
+  await reload();
+  return {};
+}
+
 export async function addStockAdjustment(
   lotId: string,
   qtyAdjusted: number,
@@ -612,6 +957,23 @@ async function reload() {
     adjustments = (adjRes.data ?? []).map(mapStockAdjustmentRow);
   } catch (_) {}
 
+  let ph: PurchaseHeader[] = [];
+  let pi: PurchaseItem[] = [];
+  let pImeis: PurchaseItemImei[] = [];
+  let pAttach: PurchaseAttachment[] = [];
+  try {
+    const [headersRes, itemsRes, imeisRes, attachRes] = await Promise.all([
+      supabase.from("purchase_headers").select("*").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("purchase_items").select("*").order("sn", { ascending: true }).limit(10000),
+      supabase.from("purchase_item_imeis").select("*").limit(20000),
+      supabase.from("purchase_attachments").select("*").limit(10000),
+    ]);
+    ph = (headersRes.data ?? []).map(mapPurchaseHeaderRow);
+    pi = (itemsRes.data ?? []).map(mapPurchaseItemRow);
+    pImeis = (imeisRes.data ?? []).map(mapPurchaseImeiRow);
+    pAttach = (attachRes.data ?? []).map(mapPurchaseAttachmentRow);
+  } catch (_) {}
+
   state = {
     stock: (stockRes.data ?? []).map(mapStockRow),
     sales: (salesRes.data ?? []).map(mapSaleRow),
@@ -619,6 +981,10 @@ async function reload() {
     stockLots: lots,
     saleAllocations: allocs,
     stockAdjustments: adjustments,
+    purchaseHeaders: ph,
+    purchaseItems: pi,
+    purchaseImeis: pImeis,
+    purchaseAttachments: pAttach,
   };
   emit();
 }
