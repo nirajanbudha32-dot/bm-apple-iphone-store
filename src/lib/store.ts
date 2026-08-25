@@ -619,15 +619,41 @@ export async function deleteStock(code: string) {
   await reload();
 }
 
+export async function calculateMaxStockCode(): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc("next_stock_code");
+    if (!error && data) {
+      const parsed = Number(data);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed - 1;
+    }
+  } catch (_) {}
+
+  // Fallback: query all codes from stock table
+  const { data: allRows } = await supabase.from("stock").select("code");
+  let max = 0;
+  if (allRows && allRows.length > 0) {
+    for (const row of allRows) {
+      const codeStr = String((row as Record<string, unknown>)["code"] ?? "");
+      const n = parseInt(codeStr.replace(/\D/g, ""), 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  } else if (state.stock && state.stock.length > 0) {
+    for (const item of state.stock) {
+      const n = parseInt(String(item.code).replace(/\D/g, ""), 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return max;
+}
+
 export async function nextItemCode(): Promise<string> {
-  const { data } = await supabase
-    .from("stock")
-    .select("code")
-    .order("code", { ascending: false })
-    .limit(1);
-  if (!data || data.length === 0) return "1";
-  const n = Number(String((data[0] as Record<string, unknown>)['code']).replace(/\D/g, ""));
-  return String((Number.isFinite(n) ? n : 0) + 1);
+  const max = await calculateMaxStockCode();
+  let candidate = max + 1;
+  const existingCodes = new Set(state.stock.map((s) => String(s.code).trim()));
+  while (existingCodes.has(String(candidate))) {
+    candidate++;
+  }
+  return String(candidate);
 }
 
 export async function addPurchase(entry: Omit<Purchase, "id">) {
@@ -635,11 +661,15 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const stockResult = await applyStockDelta(entry, entry.qty);
+  if (stockResult.error) return { error: new Error(stockResult.error) };
+  const resolvedItemCode = stockResult.itemCode || entry.itemCode;
+
   const { data: inserted, error } = await supabase.from("purchases").insert({
     bill_no: entry.billNo,
     date: entry.date,
     supplier: entry.supplier,
-    item_code: entry.itemCode,
+    item_code: resolvedItemCode,
     item_name: entry.itemName,
     category: entry.category,
     sub_category: entry.subCategory,
@@ -663,7 +693,7 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
         const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
           lot_no: lotNoResult as string,
           purchase_id: inserted.id,
-          item_code: entry.itemCode,
+          item_code: resolvedItemCode,
           item_name: entry.itemName,
           date: entry.date,
           supplier: entry.supplier,
@@ -678,8 +708,6 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
       lotError = true;
     }
 
-    const stockResult = await applyStockDelta(entry, entry.qty);
-    if (stockResult.error) return { error: new Error(stockResult.error) };
     if (lotError) return { error: new Error("Stock updated but lot tracking failed. Lot schema may not be installed.") };
     await reload();
   }
@@ -755,10 +783,34 @@ export async function addPurchaseHeader(
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i]!;
+
+    // Update stock first to ensure new stock item is created and itemCode is resolved
+    const stockResult = await applyStockDelta(
+      {
+        billNo: header.purchaseNo,
+        date: header.date,
+        supplier: header.supplierName,
+        itemCode: item.itemCode,
+        itemName: item.itemName,
+        category: item.category,
+        subCategory: item.subCategory,
+        brand: item.brand,
+        model: item.model,
+        qty: item.qty,
+        rate: item.rate,
+        amount: item.amount,
+        paymentMethod: header.paymentMethod,
+        note: "",
+      },
+      item.qty,
+    );
+    if (stockResult.error) return { error: stockResult.error };
+    const resolvedItemCode = stockResult.itemCode || item.itemCode;
+
     const { data: insertedItem, error: itemErr } = await supabase.from("purchase_items").insert({
       purchase_header_id: headerId,
       sn: item.sn,
-      item_code: item.itemCode,
+      item_code: resolvedItemCode,
       item_name: item.itemName,
       category: item.category,
       sub_category: item.subCategory,
@@ -797,7 +849,7 @@ export async function addPurchaseHeader(
         const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
           lot_no: lotNoResult as string,
           purchase_id: headerId,
-          item_code: item.itemCode,
+          item_code: resolvedItemCode,
           item_name: item.itemName,
           date: header.date,
           supplier: header.supplierName,
@@ -812,27 +864,6 @@ export async function addPurchaseHeader(
       lotError = true;
     }
 
-    // Update stock
-    const stockResult = await applyStockDelta(
-      {
-        billNo: header.purchaseNo,
-        date: header.date,
-        supplier: header.supplierName,
-        itemCode: item.itemCode,
-        itemName: item.itemName,
-        category: item.category,
-        subCategory: item.subCategory,
-        brand: item.brand,
-        model: item.model,
-        qty: item.qty,
-        rate: item.rate,
-        amount: item.amount,
-        paymentMethod: header.paymentMethod,
-        note: "",
-      },
-      item.qty,
-    );
-    if (stockResult.error) return { error: stockResult.error };
     if (lotError) return { error: "Stock updated but lot tracking failed for " + item.itemName };
   }
 
@@ -940,75 +971,105 @@ let nextStockCode: number | null = null;
 
 async function getNextStockCode(): Promise<string> {
   if (nextStockCode === null) {
-    const { data: maxRow } = await supabase
-      .from("stock")
-      .select("code")
-      .order("code", { ascending: false })
-      .limit(1);
-    if (maxRow && maxRow.length > 0) {
-      const n = Number(String((maxRow[0] as Record<string, unknown>)['code'] ?? "0").replace(/\D/g, ""));
-      nextStockCode = (Number.isFinite(n) ? n : 0) + 1;
-    } else {
-      nextStockCode = 1;
-    }
+    const max = await calculateMaxStockCode();
+    nextStockCode = max + 1;
   }
-  const code = String(nextStockCode);
-  nextStockCode++;
-  return code;
+
+  let candidate = nextStockCode;
+  const existingCodes = new Set(state.stock.map((s) => String(s.code).trim()));
+  while (existingCodes.has(String(candidate))) {
+    candidate++;
+  }
+  nextStockCode = candidate + 1;
+  return String(candidate);
 }
 
-async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number): Promise<{ error?: string }> {
+async function applyStockDelta(
+  entry: Omit<Purchase, "id">,
+  delta: number,
+): Promise<{ error?: string; itemCode?: string }> {
   // First try to find by name (new items may have empty itemCode)
-  if (!entry.itemCode && entry.itemName) {
+  let itemCode = entry.itemCode;
+  if (!itemCode && entry.itemName) {
     const { data: byName } = await supabase
       .from("stock")
       .select("code, qty")
-      .eq("name", entry.itemName)
+      .eq("name", entry.itemName.trim())
       .maybeSingle();
     if (byName) {
-      entry = { ...entry, itemCode: (byName as Record<string, unknown>)['code'] as string };
+      itemCode = (byName as Record<string, unknown>)["code"] as string;
     }
   }
 
-  const { data } = entry.itemCode
+  const { data } = itemCode
     ? await supabase
         .from("stock")
         .select("code, qty")
-        .eq("code", entry.itemCode)
+        .eq("code", itemCode)
         .maybeSingle()
     : { data: null };
 
   if (data) {
     const { error: rpcErr } = await supabase.rpc("increment_stock_by_code", {
-      p_code: entry.itemCode,
+      p_code: itemCode,
       p_qty: delta,
     });
     if (rpcErr) {
-      const current = Number((data as Record<string, unknown>)['qty'] ?? 0);
+      const current = Number((data as Record<string, unknown>)["qty"] ?? 0);
       const { error: updateErr } = await supabase
         .from("stock")
         .update({ qty: Math.max(0, current + delta), updated_at: new Date().toISOString() })
-        .eq("code", entry.itemCode);
+        .eq("code", itemCode);
       if (updateErr) return { error: `Stock update failed: ${updateErr.message}` };
     }
+    return { itemCode };
   } else if (delta > 0) {
-    const code = await getNextStockCode();
-    const { error: insertErr } = await supabase.from("stock").insert({
-      code,
-      name: entry.itemName,
-      category: entry.category,
-      sub_category: entry.subCategory,
-      brand: entry.brand,
-      sub_brand: "",
-      model: entry.model,
-      unit: "PCS",
-      qty: delta,
-      purchase_price: entry.rate,
-      selling_price: 0,
-    });
-    if (insertErr) return { error: `Stock insert failed: ${insertErr.message}` };
+    let inserted = false;
+    let attempts = 0;
+    let lastErr = "";
+    let finalCode = "";
+    while (!inserted && attempts < 5) {
+      attempts++;
+      finalCode = await getNextStockCode();
+      const { error: insertErr } = await supabase.from("stock").insert({
+        code: finalCode,
+        name: entry.itemName.trim(),
+        category: entry.category || "General",
+        sub_category: entry.subCategory || "",
+        brand: entry.brand || "",
+        sub_brand: "",
+        model: entry.model || "",
+        unit: "PCS",
+        qty: delta,
+        purchase_price: entry.rate,
+        selling_price: 0,
+      });
+      if (!insertErr) {
+        inserted = true;
+        state.stock.push({
+          code: finalCode,
+          name: entry.itemName.trim(),
+          category: entry.category || "General",
+          subCategory: entry.subCategory || "",
+          brand: entry.brand || "",
+          subBrand: "",
+          model: entry.model || "",
+          unit: "PCS",
+          qty: delta,
+          purchasePrice: entry.rate,
+          sellingPrice: 0,
+        });
+      } else {
+        lastErr = insertErr.message;
+        nextStockCode = null;
+      }
+    }
+    if (!inserted) {
+      return { error: `Stock insert failed after retries: ${lastErr}` };
+    }
+    return { itemCode: finalCode };
   }
-  return {};
+  return { itemCode };
 }
 
 async function reload() {
