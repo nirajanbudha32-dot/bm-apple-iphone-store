@@ -796,7 +796,7 @@ export async function addPurchaseHeader(
       if (!lotErr && lotNoResult) {
         const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
           lot_no: lotNoResult as string,
-          purchase_id: (insertedItem as Record<string, unknown>)['id'] as string,
+          purchase_id: headerId,
           item_code: item.itemCode,
           item_name: item.itemName,
           date: header.date,
