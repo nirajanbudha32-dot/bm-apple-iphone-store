@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Select,
@@ -39,11 +41,18 @@ export function SalesRegister() {
   const [customerPan, setCustomerPan] = useState("");
   const [hasVatPan, setHasVatPan] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
+  const [saleType, setSaleType] = useState<"Cash" | "Credit">("Cash");
+  const [remarks, setRemarks] = useState("");
 
   const [itemName, setItemName] = useState("");
   const debouncedItemName = useDebounce(itemName, 150);
   const [itemQty, setItemQty] = useState(1);
   const [itemRate, setItemRate] = useState(0);
+  const [itemDiscount, setItemDiscount] = useState(0);
+
+  const [headerDiscount, setHeaderDiscount] = useState(0);
+  const [otherCharges, setOtherCharges] = useState(0);
+  const [paidAmount, setPaidAmount] = useState(0);
 
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -54,10 +63,16 @@ export function SalesRegister() {
     customerPan: string;
     hasVatPan: boolean;
     paymentMethod: PaymentMethod;
+    saleType: string;
     items: BillItem[];
     subtotal: number;
+    headerDiscount: number;
+    otherCharges: number;
     vat: number;
     total: number;
+    paidAmount: number;
+    remaining: number;
+    remarks: string;
   } | null>(null);
 
   const suggestions = useMemo(() => {
@@ -80,7 +95,9 @@ export function SalesRegister() {
 
   const billSubtotal = useMemo(() => billItems.reduce((a, i) => a + i.amount, 0), [billItems]);
   const billVat = useMemo(() => billItems.reduce((a, i) => a + i.vat, 0), [billItems]);
-  const billTotal = useMemo(() => billItems.reduce((a, i) => a + i.total, 0), [billItems]);
+  const billItemTotal = useMemo(() => billItems.reduce((a, i) => a + i.total, 0), [billItems]);
+  const billGrandTotal = useMemo(() => billItemTotal - headerDiscount + otherCharges, [billItemTotal, headerDiscount, otherCharges]);
+  const billRemaining = useMemo(() => Math.max(0, billGrandTotal - paidAmount), [billGrandTotal, paidAmount]);
 
   function pick(name: string) {
     const item = stock.find((i) => i.name === name);
@@ -101,7 +118,7 @@ export function SalesRegister() {
       toast.error(`Insufficient stock. Available: ${matched.qty}`);
       return;
     }
-    const amount = itemQty * itemRate;
+    const amount = itemQty * itemRate - itemDiscount;
     const vat = amount * VAT_RATE;
     const newItem: BillItem = {
       itemCode: matched?.code ?? "",
@@ -112,6 +129,7 @@ export function SalesRegister() {
       model: matched?.model ?? "",
       qty: itemQty,
       rate: itemRate,
+      discount: itemDiscount,
       amount,
       vat,
       total: amount + vat,
@@ -120,6 +138,7 @@ export function SalesRegister() {
     setItemName("");
     setItemQty(1);
     setItemRate(0);
+    setItemDiscount(0);
   }
 
   function removeBillItem(index: number) {
@@ -144,7 +163,20 @@ export function SalesRegister() {
       }
     }
     setSaving(true);
-    const { error } = await addBill(invoiceNo, date, customer.trim(), customerPan.trim(), hasVatPan, paymentMethod, billItems);
+    const { error } = await addBill(
+      invoiceNo,
+      date,
+      customer.trim(),
+      customerPan.trim(),
+      hasVatPan,
+      paymentMethod,
+      billItems,
+      headerDiscount,
+      otherCharges,
+      paidAmount,
+      remarks.trim(),
+      saleType,
+    );
     setSaving(false);
     if (error) {
       toast.error(`Save failed: ${error.message}`);
@@ -157,16 +189,27 @@ export function SalesRegister() {
       customerPan: customerPan.trim(),
       hasVatPan,
       paymentMethod,
+      saleType,
       items: [...billItems],
       subtotal: billSubtotal,
+      headerDiscount,
+      otherCharges,
       vat: billVat,
-      total: billTotal,
+      total: billGrandTotal,
+      paidAmount,
+      remaining: billRemaining,
+      remarks: remarks.trim(),
     });
     setCustomer("");
     setCustomerPan("");
     setHasVatPan(false);
     setBillItems([]);
     setPaymentMethod("Cash");
+    setSaleType("Cash");
+    setRemarks("");
+    setHeaderDiscount(0);
+    setOtherCharges(0);
+    setPaidAmount(0);
     setSalesPage(0);
     toast.success(`${invoiceNo} saved with ${billItems.length} items`);
   }
@@ -203,7 +246,7 @@ export function SalesRegister() {
 <div class="info">
   <div><span class="label">Invoice No:</span> ${esc(printData.invoiceNo)}</div>
   <div><span class="label">Date:</span> ${esc(printData.date)}</div>
-  <div><span class="label">Payment:</span> ${esc(printData.paymentMethod)}</div>
+  <div><span class="label">Payment:</span> ${esc(printData.paymentMethod)} (${esc(printData.saleType)})</div>
 </div>
 <div class="info">
   <div><span class="label">Customer:</span> ${esc(printData.customer)}</div>
@@ -213,13 +256,15 @@ export function SalesRegister() {
   <thead><tr>
     <th>#</th><th>Item</th><th>Sub Category</th><th>Brand</th><th>Model</th>
     <th class="text-right">Qty</th><th class="text-right">Rate</th>
-    <th class="text-right">Amount</th><th class="text-right">VAT 13%</th><th class="text-right">Total</th>
+    <th class="text-right">Disc</th><th class="text-right">Amount</th>
+    <th class="text-right">VAT 13%</th><th class="text-right">Total</th>
   </tr></thead>
   <tbody>
   ${printData.items.map((it, i) => `<tr>
     <td>${i + 1}</td>
     <td>${esc(it.itemName)}</td><td>${esc(it.subCategory)}</td><td>${esc(it.brand)}</td><td>${esc(it.model)}</td>
     <td class="text-right">${it.qty}</td><td class="text-right">${money(it.rate)}</td>
+    <td class="text-right">${it.discount > 0 ? money(it.discount) : "-"}</td>
     <td class="text-right">${money(it.amount)}</td><td class="text-right">${money(it.vat)}</td>
     <td class="text-right">${money(it.total)}</td>
   </tr>`).join("")}
@@ -227,9 +272,14 @@ export function SalesRegister() {
 </table>
 <div class="totals">
   <div class="row">Subtotal: <strong>${money(printData.subtotal)}</strong></div>
+  ${printData.headerDiscount > 0 ? `<div class="row">Discount: <strong>-${money(printData.headerDiscount)}</strong></div>` : ""}
+  ${printData.otherCharges > 0 ? `<div class="row">Other Charges: <strong>${money(printData.otherCharges)}</strong></div>` : ""}
   <div class="row">VAT 13%: <strong>${money(printData.vat)}</strong></div>
   <div class="row grand">Grand Total: <strong>${money(printData.total)}</strong></div>
+  <div class="row">Paid: <strong>${money(printData.paidAmount)}</strong></div>
+  ${printData.remaining > 0 ? `<div class="row" style="color:red">Remaining: <strong>${money(printData.remaining)}</strong></div>` : ""}
 </div>
+${printData.remarks ? `<div style="margin-top:10px;font-size:11px;"><strong>Remarks:</strong> ${esc(printData.remarks)}</div>` : ""}
 <div class="footer">
   <p>Thank you for your purchase!</p>
   <p>BM Apple Iphone Store</p>
@@ -259,10 +309,15 @@ export function SalesRegister() {
         Model: s.model,
         Qty: s.qty,
         Rate: s.rate,
+        Discount: s.discount,
         Amount: s.amount,
         "VAT 13%": s.vat,
         Total: s.total,
+        "Sale Type": s.saleType,
         "Payment Method": s.paymentMethod,
+        "Paid Amount": s.paidAmount,
+        Remaining: s.remaining,
+        Remarks: s.remarks,
       })),
       "Sales",
       `BM_Sales_${new Date().toISOString().slice(0, 10)}.xlsx`,
@@ -363,6 +418,16 @@ export function SalesRegister() {
             </button>
           </div>
           <div>
+            <Label className="text-xs sm:text-sm">Sale Type</Label>
+            <Select value={saleType} onValueChange={(v) => setSaleType(v as "Cash" | "Credit")}>
+              <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Cash">Cash</SelectItem>
+                <SelectItem value="Credit">Credit</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label className="text-xs sm:text-sm">Payment Method</Label>
             <Select
               value={paymentMethod}
@@ -385,7 +450,7 @@ export function SalesRegister() {
         <div className="mt-4 border-t border-border pt-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Add items to bill</p>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-12">
-            <div className="relative sm:col-span-6 md:col-span-5">
+            <div className="relative sm:col-span-5 md:col-span-4">
               <Label htmlFor="s-item" className="text-xs sm:text-sm">Item</Label>
               <Input
                 id="s-item"
@@ -414,7 +479,7 @@ export function SalesRegister() {
                 </ul>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:col-span-6 md:col-span-4">
+            <div className="grid grid-cols-3 gap-2 sm:col-span-7 md:col-span-5">
               <div>
                 <Label htmlFor="s-qty" className="text-xs sm:text-sm">Qty</Label>
                 <Input
@@ -435,6 +500,18 @@ export function SalesRegister() {
                   step="0.01"
                   value={itemRate}
                   onChange={(e) => setItemRate(Number(e.target.value))}
+                  className="h-9 text-xs sm:text-sm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="s-disc" className="text-xs sm:text-sm">Discount</Label>
+                <Input
+                  id="s-disc"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={itemDiscount}
+                  onChange={(e) => setItemDiscount(Number(e.target.value))}
                   className="h-9 text-xs sm:text-sm"
                 />
               </div>
@@ -467,14 +544,14 @@ export function SalesRegister() {
               Bill items ({billItems.length})
             </p>
             <div className="max-h-[35vh] overflow-x-auto overflow-y-auto rounded-md border border-border">
-              <table className="w-full min-w-[600px] text-xs sm:text-sm">
+              <table className="w-full min-w-[700px] text-xs sm:text-sm">
                 <thead className="sticky top-0 bg-secondary text-secondary-foreground">
                   <tr className="text-left">
                     <th className="p-2">#</th>
                     <th className="p-2">Item</th>
-                    <th className="p-2">Sub Category</th>
                     <th className="p-2 text-right">Qty</th>
                     <th className="p-2 text-right">Rate</th>
+                    <th className="p-2 text-right">Disc</th>
                     <th className="p-2 text-right">Amount</th>
                     <th className="p-2 text-right">VAT</th>
                     <th className="p-2 text-right">Total</th>
@@ -491,9 +568,9 @@ export function SalesRegister() {
                           {item.subCategory} · {item.brand} · {item.model}
                         </span>
                       </td>
-                      <td className="p-2">{item.subCategory}</td>
                       <td className="p-2 text-right font-semibold">{item.qty}</td>
                       <td className="p-2 text-right">{money(item.rate)}</td>
+                      <td className="p-2 text-right text-muted-foreground">{item.discount > 0 ? money(item.discount) : "-"}</td>
                       <td className="p-2 text-right">{money(item.amount)}</td>
                       <td className="p-2 text-right">{money(item.vat)}</td>
                       <td className="p-2 text-right font-medium">{money(item.total)}</td>
@@ -508,17 +585,56 @@ export function SalesRegister() {
               </table>
             </div>
 
+            {/* TOTALS BAR */}
+            <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+              <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 text-xs sm:text-sm">
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Subtotal</Label>
+                  <div className="font-semibold">{money(billSubtotal)}</div>
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Header Discount</Label>
+                  <Input type="number" min="0" step="0.01" value={headerDiscount} onChange={(e) => setHeaderDiscount(Number(e.target.value))} className="h-8 text-xs mt-0.5" />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Other Charges</Label>
+                  <Input type="number" min="0" step="0.01" value={otherCharges} onChange={(e) => setOtherCharges(Number(e.target.value))} className="h-8 text-xs mt-0.5" />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">VAT 13%</Label>
+                  <div className="font-semibold">{money(billVat)}</div>
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Grand Total</Label>
+                  <div className="text-lg font-bold text-primary">{money(billGrandTotal)}</div>
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Paid Amount</Label>
+                  <Input type="number" min="0" step="0.01" value={paidAmount} onChange={(e) => setPaidAmount(Number(e.target.value))} className="h-8 text-xs mt-0.5" />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Remaining Balance</Label>
+                  <div className={`font-semibold ${billRemaining > 0 ? "text-destructive" : "text-green-600"}`}>
+                    {money(billRemaining)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* REMARKS */}
+            <div className="mt-3">
+              <Label className="text-xs sm:text-sm">Remarks</Label>
+              <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Optional notes..." className="h-16 text-xs sm:text-sm mt-1" />
+            </div>
+
+            {/* ACTIONS */}
             <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
-                <span>
-                  Subtotal: <strong>{money(billSubtotal)}</strong>
-                </span>
-                <span>
-                  VAT 13%: <strong>{money(billVat)}</strong>
-                </span>
-                <span className="rounded bg-primary/10 px-2 py-0.5 text-sm font-bold text-primary">
-                  Total: {money(billTotal)}
-                </span>
+              <div className="flex flex-wrap gap-4 text-xs sm:text-sm text-muted-foreground">
+                <span>Items: <strong className="text-foreground">{billItems.length}</strong></span>
+                <span>Total Qty: <strong className="text-foreground">{billItems.reduce((a, i) => a + i.qty, 0)}</strong></span>
+                {billRemaining > 0 && (
+                  <Badge variant="destructive" className="text-[10px]">Credit: {money(billRemaining)}</Badge>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button onClick={saveBill} disabled={saving} className="flex-1 sm:flex-initial">
@@ -543,94 +659,118 @@ export function SalesRegister() {
 
       <Card className="overflow-hidden p-0">
         <div className="max-h-[50vh] overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[650px] text-xs sm:text-sm">
+          <table className="w-full min-w-[750px] text-xs sm:text-sm">
             <thead className="sticky top-0 bg-secondary text-secondary-foreground">
               <tr className="text-left">
                 <th className="p-2.5">Date</th>
                 <th className="p-2.5">Invoice</th>
                 <th className="p-2.5">Customer</th>
+                <th className="p-2.5">Type</th>
                 <th className="p-2.5">Payment</th>
                 <th className="p-2.5">Items</th>
                 <th className="p-2.5 text-right">Total</th>
+                <th className="p-2.5 text-right">Paid</th>
+                <th className="p-2.5 text-right">Remaining</th>
                 <th className="p-2.5"></th>
               </tr>
             </thead>
             <tbody>
-              {pagedSales.map((g) => (
-                <tr key={g.header.invoiceNo} className="border-t border-border">
-                  <td className="p-2.5 whitespace-nowrap">{g.header.date}</td>
-                  <td className="p-2.5 font-mono font-medium">{g.header.invoiceNo}</td>
-                  <td className="p-2.5">{g.header.customer}</td>
-                  <td className="p-2.5">
-                    <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium">
-                      {g.header.paymentMethod}
-                    </span>
-                  </td>
-                  <td className="p-2.5">
-                    {g.items.length} item{g.items.length > 1 ? "s" : ""}
-                    <span className="ml-1 text-xs text-muted-foreground">
-                      ({g.items.reduce((a, i) => a + i.qty, 0)} pcs)
-                    </span>
-                  </td>
-                  <td className="p-2.5 text-right font-medium">
-                    {money(g.items.reduce((a, i) => a + i.total, 0))}
-                  </td>
-                  <td className="p-2.5 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          setPrintData({
-                            invoiceNo: g.header.invoiceNo,
-                            date: g.header.date,
-                            customer: g.header.customer,
-                            customerPan: g.header.customerPan,
-                            hasVatPan: g.header.hasVatPan,
-                            paymentMethod: g.header.paymentMethod,
-                            items: g.items.map((s) => ({
-                              itemCode: s.itemCode,
-                              itemName: s.itemName,
-                              category: s.category,
-                              subCategory: s.subCategory,
-                              brand: s.brand,
-                              model: s.model,
-                              qty: s.qty,
-                              rate: s.rate,
-                              amount: s.amount,
-                              vat: s.vat,
-                              total: s.total,
-                            })),
-                            subtotal: g.items.reduce((a, i) => a + i.amount, 0),
-                            vat: g.items.reduce((a, i) => a + i.vat, 0),
-                            total: g.items.reduce((a, i) => a + i.total, 0),
-                          });
-                          setTimeout(() => printInvoice(), 100);
-                        }}
-                        className="h-7 w-7"
-                        title="Print invoice"
-                      >
-                        <Printer className="size-3.5 text-muted-foreground" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          if (window.confirm(`Delete invoice ${g.header.invoiceNo}? This cannot be undone.`)) {
-                            deleteInvoice(g.header.invoiceNo);
-                          }
-                        }}
-                        className="h-7 w-7"
-                      >
-                        <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {pagedSales.map((g) => {
+                const invTotal = g.items.reduce((a, i) => a + i.total, 0);
+                const invPaid = g.header.paidAmount;
+                const invRemaining = g.header.remaining;
+                return (
+                  <tr key={g.header.invoiceNo} className="border-t border-border">
+                    <td className="p-2.5 whitespace-nowrap">{g.header.date}</td>
+                    <td className="p-2.5 font-mono font-medium">{g.header.invoiceNo}</td>
+                    <td className="p-2.5">{g.header.customer}</td>
+                    <td className="p-2.5">
+                      <Badge variant={g.header.saleType === "Credit" ? "destructive" : "secondary"} className="text-[10px]">
+                        {g.header.saleType || "Cash"}
+                      </Badge>
+                    </td>
+                    <td className="p-2.5">
+                      <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium">
+                        {g.header.paymentMethod}
+                      </span>
+                    </td>
+                    <td className="p-2.5">
+                      {g.items.length} item{g.items.length > 1 ? "s" : ""}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({g.items.reduce((a, i) => a + i.qty, 0)} pcs)
+                      </span>
+                    </td>
+                    <td className="p-2.5 text-right font-medium">
+                      {money(invTotal)}
+                    </td>
+                    <td className="p-2.5 text-right">{money(invPaid)}</td>
+                    <td className={`p-2.5 text-right font-medium ${invRemaining > 0 ? "text-destructive" : ""}`}>
+                      {money(invRemaining)}
+                    </td>
+                    <td className="p-2.5 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setPrintData({
+                              invoiceNo: g.header.invoiceNo,
+                              date: g.header.date,
+                              customer: g.header.customer,
+                              customerPan: g.header.customerPan,
+                              hasVatPan: g.header.hasVatPan,
+                              paymentMethod: g.header.paymentMethod,
+                              saleType: g.header.saleType,
+                              items: g.items.map((s) => ({
+                                itemCode: s.itemCode,
+                                itemName: s.itemName,
+                                category: s.category,
+                                subCategory: s.subCategory,
+                                brand: s.brand,
+                                model: s.model,
+                                qty: s.qty,
+                                rate: s.rate,
+                                discount: s.discount,
+                                amount: s.amount,
+                                vat: s.vat,
+                                total: s.total,
+                              })),
+                              subtotal: g.items.reduce((a, i) => a + i.amount, 0),
+                              headerDiscount: 0,
+                              otherCharges: g.header.otherCharges,
+                              vat: g.items.reduce((a, i) => a + i.vat, 0),
+                              total: invTotal,
+                              paidAmount: invPaid,
+                              remaining: invRemaining,
+                              remarks: g.header.remarks,
+                            });
+                            setTimeout(() => printInvoice(), 100);
+                          }}
+                          className="h-7 w-7"
+                          title="Print invoice"
+                        >
+                          <Printer className="size-3.5 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            if (window.confirm(`Delete invoice ${g.header.invoiceNo}? This cannot be undone.`)) {
+                              deleteInvoice(g.header.invoiceNo);
+                            }
+                          }}
+                          className="h-7 w-7"
+                        >
+                          <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {groupedSales.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-muted-foreground">
+                  <td colSpan={10} className="p-6 text-center text-muted-foreground">
                     No sales recorded yet.
                   </td>
                 </tr>

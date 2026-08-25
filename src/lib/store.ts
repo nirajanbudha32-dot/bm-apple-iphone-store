@@ -28,6 +28,7 @@ export type BillItem = {
   model: string;
   qty: number;
   rate: number;
+  discount: number;
   amount: number;
   vat: number;
   total: number;
@@ -48,10 +49,16 @@ export type Sale = {
   model: string;
   qty: number;
   rate: number;
+  discount: number;
   amount: number;
   vat: number;
   total: number;
   paymentMethod: PaymentMethod;
+  otherCharges: number;
+  paidAmount: number;
+  remaining: number;
+  remarks: string;
+  saleType: string;
 };
 
 export type Purchase = {
@@ -231,10 +238,16 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     model: r['model'] as string,
     qty: r['qty'] as number,
     rate: r['rate'] as number,
+    discount: Number(r['discount'] ?? 0),
     amount: r['amount'] as number,
     vat: r['vat'] as number,
     total: r['total'] as number,
     paymentMethod: r['payment_method'] as PaymentMethod,
+    otherCharges: Number(r['other_charges'] ?? 0),
+    paidAmount: Number(r['paid_amount'] ?? 0),
+    remaining: Number(r['remaining'] ?? 0),
+    remarks: (r['remarks'] as string) ?? "",
+    saleType: (r['sale_type'] as string) ?? "Cash",
   };
 }
 
@@ -402,6 +415,11 @@ export async function addBill(
   hasVatPan: boolean,
   paymentMethod: PaymentMethod,
   items: BillItem[],
+  headerDiscount: number = 0,
+  otherCharges: number = 0,
+  paidAmount: number = 0,
+  remarks: string = "",
+  saleType: string = "Cash",
 ) {
   const {
     data: { user },
@@ -421,12 +439,23 @@ export async function addBill(
     model: item.model,
     qty: item.qty,
     rate: item.rate,
+    discount: item.discount,
     amount: item.amount,
     vat: item.vat,
     total: item.total,
     payment_method: paymentMethod,
+    other_charges: otherCharges,
+    paid_amount: paidAmount,
+    remaining: 0,
+    remarks,
+    sale_type: saleType,
     created_by: user?.id ?? null,
   }));
+
+  // Calculate remaining from first item (will be set on all rows for grouping)
+  const grossTotal = items.reduce((a, i) => a + i.total, 0);
+  const remaining = Math.max(0, grossTotal - headerDiscount + otherCharges - paidAmount);
+  rows.forEach((r) => { r.remaining = remaining; });
 
   const { data: insertedSales, error: salesError } = await supabase.from("sales").insert(rows).select("id, item_name, qty");
 

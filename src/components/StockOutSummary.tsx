@@ -53,6 +53,8 @@ export function StockOutSummary() {
   const totalAmount = filtered.reduce((a, s) => a + s.amount, 0);
   const totalVat = filtered.reduce((a, s) => a + s.vat, 0);
   const totalTotal = filtered.reduce((a, s) => a + s.total, 0);
+  const totalPaid = filtered.reduce((a, s) => a + s.paidAmount, 0);
+  const totalRemaining = filtered.reduce((a, s) => a + s.remaining, 0);
 
   const PER_PAGE = 50;
   const [page, setPage] = useState(0);
@@ -74,11 +76,14 @@ export function StockOutSummary() {
         "Lot Info": s.lotInfo,
         "Qty Out": s.qty,
         "Unit Price": s.rate,
+        Discount: s.discount,
         Amount: s.amount,
         VAT: s.vat,
         Total: s.total,
         Customer: s.customer,
         "Invoice No": s.invoiceNo,
+        "Paid Amount": s.paidAmount,
+        Remaining: s.remaining,
       })),
       "Stock Out",
       `BM_StockOut_${new Date().toISOString().slice(0, 10)}.xlsx`,
@@ -134,22 +139,30 @@ export function StockOutSummary() {
           <span><strong className="text-foreground">{totalQty}</strong> units out</span>
         </div>
         <div>
-          Total Value: <strong className="text-foreground">{money(totalTotal)}</strong>
+          Total: <strong className="text-foreground">{money(totalTotal)}</strong>
+          {totalRemaining > 0 && (
+            <>
+              <span className="mx-2">•</span>
+              Remaining: <strong className="text-destructive">{money(totalRemaining)}</strong>
+            </>
+          )}
         </div>
       </div>
 
       <Card className="overflow-hidden p-0">
         <div className="max-h-[60vh] overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[700px] text-xs sm:text-sm">
+          <table className="w-full min-w-[900px] text-xs sm:text-sm">
             <thead className="sticky top-0 bg-secondary text-secondary-foreground">
               <tr className="text-left">
                 <th className="p-2.5">Date</th>
-                <th className="p-2.5">Store Name</th>
                 <th className="p-2.5">Item Code</th>
                 <th className="p-2.5">Item Name</th>
                 <th className="p-2.5">Lot No</th>
                 <th className="p-2.5 text-right">Qty Out</th>
                 <th className="p-2.5 text-right">Unit Price</th>
+                <th className="p-2.5 text-right">Amount</th>
+                <th className="p-2.5 text-right">VAT</th>
+                <th className="p-2.5 text-right">Total</th>
                 <th className="p-2.5">Customer</th>
                 <th className="p-2.5">Invoice No</th>
               </tr>
@@ -158,19 +171,21 @@ export function StockOutSummary() {
               {paged.map((s) => (
                 <tr key={s.id} className="border-t border-border">
                   <td className="p-2.5 whitespace-nowrap">{s.date}</td>
-                  <td className="p-2.5">BM iPhone Store</td>
                   <td className="p-2.5 font-mono">{s.itemCode}</td>
                   <td className="p-2.5 font-medium">{s.itemName}</td>
                   <td className="p-2.5 font-mono text-primary text-[11px]">{s.lotInfo}</td>
                   <td className="p-2.5 text-right font-semibold">{s.qty}</td>
                   <td className="p-2.5 text-right">{money(s.rate)}</td>
+                  <td className="p-2.5 text-right">{money(s.amount)}</td>
+                  <td className="p-2.5 text-right text-muted-foreground">{money(s.vat)}</td>
+                  <td className="p-2.5 text-right font-medium">{money(s.total)}</td>
                   <td className="p-2.5">{s.customer}</td>
                   <td className="p-2.5 font-mono">{s.invoiceNo}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
+                  <td colSpan={11} className="p-6 text-center text-muted-foreground">
                     No stock out records found.
                   </td>
                 </tr>
@@ -179,11 +194,11 @@ export function StockOutSummary() {
             {filtered.length > 0 && (
               <tfoot className="sticky bottom-0 bg-muted">
                 <tr className="border-t border-border font-semibold">
-                  <td className="p-2.5" colSpan={5}>
-                    Total
-                  </td>
+                  <td className="p-2.5" colSpan={4}>Total</td>
                   <td className="p-2.5 text-right">{totalQty}</td>
-                  <td className="p-2.5 text-right">{money(totalAmount)}</td>
+                  <td className="p-2.5 text-right" colSpan={2}>{money(totalAmount)}</td>
+                  <td className="p-2.5 text-right">{money(totalVat)}</td>
+                  <td className="p-2.5 text-right">{money(totalTotal)}</td>
                   <td className="p-2.5" colSpan={2}></td>
                 </tr>
               </tfoot>
