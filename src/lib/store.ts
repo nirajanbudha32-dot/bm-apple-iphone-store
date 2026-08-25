@@ -935,6 +935,18 @@ export async function addStockAdjustment(
 }
 
 async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number): Promise<{ error?: string }> {
+  // First try to find by name (new items may have empty itemCode)
+  if (!entry.itemCode && entry.itemName) {
+    const { data: byName } = await supabase
+      .from("stock")
+      .select("code, qty")
+      .eq("name", entry.itemName)
+      .maybeSingle();
+    if (byName) {
+      entry = { ...entry, itemCode: (byName as Record<string, unknown>)['code'] as string };
+    }
+  }
+
   const { data } = await supabase
     .from("stock")
     .select("code, qty")
@@ -955,7 +967,18 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number): Prom
       if (updateErr) return { error: `Stock update failed: ${updateErr.message}` };
     }
   } else if (delta > 0) {
-    const code = entry.itemCode || (await nextItemCode());
+    // Get next code from DB, not from stale in-memory state
+    const { data: maxRow } = await supabase
+      .from("stock")
+      .select("code")
+      .order("code", { ascending: false })
+      .limit(1);
+    let code = "1";
+    if (maxRow && maxRow.length > 0) {
+      const n = Number(String((maxRow[0] as Record<string, unknown>)['code'] ?? "0").replace(/\D/g, ""));
+      code = String((Number.isFinite(n) ? n : 0) + 1);
+    }
+
     const { error: insertErr } = await supabase.from("stock").insert({
       code,
       name: entry.itemName,
