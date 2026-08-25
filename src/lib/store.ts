@@ -947,11 +947,13 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number): Prom
     }
   }
 
-  const { data } = await supabase
-    .from("stock")
-    .select("code, qty")
-    .eq("code", entry.itemCode)
-    .maybeSingle();
+  const { data } = entry.itemCode
+    ? await supabase
+        .from("stock")
+        .select("code, qty")
+        .eq("code", entry.itemCode)
+        .maybeSingle()
+    : { data: null };
 
   if (data) {
     const { error: rpcErr } = await supabase.rpc("increment_stock_by_code", {
@@ -967,32 +969,36 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number): Prom
       if (updateErr) return { error: `Stock update failed: ${updateErr.message}` };
     }
   } else if (delta > 0) {
-    // Get next code from DB, not from stale in-memory state
-    const { data: maxRow } = await supabase
-      .from("stock")
-      .select("code")
-      .order("code", { ascending: false })
-      .limit(1);
-    let code = "1";
-    if (maxRow && maxRow.length > 0) {
-      const n = Number(String((maxRow[0] as Record<string, unknown>)['code'] ?? "0").replace(/\D/g, ""));
-      code = String((Number.isFinite(n) ? n : 0) + 1);
-    }
+    // Retry loop to handle race conditions when multiple new items are added
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: maxRow } = await supabase
+        .from("stock")
+        .select("code")
+        .order("code", { ascending: false })
+        .limit(1);
+      let code = "1";
+      if (maxRow && maxRow.length > 0) {
+        const n = Number(String((maxRow[0] as Record<string, unknown>)['code'] ?? "0").replace(/\D/g, ""));
+        code = String((Number.isFinite(n) ? n : 0) + 1);
+      }
 
-    const { error: insertErr } = await supabase.from("stock").insert({
-      code,
-      name: entry.itemName,
-      category: entry.category,
-      sub_category: entry.subCategory,
-      brand: entry.brand,
-      sub_brand: "",
-      model: entry.model,
-      unit: "PCS",
-      qty: delta,
-      purchase_price: entry.rate,
-      selling_price: 0,
-    });
-    if (insertErr) return { error: `Stock insert failed: ${insertErr.message}` };
+      const { error: insertErr } = await supabase.from("stock").insert({
+        code,
+        name: entry.itemName,
+        category: entry.category,
+        sub_category: entry.subCategory,
+        brand: entry.brand,
+        sub_brand: "",
+        model: entry.model,
+        unit: "PCS",
+        qty: delta,
+        purchase_price: entry.rate,
+        selling_price: 0,
+      });
+      if (!insertErr) break;
+      // If duplicate key, retry with next code
+      if (attempt === 4) return { error: `Stock insert failed after retries: ${insertErr.message}` };
+    }
   }
   return {};
 }
