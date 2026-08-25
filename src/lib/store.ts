@@ -466,7 +466,8 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
       }
     } catch (_) {}
 
-    await applyStockDelta(entry, entry.qty);
+    const stockResult = await applyStockDelta(entry, entry.qty);
+    if (stockResult.error) return { error: new Error(stockResult.error) };
     await reload();
   }
   return { error: null };
@@ -488,7 +489,7 @@ export async function deletePurchase(id: string) {
   await reload();
 }
 
-async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number) {
+async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number): Promise<{ error?: string }> {
   const { data } = await supabase
     .from("stock")
     .select("code, qty")
@@ -496,14 +497,21 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number) {
     .maybeSingle();
 
   if (data) {
-    const { error } = await supabase.rpc("increment_stock_by_code", {
+    const { error: rpcErr } = await supabase.rpc("increment_stock_by_code", {
       p_code: entry.itemCode,
       p_qty: delta,
     });
-    if (error) console.error("increment_stock_by_code failed:", error.message);
+    if (rpcErr) {
+      const current = Number((data as Record<string, unknown>)['qty'] ?? 0);
+      const { error: updateErr } = await supabase
+        .from("stock")
+        .update({ qty: Math.max(0, current + delta), updated_at: new Date().toISOString() })
+        .eq("code", entry.itemCode);
+      if (updateErr) return { error: `Stock update failed: ${updateErr.message}` };
+    }
   } else if (delta > 0) {
     const code = entry.itemCode || (await nextItemCode());
-    const { error } = await supabase.from("stock").insert({
+    const { error: insertErr } = await supabase.from("stock").insert({
       code,
       name: entry.itemName,
       category: entry.category,
@@ -516,8 +524,9 @@ async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number) {
       purchase_price: entry.rate,
       selling_price: 0,
     });
-    if (error) console.error("stock insert failed:", error.message);
+    if (insertErr) return { error: `Stock insert failed: ${insertErr.message}` };
   }
+  return {};
 }
 
 async function reload() {
