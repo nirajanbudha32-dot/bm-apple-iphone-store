@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, LogOut, PackageMinus, PackagePlus, ReceiptText, Truck, Users } from "lucide-react";
+import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, ShieldAlert, TrendingUp, Truck, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,10 @@ import { StockOutSummary } from "@/components/StockOutSummary";
 import { StockInSummary } from "@/components/StockInSummary";
 import { PurchaseManager } from "@/components/PurchaseManager";
 import { UserManager } from "@/components/UserManager";
+import { LotStockReport } from "@/components/LotStockReport";
+import { LotHistory } from "@/components/LotHistory";
+import { StockAdjustments } from "@/components/StockAdjustments";
+import { ProfitReport } from "@/components/ProfitReport";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -92,7 +96,7 @@ function Index() {
       <Tabs defaultValue="sales">
         <TabsList className="mb-6 grid h-auto w-full grid-cols-3 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
           <TabsTrigger value="sales" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <ReceiptText className="mr-1.5 size-3.5 sm:size-4" /> Sales register
+            <ReceiptText className="mr-1.5 size-3.5 sm:size-4" /> Sales
           </TabsTrigger>
           <TabsTrigger value="purchases" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <PackagePlus className="mr-1.5 size-3.5 sm:size-4" /> Purchases
@@ -105,6 +109,18 @@ function Index() {
           </TabsTrigger>
           <TabsTrigger value="stockout" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <Truck className="mr-1.5 size-3.5 sm:size-4" /> Stock Out
+          </TabsTrigger>
+          <TabsTrigger value="lots" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Lot Report
+          </TabsTrigger>
+          <TabsTrigger value="lothistory" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <History className="mr-1.5 size-3.5 sm:size-4" /> Lot History
+          </TabsTrigger>
+          <TabsTrigger value="adjustments" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <ShieldAlert className="mr-1.5 size-3.5 sm:size-4" /> Adjustments
+          </TabsTrigger>
+          <TabsTrigger value="profit" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <TrendingUp className="mr-1.5 size-3.5 sm:size-4" /> Profit
           </TabsTrigger>
           <TabsTrigger value="summary" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <BarChart3 className="mr-1.5 size-3.5 sm:size-4" /> Summary
@@ -124,6 +140,18 @@ function Index() {
         </TabsContent>
         <TabsContent value="stockin">
           <StockInSummary />
+        </TabsContent>
+        <TabsContent value="lots">
+          <LotStockReport />
+        </TabsContent>
+        <TabsContent value="lothistory">
+          <LotHistory />
+        </TabsContent>
+        <TabsContent value="adjustments">
+          <StockAdjustments />
+        </TabsContent>
+        <TabsContent value="profit">
+          <ProfitReport />
         </TabsContent>
         <TabsContent value="summary">
           <StockSummary />

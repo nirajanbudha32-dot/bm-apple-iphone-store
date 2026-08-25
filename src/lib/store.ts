@@ -91,12 +91,24 @@ export type SaleAllocation = {
   qtyTaken: number;
 };
 
+export type StockAdjustment = {
+  id: string;
+  lotId: string;
+  itemCode: string;
+  itemName: string;
+  date: string;
+  adjustmentType: string;
+  qtyAdjusted: number;
+  reason: string;
+  createdAt: string;
+};
+
 export const VAT_RATE = 0.13;
 
-type State = { stock: StockItem[]; sales: Sale[]; purchases: Purchase[]; stockLots: StockLot[]; saleAllocations: SaleAllocation[] };
+type State = { stock: StockItem[]; sales: Sale[]; purchases: Purchase[]; stockLots: StockLot[]; saleAllocations: SaleAllocation[]; stockAdjustments: StockAdjustment[] };
 
 const listeners = new Set<() => void>();
-let state: State = { stock: [], sales: [], purchases: [], stockLots: [], saleAllocations: [] };
+let state: State = { stock: [], sales: [], purchases: [], stockLots: [], saleAllocations: [], stockAdjustments: [] };
 let loaded = false;
 
 function emit() {
@@ -182,6 +194,20 @@ function mapSaleAllocationRow(r: Record<string, unknown>): SaleAllocation {
     saleId: r['sale_id'] as string,
     lotId: r['lot_id'] as string,
     qtyTaken: r['qty_taken'] as number,
+  };
+}
+
+function mapStockAdjustmentRow(r: Record<string, unknown>): StockAdjustment {
+  return {
+    id: r['id'] as string,
+    lotId: r['lot_id'] as string,
+    itemCode: r['item_code'] as string,
+    itemName: r['item_name'] as string,
+    date: r['date'] as string,
+    adjustmentType: r['adjustment_type'] as string,
+    qtyAdjusted: r['qty_adjusted'] as number,
+    reason: r['reason'] as string,
+    createdAt: r['created_at'] as string,
   };
 }
 
@@ -493,6 +519,38 @@ export async function deletePurchase(id: string) {
   await reload();
 }
 
+export async function addStockAdjustment(
+  lotId: string,
+  qtyAdjusted: number,
+  reason: string,
+  adjustmentType: string = "damage",
+): Promise<{ error?: Error }> {
+  const lot = state.stockLots.find((l) => l.id === lotId);
+  if (!lot) return { error: new Error("Lot not found") };
+  if (lot.qty + qtyAdjusted < 0) return { error: new Error(`Cannot reduce below 0. Available: ${lot.qty}`) };
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from("stock_adjustments").insert({
+    lot_id: lotId,
+    item_code: lot.itemCode,
+    item_name: lot.itemName,
+    date: new Date().toISOString().slice(0, 10),
+    adjustment_type: adjustmentType,
+    qty_adjusted: qtyAdjusted,
+    reason,
+    created_by: user?.id ?? null,
+  });
+  if (error) return { error: new Error(error.message) };
+
+  await supabase.from("stock_lots").update({ qty: lot.qty + qtyAdjusted }).eq("id", lotId);
+  const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", lot.itemName);
+  const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
+  await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", lot.itemName);
+  await reload();
+  return {};
+}
+
 async function applyStockDelta(entry: Omit<Purchase, "id">, delta: number): Promise<{ error?: string }> {
   const { data } = await supabase
     .from("stock")
@@ -542,13 +600,16 @@ async function reload() {
 
   let lots: StockLot[] = [];
   let allocs: SaleAllocation[] = [];
+  let adjustments: StockAdjustment[] = [];
   try {
-    const [lotsRes, allocRes] = await Promise.all([
+    const [lotsRes, allocRes, adjRes] = await Promise.all([
       supabase.from("stock_lots").select("*").order("created_at", { ascending: false }).limit(10000),
       supabase.from("sale_lot_allocations").select("*").limit(10000),
+      supabase.from("stock_adjustments").select("*").order("created_at", { ascending: false }).limit(10000),
     ]);
     lots = (lotsRes.data ?? []).map(mapStockLotRow);
     allocs = (allocRes.data ?? []).map(mapSaleAllocationRow);
+    adjustments = (adjRes.data ?? []).map(mapStockAdjustmentRow);
   } catch (_) {}
 
   state = {
@@ -557,6 +618,7 @@ async function reload() {
     purchases: (purchasesRes.data ?? []).map(mapPurchaseRow),
     stockLots: lots,
     saleAllocations: allocs,
+    stockAdjustments: adjustments,
   };
   emit();
 }

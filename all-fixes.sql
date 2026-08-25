@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS public.sale_lot_allocations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   sale_id uuid REFERENCES public.sales(id),
   lot_id uuid REFERENCES public.stock_lots(id),
-  qty integer NOT NULL DEFAULT 0,
+  qty_taken integer NOT NULL DEFAULT 0,
   created_at timestamptz DEFAULT now()
 );
 
@@ -148,33 +148,36 @@ AS $$
 $$;
 
 -- ============================================
--- 7. fifo_deduct RPC
+-- 7. fifo_deduct RPC (matches lot-schema.sql)
 -- ============================================
 CREATE OR REPLACE FUNCTION public.fifo_deduct(
-  p_item_code text,
-  p_qty integer
+  p_item_name text,
+  p_qty integer,
+  p_sale_id uuid
 )
-RETURNS integer
+RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  remaining integer := p_qty;
-  lot_rec record;
-  deduct integer;
+  v_remaining integer := p_qty;
+  v_lot record;
+  v_take integer;
 BEGIN
-  FOR lot_rec IN
-    SELECT id, qty FROM public.stock_lots
-    WHERE item_code = p_item_code AND qty > 0
-    ORDER BY created_at ASC
+  FOR v_lot IN
+    SELECT id, qty
+    FROM public.stock_lots
+    WHERE item_name = p_item_name AND qty > 0
+    ORDER BY date ASC, created_at ASC
   LOOP
-    IF remaining <= 0 THEN EXIT; END IF;
-    deduct := LEAST(lot_rec.qty, remaining);
-    UPDATE public.stock_lots SET qty = qty - deduct WHERE id = lot_rec.id;
-    remaining := remaining - deduct;
+    EXIT WHEN v_remaining <= 0;
+    v_take := LEAST(v_lot.qty, v_remaining);
+    UPDATE public.stock_lots SET qty = qty - v_take WHERE id = v_lot.id;
+    INSERT INTO public.sale_lot_allocations (sale_id, lot_id, qty_taken)
+    VALUES (p_sale_id, v_lot.id, v_take);
+    v_remaining := v_remaining - v_take;
   END LOOP;
-  RETURN p_qty - remaining;
 END;
 $$;
 
@@ -195,3 +198,51 @@ CREATE INDEX IF NOT EXISTS idx_purchases_item_code ON public.purchases(item_code
 CREATE INDEX IF NOT EXISTS idx_stock_lots_item_code ON public.stock_lots(item_code);
 CREATE INDEX IF NOT EXISTS idx_stock_lots_lot_no ON public.stock_lots(lot_no);
 CREATE INDEX IF NOT EXISTS idx_sale_allocations_sale_id ON public.sale_lot_allocations(sale_id);
+
+-- ============================================
+-- 10. CHECK constraints: prevent negative stock
+-- ============================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'stock_lots_qty_non_negative'
+  ) THEN
+    ALTER TABLE public.stock_lots ADD CONSTRAINT stock_lots_qty_non_negative CHECK (qty >= 0);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'stock_qty_non_negative'
+  ) THEN
+    ALTER TABLE public.stock ADD CONSTRAINT stock_qty_non_negative CHECK (qty >= 0);
+  END IF;
+END $$;
+
+-- ============================================
+-- 11. STOCK ADJUSTMENTS TABLE (damages/manual)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.stock_adjustments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  lot_id uuid NOT NULL REFERENCES public.stock_lots(id),
+  item_code text NOT NULL,
+  item_name text NOT NULL,
+  date text NOT NULL,
+  adjustment_type text NOT NULL DEFAULT 'damage',
+  qty_adjusted integer NOT NULL DEFAULT 0,
+  reason text NOT NULL DEFAULT '',
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.stock_adjustments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can read stock_adjustments" ON public.stock_adjustments;
+CREATE POLICY "Anyone can read stock_adjustments" ON public.stock_adjustments FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Anyone can insert stock_adjustments" ON public.stock_adjustments;
+CREATE POLICY "Anyone can insert stock_adjustments" ON public.stock_adjustments FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Anyone can delete stock_adjustments" ON public.stock_adjustments;
+CREATE POLICY "Anyone can delete stock_adjustments" ON public.stock_adjustments FOR DELETE USING (true);
+
+GRANT SELECT, INSERT, DELETE ON public.stock_adjustments TO authenticated;
+GRANT SELECT, INSERT, DELETE ON public.stock_adjustments TO anon;
+
+CREATE INDEX IF NOT EXISTS idx_stock_adj_lot_id ON public.stock_adjustments(lot_id);
+CREATE INDEX IF NOT EXISTS idx_stock_adj_date ON public.stock_adjustments(date);
