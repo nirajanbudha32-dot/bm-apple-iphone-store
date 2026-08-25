@@ -6,9 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useStore, type Sale, type StockItem } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
-
-const money = (n: number) =>
-  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { money } from "@/lib/utils";
 
 type Group = {
   key: string;

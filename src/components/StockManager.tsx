@@ -231,8 +231,10 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
                           size="icon"
                           variant="ghost"
                           onClick={async () => {
-                            await deleteStock(i.code);
-                            toast.success("Item deleted");
+                            if (window.confirm(`Delete stock item "${i.name}"? This cannot be undone.`)) {
+                              await deleteStock(i.code);
+                              toast.success("Item deleted");
+                            }
                           }}
                           className="h-7 w-7"
                         >

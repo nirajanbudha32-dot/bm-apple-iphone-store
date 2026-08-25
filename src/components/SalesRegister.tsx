@@ -24,12 +24,10 @@ import {
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
-
-const money = (n: number) =>
-  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { money } from "@/lib/utils";
 
 function esc(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 export function SalesRegister() {
@@ -99,6 +97,10 @@ export function SalesRegister() {
       toast.error("Enter valid quantity and rate");
       return;
     }
+    if (matched && matched.qty < itemQty) {
+      toast.error(`Insufficient stock. Available: ${matched.qty}`);
+      return;
+    }
     const amount = itemQty * itemRate;
     const vat = amount * VAT_RATE;
     const newItem: BillItem = {
@@ -132,6 +134,14 @@ export function SalesRegister() {
     if (billItems.length === 0) {
       toast.error("Add at least one item to the bill");
       return;
+    }
+    for (const item of billItems) {
+      const inStock = stock.find((s) => s.code === item.itemCode || s.name === item.itemName);
+      if (!inStock || inStock.qty < item.qty) {
+        toast.error(`Insufficient stock for "${item.itemName}". Available: ${inStock?.qty ?? 0}, needed: ${item.qty}`);
+        setSaving(false);
+        return;
+      }
     }
     setSaving(true);
     const { error } = await addBill(invoiceNo, date, customer.trim(), customerPan.trim(), hasVatPan, paymentMethod, billItems);
@@ -410,6 +420,7 @@ export function SalesRegister() {
                 <Input
                   id="s-qty"
                   type="number"
+                  min="1"
                   value={itemQty}
                   onChange={(e) => setItemQty(Number(e.target.value))}
                   className="h-9 text-xs sm:text-sm"
@@ -420,6 +431,8 @@ export function SalesRegister() {
                 <Input
                   id="s-rate"
                   type="number"
+                  min="0"
+                  step="0.01"
                   value={itemRate}
                   onChange={(e) => setItemRate(Number(e.target.value))}
                   className="h-9 text-xs sm:text-sm"
@@ -602,7 +615,11 @@ export function SalesRegister() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => deleteInvoice(g.header.invoiceNo)}
+                        onClick={() => {
+                          if (window.confirm(`Delete invoice ${g.header.invoiceNo}? This cannot be undone.`)) {
+                            deleteInvoice(g.header.invoiceNo);
+                          }
+                        }}
                         className="h-7 w-7"
                       >
                         <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />

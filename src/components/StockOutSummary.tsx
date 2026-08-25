@@ -7,9 +7,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
-
-const money = (n: number) =>
-  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { money } from "@/lib/utils";
 
 export function StockOutSummary() {
   const { sales, stockLots, saleAllocations } = useStore();
@@ -56,6 +54,11 @@ export function StockOutSummary() {
   const totalVat = filtered.reduce((a, s) => a + s.vat, 0);
   const totalTotal = filtered.reduce((a, s) => a + s.total, 0);
 
+  const PER_PAGE = 50;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const paged = filtered.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+
   function onExport() {
     if (filtered.length === 0) {
       toast.error("No data to export");
@@ -68,8 +71,12 @@ export function StockOutSummary() {
         "Item Code": s.itemCode,
         "Item Name": s.itemName,
         "Sub Category": s.subCategory,
+        "Lot Info": s.lotInfo,
         "Qty Out": s.qty,
         "Unit Price": s.rate,
+        Amount: s.amount,
+        VAT: s.vat,
+        Total: s.total,
         Customer: s.customer,
         "Invoice No": s.invoiceNo,
       })),
@@ -148,7 +155,7 @@ export function StockOutSummary() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => (
+              {paged.map((s) => (
                 <tr key={s.id} className="border-t border-border">
                   <td className="p-2.5 whitespace-nowrap">{s.date}</td>
                   <td className="p-2.5">BM iPhone Store</td>
@@ -184,6 +191,25 @@ export function StockOutSummary() {
           </table>
         </div>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
+          <span>
+            Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, filtered.length)} of {filtered.length}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className="h-8 text-xs">
+              Prev
+            </Button>
+            <span className="flex items-center px-2 text-xs">
+              {page + 1} / {totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="h-8 text-xs">
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,9 +7,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
-
-const money = (n: number) =>
-  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { money } from "@/lib/utils";
 
 export function StockInSummary() {
   const { stockLots, purchases } = useStore();
@@ -56,6 +54,11 @@ export function StockInSummary() {
 
   const totalQty = filtered.reduce((a, l) => a + l.qty, 0);
   const totalValue = filtered.reduce((a, l) => a + l.qty * l.purchasePrice, 0);
+
+  const PER_PAGE = 50;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const paged = filtered.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
 
   function onExport() {
     if (filtered.length === 0) {
@@ -149,7 +152,7 @@ export function StockInSummary() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((l) => (
+              {paged.map((l) => (
                 <tr key={l.id} className="border-t border-border">
                   <td className="p-2.5 font-mono font-medium text-primary">{l.lotNo}</td>
                   <td className="p-2.5 whitespace-nowrap">{l.date}</td>
@@ -185,6 +188,25 @@ export function StockInSummary() {
           </table>
         </div>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
+          <span>
+            Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, filtered.length)} of {filtered.length}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className="h-8 text-xs">
+              Prev
+            </Button>
+            <span className="flex items-center px-2 text-xs">
+              {page + 1} / {totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="h-8 text-xs">
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

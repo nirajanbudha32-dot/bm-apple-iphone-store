@@ -251,32 +251,29 @@ export async function addBill(
   const { data: insertedSales, error: salesError } = await supabase.from("sales").insert(rows).select("id, item_name, qty");
 
   if (!salesError && insertedSales) {
-    let lotWorks = true;
     const affectedItems = new Set<string>();
     for (const inserted of insertedSales) {
-      if (lotWorks) {
-        const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
-          p_item_name: inserted.item_name,
-          p_qty: inserted.qty,
-          p_sale_id: inserted.id,
-        });
-        if (fifoErr) lotWorks = false;
+      const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
+        p_item_name: inserted.item_name,
+        p_qty: inserted.qty,
+        p_sale_id: inserted.id,
+      });
+      if (fifoErr) {
+        await supabase.rpc("decrement_stock", { item_name: inserted.item_name, qty_sold: inserted.qty });
       }
       affectedItems.add(inserted.item_name);
     }
 
-    if (lotWorks && affectedItems.size > 0) {
-      for (const itemName of affectedItems) {
+    for (const itemName of affectedItems) {
+      try {
         const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
-        const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
-        await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
+        if (lots && lots.length > 0) {
+          const totalLotQty = (lots as Record<string, unknown>[]).reduce((sum: number, l) => sum + (l['qty'] as number), 0);
+          await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
+        }
+      } catch (_) {
+        await supabase.rpc("decrement_stock", { item_name: itemName, qty_sold: 0 });
       }
-    } else {
-      await Promise.all(
-        insertedSales.map((s) =>
-          supabase.rpc("decrement_stock", { item_name: s.item_name, qty_sold: s.qty })
-        )
-      );
     }
     await reload();
   }
@@ -450,10 +447,11 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
   if (error) return { error };
 
   if (inserted) {
+    let lotError = false;
     try {
       const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
       if (!lotErr && lotNoResult) {
-        await supabase.from("stock_lots").insert({
+        const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
           lot_no: lotNoResult as string,
           purchase_id: inserted.id,
           item_code: entry.itemCode,
@@ -463,11 +461,17 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
           qty: entry.qty,
           purchase_price: entry.rate,
         });
+        if (lotInsertErr) lotError = true;
+      } else {
+        lotError = true;
       }
-    } catch (_) {}
+    } catch (_) {
+      lotError = true;
+    }
 
     const stockResult = await applyStockDelta(entry, entry.qty);
     if (stockResult.error) return { error: new Error(stockResult.error) };
+    if (lotError) return { error: new Error("Stock updated but lot tracking failed. Lot schema may not be installed.") };
     await reload();
   }
   return { error: null };

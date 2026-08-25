@@ -23,9 +23,7 @@ import {
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
-
-const money = (n: number) =>
-  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { money } from "@/lib/utils";
 
 type PurchaseItemDraft = {
   itemCode: string;
@@ -336,11 +334,11 @@ export function PurchaseManager() {
             <div className="grid grid-cols-2 gap-2 sm:col-span-6 md:col-span-3">
               <div>
                 <Label htmlFor="p-qty" className="text-xs sm:text-sm">Qty</Label>
-                <Input id="p-qty" type="number" value={itemQty} onChange={(e) => setItemQty(Number(e.target.value))} className="h-9 text-xs sm:text-sm" />
+                <Input id="p-qty" type="number" min="1" value={itemQty} onChange={(e) => setItemQty(Number(e.target.value))} className="h-9 text-xs sm:text-sm" />
               </div>
               <div>
                 <Label htmlFor="p-rate" className="text-xs sm:text-sm">Rate</Label>
-                <Input id="p-rate" type="number" value={itemRate} onChange={(e) => setItemRate(Number(e.target.value))} className="h-9 text-xs sm:text-sm" />
+                <Input id="p-rate" type="number" min="0" step="0.01" value={itemRate} onChange={(e) => setItemRate(Number(e.target.value))} className="h-9 text-xs sm:text-sm" />
               </div>
             </div>
             <div className="sm:col-span-6 md:col-span-3">
@@ -529,8 +527,10 @@ export function PurchaseManager() {
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        deletePurchase(p.id);
-                        toast.success(`Deleted purchase ${p.billNo}`);
+                        if (window.confirm(`Delete purchase ${p.billNo} (${p.itemName})? This cannot be undone.`)) {
+                          deletePurchase(p.id);
+                          toast.success(`Deleted purchase ${p.billNo}`);
+                        }
                       }}
                       className="h-7 w-7"
                     >
