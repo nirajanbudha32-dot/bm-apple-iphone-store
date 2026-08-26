@@ -42,6 +42,8 @@ export type Sale = {
   customerPan: string;
   hasVatPan: boolean;
   customerType: string;
+  customerContact: string;
+  customerLocation: string;
   itemName: string;
   itemCode: string;
   category: string;
@@ -361,6 +363,8 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     customerPan: (r['customer_pan'] as string) ?? "",
     hasVatPan: (r['has_vat_pan'] as boolean) ?? false,
     customerType: (r['customer_type'] as string) ?? "Individual",
+    customerContact: (r['customer_contact'] as string) ?? "",
+    customerLocation: (r['customer_location'] as string) ?? "",
     itemName: r['item_name'] as string,
     itemCode: r['item_code'] as string,
     category: r['category'] as string,
@@ -682,6 +686,8 @@ export async function addBill(
   saleType: string = "Cash",
   status: string = "CONFIRMED",
   customerType: string = "Individual",
+  customerContact: string = "",
+  customerLocation: string = "",
   imeisByItem: Record<number, string[]> = {},
 ) {
   const {
@@ -695,6 +701,8 @@ export async function addBill(
     customer_pan: customerPan,
     has_vat_pan: hasVatPan,
     customer_type: customerType,
+    customer_contact: customerContact,
+    customer_location: customerLocation,
     item_name: item.itemName,
     item_code: item.itemCode,
     category: item.category,

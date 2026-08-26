@@ -49,6 +49,8 @@ export function SalesRegister() {
   const [customerPan, setCustomerPan] = useState("");
   const [hasVatPan, setHasVatPan] = useState(false);
   const [customerType, setCustomerType] = useState<"Individual" | "Business" | "VAT Registered">("Individual");
+  const [customerContact, setCustomerContact] = useState("");
+  const [customerLocation, setCustomerLocation] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
   const [saleType, setSaleType] = useState<"Cash" | "Credit">("Cash");
   const [remarks, setRemarks] = useState("");
@@ -78,6 +80,8 @@ export function SalesRegister() {
     customer: string;
     customerPan: string;
     hasVatPan: boolean;
+    customerContact: string;
+    customerLocation: string;
     paymentMethod: PaymentMethod;
     saleType: string;
     items: BillItem[];
@@ -220,6 +224,8 @@ export function SalesRegister() {
       saleType,
       "CONFIRMED",
       customerType,
+      customerContact.trim(),
+      customerLocation.trim(),
       billItemImeis,
     );
     setSaving(false);
@@ -233,6 +239,8 @@ export function SalesRegister() {
       customer: customer.trim(),
       customerPan: customerPan.trim(),
       hasVatPan,
+      customerContact: customerContact.trim(),
+      customerLocation: customerLocation.trim(),
       paymentMethod,
       saleType,
       items: [...billItems],
@@ -249,6 +257,8 @@ export function SalesRegister() {
     setCustomerPan("");
     setHasVatPan(false);
     setCustomerType("Individual");
+    setCustomerContact("");
+    setCustomerLocation("");
     setBillItems([]);
     setBillItemImeis({});
     setPaymentMethod("Cash");
@@ -336,6 +346,8 @@ export function SalesRegister() {
     <div class="info-label">Invoice To</div>
     <div class="info-row"><span class="lbl">Customer</span><span class="val">${esc(printData.customer)}</span></div>
     ${printData.hasVatPan ? `<div class="info-row"><span class="lbl">PAN Number</span><span class="val">${esc(printData.customerPan)}</span></div>` : ""}
+    ${printData.customerContact ? `<div class="info-row"><span class="lbl">Contact</span><span class="val">${esc(printData.customerContact)}</span></div>` : ""}
+    ${printData.customerLocation ? `<div class="info-row"><span class="lbl">Location</span><span class="val">${esc(printData.customerLocation)}</span></div>` : ""}
   </div>
   <div class="info-card">
     <div class="info-label">Invoice Details</div>
@@ -416,6 +428,8 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
         Customer: s.customer,
         "PAN Number": s.customerPan,
         "Has VAT/PAN": s.hasVatPan ? "Yes" : "No",
+        "Contact Name": s.customerContact,
+        Location: s.customerLocation,
         "Item Code": s.itemCode,
         Item: s.itemName,
         "Sub Category": s.subCategory,
@@ -571,6 +585,28 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
               </SelectContent>
             </Select>
           </div>
+          {(customerType === "Business" || customerType === "VAT Registered") && (
+            <>
+              <div>
+                <Label className="text-xs sm:text-sm">Contact Name</Label>
+                <Input
+                  value={customerContact}
+                  onChange={(e) => setCustomerContact(e.target.value)}
+                  placeholder="Contact person name"
+                  className="h-9 text-xs sm:text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs sm:text-sm">Location</Label>
+                <Input
+                  value={customerLocation}
+                  onChange={(e) => setCustomerLocation(e.target.value)}
+                  placeholder="Business location/address"
+                  className="h-9 text-xs sm:text-sm"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-4 border-t border-border pt-4">
@@ -877,6 +913,8 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                               customer: g.header.customer,
                               customerPan: g.header.customerPan,
                               hasVatPan: g.header.hasVatPan,
+                              customerContact: g.header.customerContact,
+                              customerLocation: g.header.customerLocation,
                               paymentMethod: g.header.paymentMethod,
                               saleType: g.header.saleType,
                               items: g.items.map((s) => ({
