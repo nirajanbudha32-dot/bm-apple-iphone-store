@@ -428,7 +428,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
         Customer: s.customer,
         "PAN Number": s.customerPan,
         "Has VAT/PAN": s.hasVatPan ? "Yes" : "No",
-        "Contact Name": s.customerContact,
+        "Contact Number": s.customerContact,
         Location: s.customerLocation,
         "Item Code": s.itemCode,
         Item: s.itemName,
@@ -588,11 +588,11 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
           {(customerType === "Business" || customerType === "VAT Registered") && (
             <>
               <div>
-                <Label className="text-xs sm:text-sm">Contact Name</Label>
+                <Label className="text-xs sm:text-sm">Contact Number</Label>
                 <Input
                   value={customerContact}
                   onChange={(e) => setCustomerContact(e.target.value)}
-                  placeholder="Contact person name"
+                  placeholder="Contact phone number"
                   className="h-9 text-xs sm:text-sm"
                 />
               </div>
