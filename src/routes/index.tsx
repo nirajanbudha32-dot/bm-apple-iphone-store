@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, ShieldAlert, TrendingUp, Truck, Users } from "lucide-react";
+import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { LotStockReport } from "@/components/LotStockReport";
 import { LotHistory } from "@/components/LotHistory";
 import { StockAdjustments } from "@/components/StockAdjustments";
 import { ProfitReport } from "@/components/ProfitReport";
+import { SalesReturns } from "@/components/SalesReturns";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -122,6 +123,9 @@ function Index() {
           <TabsTrigger value="profit" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <TrendingUp className="mr-1.5 size-3.5 sm:size-4" /> Profit
           </TabsTrigger>
+          <TabsTrigger value="returns" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <RotateCcw className="mr-1.5 size-3.5 sm:size-4" /> Returns
+          </TabsTrigger>
           <TabsTrigger value="summary" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <BarChart3 className="mr-1.5 size-3.5 sm:size-4" /> Summary
           </TabsTrigger>
@@ -152,6 +156,9 @@ function Index() {
         </TabsContent>
         <TabsContent value="profit">
           <ProfitReport />
+        </TabsContent>
+        <TabsContent value="returns">
+          <SalesReturns />
         </TabsContent>
         <TabsContent value="summary">
           <StockSummary />

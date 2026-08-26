@@ -15,9 +15,9 @@ export type StockItem = {
   sellingPrice: number;
 };
 
-export type PaymentMethod = "Cash" | "Bank" | "Khalti" | "eSewa" | "Other Bank";
+export type PaymentMethod = "Cash" | "Bank" | "Khalti" | "eSewa" | "Other Bank" | "Card" | "Online";
 
-export const PAYMENT_METHODS: PaymentMethod[] = ["Cash", "Bank", "Khalti", "eSewa", "Other Bank"];
+export const PAYMENT_METHODS: PaymentMethod[] = ["Cash", "Bank", "Card", "Khalti", "eSewa", "Online", "Other Bank"];
 
 export type BillItem = {
   itemCode: string;
@@ -41,6 +41,7 @@ export type Sale = {
   customer: string;
   customerPan: string;
   hasVatPan: boolean;
+  customerType: string;
   itemName: string;
   itemCode: string;
   category: string;
@@ -59,6 +60,7 @@ export type Sale = {
   remaining: number;
   remarks: string;
   saleType: string;
+  status: string;
 };
 
 export type Purchase = {
@@ -172,6 +174,30 @@ export type PurchaseAttachment = {
   fileData: string;
 };
 
+export type SaleItemImei = {
+  id: string;
+  saleId: string;
+  imei: string;
+};
+
+export type SalesReturn = {
+  id: string;
+  returnNo: string;
+  originalInvoiceNo: string;
+  saleId: string;
+  saleItemName: string;
+  saleItemCode: string;
+  lotId: string;
+  imei: string;
+  qty: number;
+  returnDate: string;
+  reason: string;
+  refundAmount: number;
+  status: string;
+  createdBy: string;
+  createdAt: string;
+};
+
 export const VAT_RATE = 0.13;
 
 type State = {
@@ -185,6 +211,8 @@ type State = {
   purchaseItems: PurchaseItem[];
   purchaseImeis: PurchaseItemImei[];
   purchaseAttachments: PurchaseAttachment[];
+  saleImeis: SaleItemImei[];
+  salesReturns: SalesReturn[];
 };
 
 const listeners = new Set<() => void>();
@@ -199,6 +227,8 @@ let state: State = {
   purchaseItems: [],
   purchaseImeis: [],
   purchaseAttachments: [],
+  saleImeis: [],
+  salesReturns: [],
 };
 let loaded = false;
 
@@ -230,6 +260,7 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     customer: r['customer'] as string,
     customerPan: (r['customer_pan'] as string) ?? "",
     hasVatPan: (r['has_vat_pan'] as boolean) ?? false,
+    customerType: (r['customer_type'] as string) ?? "Individual",
     itemName: r['item_name'] as string,
     itemCode: r['item_code'] as string,
     category: r['category'] as string,
@@ -248,6 +279,7 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     remaining: Number(r['remaining'] ?? 0),
     remarks: (r['remarks'] as string) ?? "",
     saleType: (r['sale_type'] as string) ?? "Cash",
+    status: (r['status'] as string) ?? "CONFIRMED",
   };
 }
 
@@ -378,6 +410,34 @@ function mapPurchaseAttachmentRow(r: Record<string, unknown>): PurchaseAttachmen
   };
 }
 
+function mapSaleImeiRow(r: Record<string, unknown>): SaleItemImei {
+  return {
+    id: r['id'] as string,
+    saleId: r['sale_id'] as string,
+    imei: r['imei'] as string,
+  };
+}
+
+function mapSalesReturnRow(r: Record<string, unknown>): SalesReturn {
+  return {
+    id: r['id'] as string,
+    returnNo: r['return_no'] as string,
+    originalInvoiceNo: r['original_invoice_no'] as string,
+    saleId: (r['sale_id'] as string) ?? "",
+    saleItemName: r['sale_item_name'] as string,
+    saleItemCode: r['sale_item_code'] as string,
+    lotId: (r['lot_id'] as string) ?? "",
+    imei: (r['imei'] as string) ?? "",
+    qty: r['qty'] as number,
+    returnDate: r['return_date'] as string,
+    reason: (r['reason'] as string) ?? "",
+    refundAmount: Number(r['refund_amount'] ?? 0),
+    status: (r['status'] as string) ?? "COMPLETED",
+    createdBy: (r['created_by'] as string) ?? "",
+    createdAt: r['created_at'] as string,
+  };
+}
+
 export function useStore() {
   const [snapshot, setSnapshot] = useState(state);
 
@@ -420,6 +480,9 @@ export async function addBill(
   paidAmount: number = 0,
   remarks: string = "",
   saleType: string = "Cash",
+  status: string = "CONFIRMED",
+  customerType: string = "Individual",
+  imeisByItem: Record<number, string[]> = {},
 ) {
   const {
     data: { user },
@@ -431,6 +494,7 @@ export async function addBill(
     customer,
     customer_pan: customerPan,
     has_vat_pan: hasVatPan,
+    customer_type: customerType,
     item_name: item.itemName,
     item_code: item.itemCode,
     category: item.category,
@@ -449,6 +513,7 @@ export async function addBill(
     remaining: 0,
     remarks,
     sale_type: saleType,
+    status,
     created_by: user?.id ?? null,
   }));
 
@@ -461,7 +526,19 @@ export async function addBill(
 
   if (!salesError && insertedSales) {
     const affectedItems = new Set<string>();
-    for (const inserted of insertedSales) {
+    for (let idx = 0; idx < insertedSales.length; idx++) {
+      const inserted = insertedSales[idx]!;
+
+      // Insert IMEIs for this sale row
+      const imeis = imeisByItem[idx] || [];
+      if (imeis.length > 0) {
+        const imeiRows = imeis.map((imei) => ({
+          sale_id: inserted.id,
+          imei,
+        }));
+        await supabase.from("sale_item_imeis").insert(imeiRows);
+      }
+
       const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
         p_item_name: inserted.item_name,
         p_qty: inserted.qty,
@@ -514,6 +591,11 @@ export async function deleteSale(id: string) {
     }
   } catch (_) {}
 
+  // Delete sale IMEIs
+  try {
+    await supabase.from("sale_item_imeis").delete().eq("sale_id", id);
+  } catch (_) {}
+
   await supabase.from("sales").delete().eq("id", id);
 
   if (!lotRestored) {
@@ -551,6 +633,14 @@ export async function deleteInvoice(invoiceNo: string) {
         await supabase.from("sale_lot_allocations").delete().eq("sale_id", sale.id);
         lotRestored = true;
       }
+    }
+  } catch (_) {}
+
+  // Delete all sale IMEIs for this invoice
+  try {
+    const saleIds = items.map((s) => s.id);
+    for (const saleId of saleIds) {
+      await supabase.from("sale_item_imeis").delete().eq("sale_id", saleId);
     }
   } catch (_) {}
 
@@ -1001,6 +1091,164 @@ export async function addStockAdjustment(
   return {};
 }
 
+export async function findItemByImei(imei: string): Promise<{ item?: StockItem; lot?: StockLot; error?: string }> {
+  if (!imei.trim()) return { error: "IMEI is required" };
+
+  // Find the IMEI in purchase_item_imeis
+  const { data: imeiRow, error: imeiErr } = await supabase
+    .from("purchase_item_imeis")
+    .select("purchase_item_id, imei")
+    .eq("imei", imei.trim())
+    .maybeSingle();
+
+  if (imeiErr || !imeiRow) return { error: "IMEI not found in purchases" };
+
+  // Check if this IMEI is already sold
+  const { data: soldImei } = await supabase
+    .from("sale_item_imeis")
+    .select("id")
+    .eq("imei", imei.trim())
+    .maybeSingle();
+
+  if (soldImei) return { error: "IMEI already sold" };
+
+  // Find the purchase item to get the product info
+  const { data: purchaseItem } = await supabase
+    .from("purchase_items")
+    .select("item_code, item_name, category, sub_category, brand, model, unit, rate")
+    .eq("id", imeiRow['purchase_item_id'] as string)
+    .maybeSingle();
+
+  if (!purchaseItem) return { error: "Purchase item not found" };
+
+  // Find the stock item
+  const itemName = purchaseItem['item_name'] as string;
+  const { data: stockItem } = await supabase
+    .from("stock")
+    .select("*")
+    .eq("name", itemName)
+    .maybeSingle();
+
+  if (!stockItem) return { error: "Stock item not found" };
+
+  // Find available lot for this item
+  const { data: lot } = await supabase
+    .from("stock_lots")
+    .select("*")
+    .eq("item_name", itemName)
+    .gt("qty", 0)
+    .order("date", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    item: mapStockRow(stockItem as Record<string, unknown>),
+    lot: lot ? mapStockLotRow(lot as Record<string, unknown>) : undefined,
+  } as { item?: StockItem; lot?: StockLot; error?: string };
+}
+
+export async function getAvailableImeis(itemName: string): Promise<string[]> {
+  if (!itemName.trim()) return [];
+
+  // Get all purchase IMEIs for this item
+  const { data: purchaseItems } = await supabase
+    .from("purchase_items")
+    .select("id")
+    .eq("item_name", itemName);
+
+  if (!purchaseItems || purchaseItems.length === 0) return [];
+
+  const purchaseItemIds = purchaseItems.map((pi) => pi['id'] as string);
+
+  // Get all purchase IMEIs for these items
+  const { data: purchaseImeis } = await supabase
+    .from("purchase_item_imeis")
+    .select("imei, purchase_item_id")
+    .in("purchase_item_id", purchaseItemIds);
+
+  if (!purchaseImeis || purchaseImeis.length === 0) return [];
+
+  // Get all sold IMEIs
+  const allImeis = purchaseImeis.map((pi) => pi['imei'] as string);
+  const { data: soldImeis } = await supabase
+    .from("sale_item_imeis")
+    .select("imei")
+    .in("imei", allImeis);
+
+  const soldSet = new Set((soldImeis ?? []).map((si) => si['imei'] as string));
+
+  // Return only unsold IMEIs
+  return allImeis.filter((imei) => !soldSet.has(imei));
+}
+
+export async function addSalesReturn(
+  originalInvoiceNo: string,
+  saleId: string,
+  itemName: string,
+  itemCode: string,
+  lotId: string,
+  imei: string,
+  qty: number,
+  returnDate: string,
+  reason: string,
+  refundAmount: number,
+): Promise<{ error?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Generate return_no
+  let returnNo = "";
+  try {
+    const { data: noResult, error: noErr } = await supabase.rpc("next_return_no");
+    if (!noErr && noResult) returnNo = noResult as string;
+  } catch (_) {}
+
+  // Insert the return record
+  const { error } = await supabase.from("sales_returns").insert({
+    return_no: returnNo,
+    original_invoice_no: originalInvoiceNo,
+    sale_id: saleId,
+    sale_item_name: itemName,
+    sale_item_code: itemCode,
+    lot_id: lotId,
+    imei,
+    qty,
+    return_date: returnDate,
+    reason,
+    refund_amount: refundAmount,
+    status: "COMPLETED",
+    created_by: user?.id ?? null,
+  });
+  if (error) return { error: error.message };
+
+  // Restore lot qty
+  if (lotId) {
+    const lot = state.stockLots.find((l) => l.id === lotId);
+    if (lot) {
+      await supabase.from("stock_lots").update({ qty: lot.qty + qty }).eq("id", lotId);
+    }
+  }
+
+  // Delete sale IMEI if present
+  if (imei && saleId) {
+    try {
+      await supabase.from("sale_item_imeis").delete().eq("sale_id", saleId).eq("imei", imei);
+    } catch (_) {}
+  }
+
+  // Reconcile stock qty from lot totals
+  try {
+    const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
+    if (lots && lots.length > 0) {
+      const totalLotQty = (lots as Record<string, unknown>[]).reduce((sum: number, l) => sum + (l['qty'] as number), 0);
+      await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
+    }
+  } catch (_) {}
+
+  await reload();
+  return {};
+}
+
 // Module-level counter for generating unique stock codes within a session
 // Prevents race conditions when multiple new items are added in a single purchase
 let nextStockCode: number | null = null;
@@ -1147,6 +1395,17 @@ async function reload() {
     pAttach = (attachRes.data ?? []).map(mapPurchaseAttachmentRow);
   } catch (_) {}
 
+  let saleImeis: SaleItemImei[] = [];
+  let salesReturns: SalesReturn[] = [];
+  try {
+    const [saleImeiRes, returnsRes] = await Promise.all([
+      supabase.from("sale_item_imeis").select("*").limit(20000),
+      supabase.from("sales_returns").select("*").order("created_at", { ascending: false }).limit(5000),
+    ]);
+    saleImeis = (saleImeiRes.data ?? []).map(mapSaleImeiRow);
+    salesReturns = (returnsRes.data ?? []).map(mapSalesReturnRow);
+  } catch (_) {}
+
   state = {
     stock: (stockRes.data ?? []).map(mapStockRow),
     sales: (salesRes.data ?? []).map(mapSaleRow),
@@ -1158,6 +1417,8 @@ async function reload() {
     purchaseItems: pi,
     purchaseImeis: pImeis,
     purchaseAttachments: pAttach,
+    saleImeis,
+    salesReturns,
   };
   emit();
 }

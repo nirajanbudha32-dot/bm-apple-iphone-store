@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Trash2, Plus, Check, Printer } from "lucide-react";
+import { Download, Trash2, Plus, Check, Printer, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import {
   useStore,
   VAT_RATE,
   PAYMENT_METHODS,
+  getAvailableImeis,
   type PaymentMethod,
   type BillItem,
 } from "@/lib/store";
@@ -28,18 +29,26 @@ import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
 import { money } from "@/lib/utils";
 
+const COMPANY = {
+  name: "BM Apple iPhone Store",
+  address: "Birendranagar, Surkhet",
+  pan: "123456789",
+  vatNo: "123456789",
+};
+
 function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 export function SalesRegister() {
-  const { stock, sales } = useStore();
+  const { stock, sales, saleImeis, stockLots } = useStore();
   const invoiceNo = nextInvoiceNo(sales);
 
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [customer, setCustomer] = useState("");
   const [customerPan, setCustomerPan] = useState("");
   const [hasVatPan, setHasVatPan] = useState(false);
+  const [customerType, setCustomerType] = useState<"Individual" | "Business" | "VAT Registered">("Individual");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
   const [saleType, setSaleType] = useState<"Cash" | "Credit">("Cash");
   const [remarks, setRemarks] = useState("");
@@ -50,11 +59,18 @@ export function SalesRegister() {
   const [itemRate, setItemRate] = useState(0);
   const [itemDiscount, setItemDiscount] = useState(0);
 
+  const [imeiInput, setImeiInput] = useState("");
+  const [showImeiInput, setShowImeiInput] = useState(false);
+  const [draftImeis, setDraftImeis] = useState<string[]>([]);
+  const [availableImeis, setAvailableImeis] = useState<string[]>([]);
+  const [expandedBillItem, setExpandedBillItem] = useState<number | null>(null);
+
   const [headerDiscount, setHeaderDiscount] = useState(0);
   const [otherCharges, setOtherCharges] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
 
   const [billItems, setBillItems] = useState<BillItem[]>([]);
+  const [billItemImeis, setBillItemImeis] = useState<Record<number, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [printData, setPrintData] = useState<{
     invoiceNo: string;
@@ -103,6 +119,8 @@ export function SalesRegister() {
     const item = stock.find((i) => i.name === name);
     setItemName(name);
     if (item?.sellingPrice) setItemRate(item.sellingPrice);
+    // Fetch available IMEIs for this item
+    getAvailableImeis(name).then((imeis) => setAvailableImeis(imeis));
   }
 
   function addToBill() {
@@ -134,15 +152,39 @@ export function SalesRegister() {
       vat,
       total: amount + vat,
     };
-    setBillItems((prev) => [...prev, newItem]);
+    setBillItems((prev) => {
+      const newIndex = prev.length;
+      // Store IMEIs for this new item
+      if (draftImeis.length > 0 || imeiInput.trim()) {
+        const imeis = draftImeis.length > 0 ? [...draftImeis] : (imeiInput.trim() ? [imeiInput.trim()] : []);
+        setBillItemImeis((prevImeis) => ({ ...prevImeis, [newIndex]: imeis }));
+      }
+      return [...prev, newItem];
+    });
     setItemName("");
     setItemQty(1);
     setItemRate(0);
     setItemDiscount(0);
+    setDraftImeis([]);
+    setImeiInput("");
+    setAvailableImeis([]);
   }
 
   function removeBillItem(index: number) {
     setBillItems((prev) => prev.filter((_, i) => i !== index));
+    // Reindex IMEIs after removal
+    setBillItemImeis((prev) => {
+      const updated: Record<number, string[]> = {};
+      let newIdx = 0;
+      for (let i = 0; i < 100; i++) {
+        if (i === index) continue;
+        if (prev[i]) {
+          updated[newIdx] = prev[i] as string[];
+          newIdx++;
+        }
+      }
+      return updated;
+    });
   }
 
   async function saveBill() {
@@ -176,6 +218,9 @@ export function SalesRegister() {
       paidAmount,
       remarks.trim(),
       saleType,
+      "CONFIRMED",
+      customerType,
+      billItemImeis,
     );
     setSaving(false);
     if (error) {
@@ -203,7 +248,9 @@ export function SalesRegister() {
     setCustomer("");
     setCustomerPan("");
     setHasVatPan(false);
+    setCustomerType("Individual");
     setBillItems([]);
+    setBillItemImeis({});
     setPaymentMethod("Cash");
     setSaleType("Cash");
     setRemarks("");
@@ -227,6 +274,7 @@ export function SalesRegister() {
 
   .header { text-align: center; margin-bottom: 24px; }
   .company-name { font-size: 22px; font-weight: 700; color: #16a34a; letter-spacing: 0.5px; }
+  .company-address { font-size: 10px; color: #6b7280; margin-top: 3px; letter-spacing: 0.2px; }
   .company-tagline { font-size: 11px; color: #6b7280; margin-top: 2px; letter-spacing: 0.3px; }
   .header-bar { width: 60px; height: 3px; background: #16a34a; margin: 10px auto 0; border-radius: 2px; }
 
@@ -277,7 +325,8 @@ export function SalesRegister() {
 </style></head><body>
 
 <div class="header">
-  <div class="company-name">BM Apple iPhone Store</div>
+  <div class="company-name">${esc(COMPANY.name)}</div>
+  <div class="company-address">${esc(COMPANY.address)} | PAN: ${esc(COMPANY.pan)} | VAT: ${esc(COMPANY.vatNo)}</div>
   <div class="company-tagline">Stock Management &amp; Sales</div>
   <div class="header-bar"></div>
 </div>
@@ -511,6 +560,17 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label className="text-xs sm:text-sm">Customer Type</Label>
+            <Select value={customerType} onValueChange={(v) => setCustomerType(v as "Individual" | "Business" | "VAT Registered")}>
+              <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Individual">Individual</SelectItem>
+                <SelectItem value="Business">Business</SelectItem>
+                <SelectItem value="VAT Registered">VAT Registered</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="mt-4 border-t border-border pt-4">
@@ -545,41 +605,67 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                 </ul>
               )}
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:col-span-7 md:col-span-5">
-              <div>
-                <Label htmlFor="s-qty" className="text-xs sm:text-sm">Qty</Label>
-                <Input
-                  id="s-qty"
-                  type="number"
-                  min="1"
-                  value={itemQty}
-                  onChange={(e) => setItemQty(Number(e.target.value))}
-                  className="h-9 text-xs sm:text-sm"
-                />
+            <div className="sm:col-span-7 md:col-span-5">
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label htmlFor="s-qty" className="text-xs sm:text-sm">Qty</Label>
+                  <Input
+                    id="s-qty"
+                    type="number"
+                    min="1"
+                    value={itemQty}
+                    onChange={(e) => setItemQty(Number(e.target.value))}
+                    className="h-9 text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="s-rate" className="text-xs sm:text-sm">Rate</Label>
+                  <Input
+                    id="s-rate"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={itemRate}
+                    onChange={(e) => setItemRate(Number(e.target.value))}
+                    className="h-9 text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="s-disc" className="text-xs sm:text-sm">Discount</Label>
+                  <Input
+                    id="s-disc"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={itemDiscount}
+                    onChange={(e) => setItemDiscount(Number(e.target.value))}
+                    className="h-9 text-xs sm:text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="s-rate" className="text-xs sm:text-sm">Rate</Label>
-                <Input
-                  id="s-rate"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={itemRate}
-                  onChange={(e) => setItemRate(Number(e.target.value))}
-                  className="h-9 text-xs sm:text-sm"
-                />
-              </div>
-              <div>
-                <Label htmlFor="s-disc" className="text-xs sm:text-sm">Discount</Label>
-                <Input
-                  id="s-disc"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={itemDiscount}
-                  onChange={(e) => setItemDiscount(Number(e.target.value))}
-                  className="h-9 text-xs sm:text-sm"
-                />
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowImeiInput(!showImeiInput)}
+                  className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs transition-colors ${
+                    showImeiInput ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  <Smartphone className="size-3.5" />
+                  IMEI
+                </button>
+                {showImeiInput && (
+                  <Input
+                    value={imeiInput}
+                    onChange={(e) => setImeiInput(e.target.value)}
+                    placeholder="15-digit IMEI"
+                    maxLength={15}
+                    className="h-8 max-w-[200px] text-xs font-mono"
+                  />
+                )}
+                {draftImeis.length > 0 && (
+                  <span className="text-xs text-muted-foreground">{draftImeis.length} IMEI(s) attached</span>
+                )}
               </div>
             </div>
             <div className="flex items-end sm:col-span-12 md:col-span-3">
@@ -732,6 +818,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                 <th className="p-2.5">Invoice</th>
                 <th className="p-2.5">Customer</th>
                 <th className="p-2.5">Type</th>
+                <th className="p-2.5">Status</th>
                 <th className="p-2.5">Payment</th>
                 <th className="p-2.5">Items</th>
                 <th className="p-2.5 text-right">Total</th>
@@ -753,6 +840,11 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                     <td className="p-2.5">
                       <Badge variant={g.header.saleType === "Credit" ? "destructive" : "secondary"} className="text-[10px]">
                         {g.header.saleType || "Cash"}
+                      </Badge>
+                    </td>
+                    <td className="p-2.5">
+                      <Badge variant={g.header.status === "CANCELLED" || g.header.status === "RETURNED" ? "destructive" : "outline"} className="text-[10px]">
+                        {g.header.status || "CONFIRMED"}
                       </Badge>
                     </td>
                     <td className="p-2.5">
@@ -836,7 +928,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
               })}
               {groupedSales.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="p-6 text-center text-muted-foreground">
+                  <td colSpan={11} className="p-6 text-center text-muted-foreground">
                     No sales recorded yet.
                   </td>
                 </tr>
