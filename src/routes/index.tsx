@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users } from "lucide-react";
+import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,12 @@ import { LotHistory } from "@/components/LotHistory";
 import { StockAdjustments } from "@/components/StockAdjustments";
 import { ProfitReport } from "@/components/ProfitReport";
 import { SalesReturns } from "@/components/SalesReturns";
+import { VendorMaster } from "@/components/VendorMaster";
+import { VendorDashboard } from "@/components/VendorDashboard";
+import { VendorLedger } from "@/components/VendorLedger";
+import { VendorPayments } from "@/components/VendorPayments";
+import { PurchaseReturns } from "@/components/PurchaseReturns";
+import { VendorReports } from "@/components/VendorReports";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -42,6 +48,7 @@ function Index() {
   const { user, profile, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [userManagerOpen, setUserManagerOpen] = useState(false);
+  const [vendorSubTab, setVendorSubTab] = useState("dashboard");
 
   useEffect(() => {
     if (AUTH_ENABLED && !loading && !user) {
@@ -95,7 +102,7 @@ function Index() {
       </header>
 
       <Tabs defaultValue="sales">
-        <TabsList className="mb-6 grid h-auto w-full grid-cols-3 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
+        <TabsList className="mb-6 grid h-auto w-full grid-cols-4 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
           <TabsTrigger value="sales" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <ReceiptText className="mr-1.5 size-3.5 sm:size-4" /> Sales
           </TabsTrigger>
@@ -128,6 +135,9 @@ function Index() {
           </TabsTrigger>
           <TabsTrigger value="summary" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <BarChart3 className="mr-1.5 size-3.5 sm:size-4" /> Summary
+          </TabsTrigger>
+          <TabsTrigger value="vendors" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+            <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
           </TabsTrigger>
         </TabsList>
         <TabsContent value="sales">
@@ -162,6 +172,34 @@ function Index() {
         </TabsContent>
         <TabsContent value="summary">
           <StockSummary />
+        </TabsContent>
+        <TabsContent value="vendors">
+          <div className="flex flex-wrap gap-1 border-b border-border/60 pb-2 mb-4">
+            <Button variant={vendorSubTab === "dashboard" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("dashboard")} className="h-8 text-xs sm:text-sm">
+              <LayoutDashboard className="mr-1 size-3.5" /> Dashboard
+            </Button>
+            <Button variant={vendorSubTab === "master" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("master")} className="h-8 text-xs sm:text-sm">
+              <Users className="mr-1 size-3.5" /> Master
+            </Button>
+            <Button variant={vendorSubTab === "ledger" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("ledger")} className="h-8 text-xs sm:text-sm">
+              <BookOpen className="mr-1 size-3.5" /> Ledger
+            </Button>
+            <Button variant={vendorSubTab === "payments" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("payments")} className="h-8 text-xs sm:text-sm">
+              <CreditCard className="mr-1 size-3.5" /> Payments
+            </Button>
+            <Button variant={vendorSubTab === "returns" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("returns")} className="h-8 text-xs sm:text-sm">
+              <RotateCcw className="mr-1 size-3.5" /> Returns
+            </Button>
+            <Button variant={vendorSubTab === "reports" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("reports")} className="h-8 text-xs sm:text-sm">
+              <FileText className="mr-1 size-3.5" /> Reports
+            </Button>
+          </div>
+          {vendorSubTab === "dashboard" && <VendorDashboard />}
+          {vendorSubTab === "master" && <VendorMaster />}
+          {vendorSubTab === "ledger" && <VendorLedger />}
+          {vendorSubTab === "payments" && <VendorPayments />}
+          {vendorSubTab === "returns" && <PurchaseReturns />}
+          {vendorSubTab === "reports" && <VendorReports />}
         </TabsContent>
       </Tabs>
 

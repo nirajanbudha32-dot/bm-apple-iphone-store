@@ -25,6 +25,7 @@ import {
   type PurchaseHeader,
   type PurchaseItem,
   type StockItem,
+  type Vendor,
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
@@ -81,8 +82,9 @@ const emptyDraft = (): PurchaseItemDraft => ({
 });
 
 export function PurchaseManager() {
-  const { stock, purchaseHeaders, purchaseItems, purchaseImeis, purchaseAttachments } = useStore();
+  const { stock, purchaseHeaders, purchaseItems, purchaseImeis, purchaseAttachments, vendors } = useStore();
 
+  const [selectedVendorId, setSelectedVendorId] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState("");
   const [supplierName, setSupplierName] = useState("");
@@ -352,6 +354,7 @@ export function PurchaseManager() {
       grandTotal: headerTotals.grandTotal,
       paidAmount,
       remainingBalance: headerTotals.remainingBalance,
+      vendorId: selectedVendorId || "",
     };
 
     const result = await addPurchaseHeader(header, items, imeisByItem);
@@ -377,6 +380,7 @@ export function PurchaseManager() {
     }
 
     toast.success(`Purchase saved with ${purchaseItemsDraft.length} items`);
+    setSelectedVendorId("");
     setSupplierName("");
     setSupplierInvoiceNo("");
     setSupplierAddress("");
@@ -473,6 +477,26 @@ export function PurchaseManager() {
           <div>
             <Label className="text-xs sm:text-sm">Date</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 text-xs sm:text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs sm:text-sm">Select Vendor</Label>
+            <Select value={selectedVendorId} onValueChange={(v) => {
+              setSelectedVendorId(v);
+              const vendor = vendors.find(vend => vend.id === v);
+              if (vendor) {
+                setSupplierName(vendor.vendorName);
+                setSupplierAddress(vendor.address || "");
+                setSupplierPan(vendor.pan || "");
+                setSupplierVat(vendor.vatNumber || "");
+              }
+            }}>
+              <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue placeholder="Select vendor (optional)" /></SelectTrigger>
+              <SelectContent>
+                {vendors.filter(v => v.status === "Active").map(v => (
+                  <SelectItem key={v.id} value={v.id}>{v.vendorCode} - {v.vendorName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label className="text-xs sm:text-sm">Purchase No</Label>

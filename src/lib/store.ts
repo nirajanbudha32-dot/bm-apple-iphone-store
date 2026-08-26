@@ -134,6 +134,7 @@ export type PurchaseHeader = {
   grandTotal: number;
   paidAmount: number;
   remainingBalance: number;
+  vendorId: string;
   createdAt: string;
 };
 
@@ -198,6 +199,93 @@ export type SalesReturn = {
   createdAt: string;
 };
 
+export type Vendor = {
+  id: string;
+  vendorCode: string;
+  vendorName: string;
+  vendorType: string;
+  pan: string;
+  vatNumber: string;
+  vatStatus: string;
+  address: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  paymentTerms: string;
+  creditLimit: number;
+  bankName: string;
+  bankAccountNo: string;
+  openingBalance: number;
+  openingBalanceDate: string;
+  status: string;
+  remarks: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type VendorTransaction = {
+  id: string;
+  vendorId: string;
+  transactionType: string;
+  referenceNo: string;
+  referenceId: string;
+  transactionDate: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  remarks: string;
+  createdAt: string;
+};
+
+export type VendorPayment = {
+  id: string;
+  paymentNo: string;
+  vendorId: string;
+  paymentDate: string;
+  paymentMethod: string;
+  amount: number;
+  bankName: string;
+  referenceNo: string;
+  remarks: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type VendorPaymentAllocation = {
+  id: string;
+  paymentId: string;
+  purchaseHeaderId: string;
+  amount: number;
+};
+
+export type PurchaseReturn = {
+  id: string;
+  returnNo: string;
+  originalPurchaseNo: string;
+  purchaseHeaderId: string;
+  vendorId: string;
+  itemCode: string;
+  itemName: string;
+  lotId: string;
+  imei: string;
+  qty: number;
+  returnDate: string;
+  reason: string;
+  refundAmount: number;
+  status: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type VendorDocument = {
+  id: string;
+  vendorId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  fileData: string;
+};
+
 export const VAT_RATE = 0.13;
 
 type State = {
@@ -213,6 +301,12 @@ type State = {
   purchaseAttachments: PurchaseAttachment[];
   saleImeis: SaleItemImei[];
   salesReturns: SalesReturn[];
+  vendors: Vendor[];
+  vendorTransactions: VendorTransaction[];
+  vendorPayments: VendorPayment[];
+  vendorPaymentAllocations: VendorPaymentAllocation[];
+  purchaseReturns: PurchaseReturn[];
+  vendorDocuments: VendorDocument[];
 };
 
 const listeners = new Set<() => void>();
@@ -229,6 +323,12 @@ let state: State = {
   purchaseAttachments: [],
   saleImeis: [],
   salesReturns: [],
+  vendors: [],
+  vendorTransactions: [],
+  vendorPayments: [],
+  vendorPaymentAllocations: [],
+  purchaseReturns: [],
+  vendorDocuments: [],
 };
 let loaded = false;
 
@@ -363,6 +463,7 @@ function mapPurchaseHeaderRow(r: Record<string, unknown>): PurchaseHeader {
     grandTotal: Number(r['grand_total'] ?? 0),
     paidAmount: Number(r['paid_amount'] ?? 0),
     remainingBalance: Number(r['remaining_balance'] ?? 0),
+    vendorId: (r['vendor_id'] as string) ?? "",
     createdAt: r['created_at'] as string,
   };
 }
@@ -435,6 +536,105 @@ function mapSalesReturnRow(r: Record<string, unknown>): SalesReturn {
     status: (r['status'] as string) ?? "COMPLETED",
     createdBy: (r['created_by'] as string) ?? "",
     createdAt: r['created_at'] as string,
+  };
+}
+
+function mapVendorRow(r: Record<string, unknown>): Vendor {
+  return {
+    id: r['id'] as string,
+    vendorCode: r['vendor_code'] as string,
+    vendorName: r['vendor_name'] as string,
+    vendorType: (r['vendor_type'] as string) ?? "Local Supplier",
+    pan: (r['pan'] as string) ?? "",
+    vatNumber: (r['vat_number'] as string) ?? "",
+    vatStatus: (r['vat_status'] as string) ?? "PAN Only",
+    address: (r['address'] as string) ?? "",
+    contactPerson: (r['contact_person'] as string) ?? "",
+    phone: (r['phone'] as string) ?? "",
+    email: (r['email'] as string) ?? "",
+    paymentTerms: (r['payment_terms'] as string) ?? "30 Days",
+    creditLimit: Number(r['credit_limit'] ?? 0),
+    bankName: (r['bank_name'] as string) ?? "",
+    bankAccountNo: (r['bank_account_no'] as string) ?? "",
+    openingBalance: Number(r['opening_balance'] ?? 0),
+    openingBalanceDate: (r['opening_balance_date'] as string) ?? "",
+    status: (r['status'] as string) ?? "Active",
+    remarks: (r['remarks'] as string) ?? "",
+    createdBy: (r['created_by'] as string) ?? "",
+    createdAt: r['created_at'] as string,
+  };
+}
+
+function mapVendorTransactionRow(r: Record<string, unknown>): VendorTransaction {
+  return {
+    id: r['id'] as string,
+    vendorId: r['vendor_id'] as string,
+    transactionType: r['transaction_type'] as string,
+    referenceNo: (r['reference_no'] as string) ?? "",
+    referenceId: (r['reference_id'] as string) ?? "",
+    transactionDate: r['transaction_date'] as string,
+    debit: Number(r['debit'] ?? 0),
+    credit: Number(r['credit'] ?? 0),
+    balance: Number(r['balance'] ?? 0),
+    remarks: (r['remarks'] as string) ?? "",
+    createdAt: r['created_at'] as string,
+  };
+}
+
+function mapVendorPaymentRow(r: Record<string, unknown>): VendorPayment {
+  return {
+    id: r['id'] as string,
+    paymentNo: r['payment_no'] as string,
+    vendorId: r['vendor_id'] as string,
+    paymentDate: r['payment_date'] as string,
+    paymentMethod: (r['payment_method'] as string) ?? "Cash",
+    amount: Number(r['amount'] ?? 0),
+    bankName: (r['bank_name'] as string) ?? "",
+    referenceNo: (r['reference_no'] as string) ?? "",
+    remarks: (r['remarks'] as string) ?? "",
+    createdBy: (r['created_by'] as string) ?? "",
+    createdAt: r['created_at'] as string,
+  };
+}
+
+function mapVendorPaymentAllocationRow(r: Record<string, unknown>): VendorPaymentAllocation {
+  return {
+    id: r['id'] as string,
+    paymentId: r['payment_id'] as string,
+    purchaseHeaderId: r['purchase_header_id'] as string,
+    amount: Number(r['amount'] ?? 0),
+  };
+}
+
+function mapPurchaseReturnRow(r: Record<string, unknown>): PurchaseReturn {
+  return {
+    id: r['id'] as string,
+    returnNo: r['return_no'] as string,
+    originalPurchaseNo: r['original_purchase_no'] as string,
+    purchaseHeaderId: (r['purchase_header_id'] as string) ?? "",
+    vendorId: (r['vendor_id'] as string) ?? "",
+    itemCode: r['item_code'] as string,
+    itemName: r['item_name'] as string,
+    lotId: (r['lot_id'] as string) ?? "",
+    imei: (r['imei'] as string) ?? "",
+    qty: r['qty'] as number,
+    returnDate: r['return_date'] as string,
+    reason: (r['reason'] as string) ?? "",
+    refundAmount: Number(r['refund_amount'] ?? 0),
+    status: (r['status'] as string) ?? "COMPLETED",
+    createdBy: (r['created_by'] as string) ?? "",
+    createdAt: r['created_at'] as string,
+  };
+}
+
+function mapVendorDocumentRow(r: Record<string, unknown>): VendorDocument {
+  return {
+    id: r['id'] as string,
+    vendorId: r['vendor_id'] as string,
+    fileName: r['file_name'] as string,
+    fileType: (r['file_type'] as string) ?? "",
+    fileSize: Number(r['file_size'] ?? 0),
+    fileData: (r['file_data'] as string) ?? "",
   };
 }
 
@@ -904,7 +1104,8 @@ export async function addPurchaseHeader(
     other_charges: header.otherCharges,
     grand_total: header.grandTotal,
     paid_amount: header.paidAmount,
-    remaining_balance: header.remainingBalance,
+    remaining_balance: header.grandTotal - header.paidAmount,
+    vendor_id: (header as Record<string, unknown>)['vendorId'] || null,
     created_by: user?.id ?? null,
   }).select("id").single();
 
@@ -1001,6 +1202,24 @@ export async function addPurchaseHeader(
     if (lotInsertErr) {
       console.warn("Stock lot insert warning for " + item.itemName, lotInsertErr.message);
     }
+  }
+
+  // Create vendor ledger entry for this purchase (debit = increases what we owe)
+  const vendorIdForTxn = (header as Record<string, unknown>)['vendorId'] as string | undefined;
+  if (vendorIdForTxn && header.grandTotal > 0) {
+    const prevBalance = getVendorBalance(vendorIdForTxn);
+    const newBalance = prevBalance + header.grandTotal;
+    await supabase.from("vendor_transactions").insert({
+      vendor_id: vendorIdForTxn,
+      transaction_type: "PURCHASE",
+      reference_no: purchaseNo,
+      reference_id: headerId,
+      transaction_date: header.date,
+      debit: header.grandTotal,
+      credit: 0,
+      balance: newBalance,
+      remarks: `Purchase ${purchaseNo}`,
+    });
   }
 
   await reload();
@@ -1356,6 +1575,327 @@ async function applyStockDelta(
   return { itemCode };
 }
 
+export async function nextVendorCode(): Promise<string> {
+  try {
+    const { data, error } = await supabase.rpc("next_vendor_code");
+    if (!error && data) return data as string;
+  } catch (_) {}
+  // Fallback
+  const max = state.vendors.reduce((acc, v) => {
+    const n = Number(v.vendorCode.replace(/\D/g, ""));
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  return `VEN-${String(max + 1).padStart(4, "0")}`;
+}
+
+export async function addVendor(
+  vendor: Omit<Vendor, "id" | "createdAt">,
+): Promise<{ error?: string; vendorId?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  let vendorCode = vendor.vendorCode;
+  if (!vendorCode) {
+    vendorCode = await nextVendorCode();
+  }
+  const { data: inserted, error } = await supabase.from("vendors").insert({
+    vendor_code: vendorCode,
+    vendor_name: vendor.vendorName,
+    vendor_type: vendor.vendorType,
+    pan: vendor.pan,
+    vat_number: vendor.vatNumber,
+    vat_status: vendor.vatStatus,
+    address: vendor.address,
+    contact_person: vendor.contactPerson,
+    phone: vendor.phone,
+    email: vendor.email,
+    payment_terms: vendor.paymentTerms,
+    credit_limit: vendor.creditLimit,
+    bank_name: vendor.bankName,
+    bank_account_no: vendor.bankAccountNo,
+    opening_balance: vendor.openingBalance,
+    opening_balance_date: vendor.openingBalanceDate,
+    status: vendor.status,
+    remarks: vendor.remarks,
+    created_by: user?.id ?? null,
+  }).select("id").single();
+
+  if (error) return { error: error.message };
+  const vendorId = inserted!.id as string;
+
+  // Create opening balance ledger entry if balance > 0
+  if (vendor.openingBalance > 0 && vendor.openingBalanceDate) {
+    await supabase.from("vendor_transactions").insert({
+      vendor_id: vendorId,
+      transaction_type: "OPENING_BALANCE",
+      reference_no: "Opening",
+      transaction_date: vendor.openingBalanceDate,
+      debit: 0,
+      credit: vendor.openingBalance,
+      balance: vendor.openingBalance,
+      remarks: "Opening balance",
+    });
+  }
+
+  await reload();
+  return { vendorId };
+}
+
+export async function updateVendor(
+  id: string,
+  vendor: Omit<Vendor, "id" | "createdAt">,
+): Promise<{ error?: string }> {
+  const { error } = await supabase.from("vendors").update({
+    vendor_code: vendor.vendorCode,
+    vendor_name: vendor.vendorName,
+    vendor_type: vendor.vendorType,
+    pan: vendor.pan,
+    vat_number: vendor.vatNumber,
+    vat_status: vendor.vatStatus,
+    address: vendor.address,
+    contact_person: vendor.contactPerson,
+    phone: vendor.phone,
+    email: vendor.email,
+    payment_terms: vendor.paymentTerms,
+    credit_limit: vendor.creditLimit,
+    bank_name: vendor.bankName,
+    bank_account_no: vendor.bankAccountNo,
+    opening_balance: vendor.openingBalance,
+    opening_balance_date: vendor.openingBalanceDate,
+    status: vendor.status,
+    remarks: vendor.remarks,
+    updated_at: new Date().toISOString(),
+  }).eq("id", id);
+  if (error) return { error: error.message };
+  await reload();
+  return {};
+}
+
+export async function addVendorDocument(
+  vendorId: string,
+  fileName: string,
+  fileType: string,
+  fileSize: number,
+  fileData: string,
+): Promise<{ error?: string }> {
+  const { error } = await supabase.from("vendor_documents").insert({
+    vendor_id: vendorId,
+    file_name: fileName,
+    file_type: fileType,
+    file_size: fileSize,
+    file_data: fileData,
+  });
+  if (error) return { error: error.message };
+  await reload();
+  return {};
+}
+
+export async function deleteVendorDocument(id: string): Promise<{ error?: string }> {
+  const { error } = await supabase.from("vendor_documents").delete().eq("id", id);
+  if (error) return { error: error.message };
+  await reload();
+  return {};
+}
+
+export async function nextVendorPaymentNo(): Promise<string> {
+  try {
+    const { data, error } = await supabase.rpc("next_vendor_payment_no");
+    if (!error && data) return data as string;
+  } catch (_) {}
+  const max = state.vendorPayments.reduce((acc, p) => {
+    const n = Number(p.paymentNo.replace(/\D/g, ""));
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  return `VP-${String(max + 1).padStart(4, "0")}`;
+}
+
+export async function addVendorPayment(
+  vendorId: string,
+  paymentDate: string,
+  paymentMethod: string,
+  amount: number,
+  bankName: string,
+  referenceNo: string,
+  remarks: string,
+  allocations: { purchaseHeaderId: string; amount: number }[],
+): Promise<{ error?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const paymentNo = await nextVendorPaymentNo();
+
+  const { data: inserted, error } = await supabase.from("vendor_payments").insert({
+    payment_no: paymentNo,
+    vendor_id: vendorId,
+    payment_date: paymentDate,
+    payment_method: paymentMethod,
+    amount,
+    bank_name: bankName,
+    reference_no: referenceNo,
+    remarks,
+    created_by: user?.id ?? null,
+  }).select("id").single();
+
+  if (error) return { error: error.message };
+  const paymentId = inserted!.id as string;
+
+  // Insert allocations
+  for (const alloc of allocations) {
+    if (alloc.amount > 0) {
+      await supabase.from("vendor_payment_allocations").insert({
+        payment_id: paymentId,
+        purchase_header_id: alloc.purchaseHeaderId,
+        amount: alloc.amount,
+      });
+      // Update purchase_headers remaining_balance
+      const ph = state.purchaseHeaders.find((h) => h.id === alloc.purchaseHeaderId);
+      if (ph) {
+        const newRemaining = Math.max(0, ph.remainingBalance - alloc.amount);
+        await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", alloc.purchaseHeaderId);
+      }
+    }
+  }
+
+  // Create ledger entry (credit = reduces what you owe)
+  const vendor = state.vendors.find((v) => v.id === vendorId);
+  const prevBalance = vendor ? getVendorBalance(vendorId) : 0;
+  const newBalance = prevBalance - amount;
+  await supabase.from("vendor_transactions").insert({
+    vendor_id: vendorId,
+    transaction_type: "PAYMENT",
+    reference_no: paymentNo,
+    reference_id: paymentId,
+    transaction_date: paymentDate,
+    debit: 0,
+    credit: amount,
+    balance: newBalance,
+    remarks: remarks || `Payment ${paymentNo}`,
+  });
+
+  // Update vendor opening_balance equivalent (we track via ledger now)
+  await reload();
+  return {};
+}
+
+export async function nextPurchaseReturnNo(): Promise<string> {
+  try {
+    const { data, error } = await supabase.rpc("next_purchase_return_no");
+    if (!error && data) return data as string;
+  } catch (_) {}
+  const max = state.purchaseReturns.reduce((acc, r) => {
+    const n = Number(r.returnNo.replace(/\D/g, ""));
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  return `PR-${String(max + 1).padStart(4, "0")}`;
+}
+
+export async function addPurchaseReturn(
+  originalPurchaseNo: string,
+  purchaseHeaderId: string,
+  vendorId: string,
+  itemCode: string,
+  itemName: string,
+  lotId: string,
+  imei: string,
+  qty: number,
+  returnDate: string,
+  reason: string,
+  refundAmount: number,
+): Promise<{ error?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const returnNo = await nextPurchaseReturnNo();
+
+  const { error } = await supabase.from("purchase_returns").insert({
+    return_no: returnNo,
+    original_purchase_no: originalPurchaseNo,
+    purchase_header_id: purchaseHeaderId,
+    vendor_id: vendorId,
+    item_code: itemCode,
+    item_name: itemName,
+    lot_id: lotId,
+    imei,
+    qty,
+    return_date: returnDate,
+    reason,
+    refund_amount: refundAmount,
+    status: "COMPLETED",
+    created_by: user?.id ?? null,
+  });
+  if (error) return { error: error.message };
+
+  // Restore lot qty (reduce it — we're returning stock)
+  if (lotId) {
+    const lot = state.stockLots.find((l) => l.id === lotId);
+    if (lot) {
+      await supabase.from("stock_lots").update({ qty: Math.max(0, lot.qty - qty) }).eq("id", lotId);
+    }
+  }
+
+  // Reconcile stock qty
+  try {
+    const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
+    if (lots && lots.length > 0) {
+      const totalLotQty = (lots as Record<string, unknown>[]).reduce((sum: number, l) => sum + (l['qty'] as number), 0);
+      await supabase.from("stock").update({ qty: Math.max(0, totalLotQty), updated_at: new Date().toISOString() }).eq("name", itemName);
+    }
+  } catch (_) {}
+
+  // Create ledger entry (credit = reduces what you owe)
+  if (vendorId) {
+    const prevBalance = getVendorBalance(vendorId);
+    const newBalance = prevBalance - refundAmount;
+    await supabase.from("vendor_transactions").insert({
+      vendor_id: vendorId,
+      transaction_type: "PURCHASE_RETURN",
+      reference_no: returnNo,
+      transaction_date: returnDate,
+      debit: 0,
+      credit: refundAmount,
+      balance: newBalance,
+      remarks: reason || `Return ${returnNo}`,
+    });
+  }
+
+  await reload();
+  return {};
+}
+
+export function getVendorBalance(vendorId: string): number {
+  const txns = state.vendorTransactions
+    .filter((t) => t.vendorId === vendorId)
+    .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
+
+  let balance = 0;
+  for (const txn of txns) {
+    balance = txn.debit - txn.credit + (txns.indexOf(txn) === 0 ? balance : 0);
+  }
+  // Recalculate properly: opening + purchases - payments - returns
+  const vendor = state.vendors.find((v) => v.id === vendorId);
+  const openingBalance = vendor?.openingBalance ?? 0;
+  const totalDebit = txns.filter((t) => t.transactionType === "PURCHASE" || t.transactionType === "OPENING_BALANCE").reduce((a, t) => a + t.debit, 0);
+  const totalCredit = txns.filter((t) => t.transactionType !== "PURCHASE" && t.transactionType !== "OPENING_BALANCE").reduce((a, t) => a + t.credit, 0);
+  // Opening balance is what vendor owes us at start (credit side from vendor perspective)
+  // Purchases increase what we owe (debit)
+  // Payments/returns decrease what we owe (credit)
+  return totalDebit + openingBalance - totalCredit;
+}
+
+export function getVendorPurchases(vendorId: string) {
+  return state.purchaseHeaders.filter((ph) => {
+    // Match by vendor_id if set, else by supplier_name
+    const vendor = state.vendors.find((v) => v.id === vendorId);
+    if (ph.vendorId === vendorId) return true;
+    if (vendor && ph.supplierName === vendor.vendorName) return true;
+    return false;
+  });
+}
+
+export function getVendorPayments(vendorId: string) {
+  return state.vendorPayments.filter((p) => p.vendorId === vendorId);
+}
+
+export function getVendorLedger(vendorId: string) {
+  return state.vendorTransactions
+    .filter((t) => t.vendorId === vendorId)
+    .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
+}
+
 async function reload() {
   nextStockCode = null; // Reset so next insert reads fresh MAX(code) from DB
   const [stockRes, salesRes, purchasesRes] = await Promise.all([
@@ -1406,6 +1946,29 @@ async function reload() {
     salesReturns = (returnsRes.data ?? []).map(mapSalesReturnRow);
   } catch (_) {}
 
+  let vendors: Vendor[] = [];
+  let vendorTransactions: VendorTransaction[] = [];
+  let vendorPaymentsList: VendorPayment[] = [];
+  let vendorPaymentAllocs: VendorPaymentAllocation[] = [];
+  let purchaseReturnsList: PurchaseReturn[] = [];
+  let vendorDocs: VendorDocument[] = [];
+  try {
+    const [vendorsRes, txnsRes, vpRes, vpaRes, prRes, vdRes] = await Promise.all([
+      supabase.from("vendors").select("*").order("vendor_name"),
+      supabase.from("vendor_transactions").select("*").order("transaction_date", { ascending: true }).limit(20000),
+      supabase.from("vendor_payments").select("*").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("vendor_payment_allocations").select("*").limit(10000),
+      supabase.from("purchase_returns").select("*").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("vendor_documents").select("*").limit(10000),
+    ]);
+    vendors = (vendorsRes.data ?? []).map(mapVendorRow);
+    vendorTransactions = (txnsRes.data ?? []).map(mapVendorTransactionRow);
+    vendorPaymentsList = (vpRes.data ?? []).map(mapVendorPaymentRow);
+    vendorPaymentAllocs = (vpaRes.data ?? []).map(mapVendorPaymentAllocationRow);
+    purchaseReturnsList = (prRes.data ?? []).map(mapPurchaseReturnRow);
+    vendorDocs = (vdRes.data ?? []).map(mapVendorDocumentRow);
+  } catch (_) {}
+
   state = {
     stock: (stockRes.data ?? []).map(mapStockRow),
     sales: (salesRes.data ?? []).map(mapSaleRow),
@@ -1419,6 +1982,12 @@ async function reload() {
     purchaseAttachments: pAttach,
     saleImeis,
     salesReturns,
+    vendors,
+    vendorTransactions,
+    vendorPayments: vendorPaymentsList,
+    vendorPaymentAllocations: vendorPaymentAllocs,
+    purchaseReturns: purchaseReturnsList,
+    vendorDocuments: vendorDocs,
   };
   emit();
 }
