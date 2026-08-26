@@ -130,7 +130,7 @@ RETURNS boolean AS '
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid() AND role = ''super_admin''
   );
-' LANGUAGE plpgsql SECURITY DEFINER STABLE;
+' LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- Check if store_owner or above (store_owner or super_admin)
 CREATE OR REPLACE FUNCTION public.is_store_owner_or_above()
@@ -139,7 +139,7 @@ RETURNS boolean AS '
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid() AND role IN (''super_admin'', ''store_owner'')
   );
-' LANGUAGE plpgsql SECURITY DEFINER STABLE;
+' LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- Keep is_admin() for backward compatibility (treats super_admin as admin)
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -148,7 +148,7 @@ RETURNS boolean AS '
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid() AND role IN (''admin'', ''super_admin'')
   );
-' LANGUAGE plpgsql SECURITY DEFINER STABLE;
+' LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- PART 6: Drop ALL old RLS policies
 -- ============================================================
