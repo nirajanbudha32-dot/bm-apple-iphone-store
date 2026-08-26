@@ -40,10 +40,7 @@ ALTER TABLE public.stock ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES publi
 ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public.stores(id);
 
 -- Purchases (legacy)
-DO $$ BEGIN
-  ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public.stores(id);
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
+DO 'BEGIN ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public.stores(id); EXCEPTION WHEN duplicate_column THEN NULL; END;';
 
 -- Stock lots
 ALTER TABLE public.stock_lots ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public.stores(id);
@@ -111,56 +108,47 @@ UPDATE public.vendor_payment_allocations SET store_id = 'a0000000-0000-0000-0000
 UPDATE public.vendor_documents SET store_id = 'a0000000-0000-0000-0000-000000000001' WHERE store_id IS NULL;
 UPDATE public.purchase_returns SET store_id = 'a0000000-0000-0000-0000-000000000001' WHERE store_id IS NULL;
 
-DO $$ BEGIN
-  UPDATE public.sales_returns SET store_id = 'a0000000-0000-0000-0000-000000000001' WHERE store_id IS NULL;
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
+DO 'BEGIN UPDATE public.sales_returns SET store_id = ''a0000000-0000-0000-0000-000000000001'' WHERE store_id IS NULL; EXCEPTION WHEN undefined_table THEN NULL; END;';
 
-DO $$ BEGIN
-  UPDATE public.sale_item_imeis SET store_id = 'a0000000-0000-0000-0000-000000000001' WHERE store_id IS NULL;
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
+DO 'BEGIN UPDATE public.sale_item_imeis SET store_id = ''a0000000-0000-0000-0000-000000000001'' WHERE store_id IS NULL; EXCEPTION WHEN undefined_table THEN NULL; END;';
 
-DO $$ BEGIN
-  UPDATE public.purchases SET store_id = 'a0000000-0000-0000-0000-000000000001' WHERE store_id IS NULL;
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
+DO 'BEGIN UPDATE public.purchases SET store_id = ''a0000000-0000-0000-0000-000000000001'' WHERE store_id IS NULL; EXCEPTION WHEN undefined_table THEN NULL; END;';
 
 -- PART 5: Create helper functions
 -- ============================================================
 
 -- Get current user's store_id
 CREATE OR REPLACE FUNCTION public.user_store_id()
-RETURNS uuid AS $$
+RETURNS uuid AS '
   SELECT store_id FROM public.profiles WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+' LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- Check if super_admin
 CREATE OR REPLACE FUNCTION public.is_super_admin()
-RETURNS boolean AS $$
+RETURNS boolean AS '
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role = 'super_admin'
+    WHERE id = auth.uid() AND role = ''super_admin''
   );
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+' LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- Check if store_owner or above (store_owner or super_admin)
 CREATE OR REPLACE FUNCTION public.is_store_owner_or_above()
-RETURNS boolean AS $$
+RETURNS boolean AS '
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role IN ('super_admin', 'store_owner')
+    WHERE id = auth.uid() AND role IN (''super_admin'', ''store_owner'')
   );
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+' LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- Keep is_admin() for backward compatibility (treats super_admin as admin)
 CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS boolean AS $$
+RETURNS boolean AS '
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+    WHERE id = auth.uid() AND role IN (''admin'', ''super_admin'')
   );
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+' LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- PART 6: Drop ALL old RLS policies
 -- ============================================================
@@ -420,30 +408,14 @@ CREATE POLICY pr_insert ON public.purchase_returns FOR INSERT TO authenticated
   WITH CHECK (is_super_admin() OR store_id = user_store_id());
 
 -- SALES RETURNS (may not exist yet)
-DO $$ BEGIN
-  CREATE POLICY sr_select ON public.sales_returns FOR SELECT TO authenticated
-    USING (is_super_admin() OR store_id = user_store_id());
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
+DO 'BEGIN CREATE POLICY sr_select ON public.sales_returns FOR SELECT TO authenticated USING (is_super_admin() OR store_id = user_store_id()); EXCEPTION WHEN undefined_table THEN NULL; END;';
 
-DO $$ BEGIN
-  CREATE POLICY sr_insert ON public.sales_returns FOR INSERT TO authenticated
-    WITH CHECK (is_super_admin() OR store_id = user_store_id());
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
+DO 'BEGIN CREATE POLICY sr_insert ON public.sales_returns FOR INSERT TO authenticated WITH CHECK (is_super_admin() OR store_id = user_store_id()); EXCEPTION WHEN undefined_table THEN NULL; END;';
 
 -- SALE ITEM IMEIs (may not exist yet)
-DO $$ BEGIN
-  CREATE POLICY sale_imei_select ON public.sale_item_imeis FOR SELECT TO authenticated
-    USING (is_super_admin() OR store_id = user_store_id());
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
+DO 'BEGIN CREATE POLICY sale_imei_select ON public.sale_item_imeis FOR SELECT TO authenticated USING (is_super_admin() OR store_id = user_store_id()); EXCEPTION WHEN undefined_table THEN NULL; END;';
 
-DO $$ BEGIN
-  CREATE POLICY sale_imei_insert ON public.sale_item_imeis FOR INSERT TO authenticated
-    WITH CHECK (is_super_admin() OR store_id = user_store_id());
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
+DO 'BEGIN CREATE POLICY sale_imei_insert ON public.sale_item_imeis FOR INSERT TO authenticated WITH CHECK (is_super_admin() OR store_id = user_store_id()); EXCEPTION WHEN undefined_table THEN NULL; END;';
 
 -- PART 8: Add store_id indexes for performance
 -- ============================================================
@@ -461,14 +433,14 @@ CREATE INDEX IF NOT EXISTS idx_profiles_store ON public.profiles(store_id);
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger AS '
 BEGIN
   INSERT INTO public.profiles (id, email, role, store_id)
-  VALUES (new.id, new.email, 'salesman', NULL)
+  VALUES (new.id, new.email, ''salesman'', NULL)
   ON CONFLICT (id) DO NOTHING;
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+' LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Recreate trigger if missing
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
