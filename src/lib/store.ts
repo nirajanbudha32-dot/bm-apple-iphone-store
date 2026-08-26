@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase, type Profile } from "@/lib/supabase";
+import { useStoreContext } from "@/lib/store-context";
+
+let _currentStoreId: string | null = null;
+export function setCurrentStoreIdForStore(id: string | null) { _currentStoreId = id; }
+export function getCurrentStoreId(): string | null { return _currentStoreId; }
 
 export type StockItem = {
   code: string;
@@ -13,6 +18,7 @@ export type StockItem = {
   qty: number;
   purchasePrice: number;
   sellingPrice: number;
+  storeId?: string;
 };
 
 export type PaymentMethod = "Cash" | "Bank" | "Khalti" | "eSewa" | "Other Bank" | "Card" | "Online";
@@ -63,6 +69,7 @@ export type Sale = {
   remarks: string;
   saleType: string;
   status: string;
+  storeId?: string;
 };
 
 export type Purchase = {
@@ -81,6 +88,7 @@ export type Purchase = {
   amount: number;
   paymentMethod: PaymentMethod;
   note: string;
+  storeId?: string;
 };
 
 export type StockLot = {
@@ -93,6 +101,7 @@ export type StockLot = {
   supplier: string;
   qty: number;
   purchasePrice: number;
+  storeId?: string;
 };
 
 export type SaleAllocation = {
@@ -100,6 +109,7 @@ export type SaleAllocation = {
   saleId: string;
   lotId: string;
   qtyTaken: number;
+  storeId?: string;
 };
 
 export type StockAdjustment = {
@@ -112,6 +122,7 @@ export type StockAdjustment = {
   qtyAdjusted: number;
   reason: string;
   createdAt: string;
+  storeId?: string;
 };
 
 export type PurchaseHeader = {
@@ -138,6 +149,7 @@ export type PurchaseHeader = {
   remainingBalance: number;
   vendorId: string;
   createdAt: string;
+  storeId?: string;
 };
 
 export type PurchaseItem = {
@@ -160,12 +172,14 @@ export type PurchaseItem = {
   vatAmount: number;
   total: number;
   lotNo: string;
+  storeId?: string;
 };
 
 export type PurchaseItemImei = {
   id: string;
   purchaseItemId: string;
   imei: string;
+  storeId?: string;
 };
 
 export type PurchaseAttachment = {
@@ -175,12 +189,14 @@ export type PurchaseAttachment = {
   fileType: string;
   fileSize: number;
   fileData: string;
+  storeId?: string;
 };
 
 export type SaleItemImei = {
   id: string;
   saleId: string;
   imei: string;
+  storeId?: string;
 };
 
 export type SalesReturn = {
@@ -199,6 +215,7 @@ export type SalesReturn = {
   status: string;
   createdBy: string;
   createdAt: string;
+  storeId?: string;
 };
 
 export type Vendor = {
@@ -223,6 +240,7 @@ export type Vendor = {
   remarks: string;
   createdBy: string;
   createdAt: string;
+  storeId?: string;
 };
 
 export type VendorTransaction = {
@@ -237,6 +255,7 @@ export type VendorTransaction = {
   balance: number;
   remarks: string;
   createdAt: string;
+  storeId?: string;
 };
 
 export type VendorPayment = {
@@ -251,6 +270,7 @@ export type VendorPayment = {
   remarks: string;
   createdBy: string;
   createdAt: string;
+  storeId?: string;
 };
 
 export type VendorPaymentAllocation = {
@@ -259,6 +279,7 @@ export type VendorPaymentAllocation = {
   purchaseHeaderId: string;
   amount: number;
   allocationType: string;
+  storeId?: string;
 };
 
 export type PurchaseReturn = {
@@ -278,6 +299,7 @@ export type PurchaseReturn = {
   status: string;
   createdBy: string;
   createdAt: string;
+  storeId?: string;
 };
 
 export type VendorDocument = {
@@ -287,6 +309,7 @@ export type VendorDocument = {
   fileType: string;
   fileSize: number;
   fileData: string;
+  storeId?: string;
 };
 
 export const VAT_RATE = 0.13;
@@ -352,6 +375,7 @@ function mapStockRow(r: Record<string, unknown>): StockItem {
     qty: r['qty'] as number,
     purchasePrice: r['purchase_price'] as number,
     sellingPrice: r['selling_price'] as number,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -385,6 +409,7 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     remarks: (r['remarks'] as string) ?? "",
     saleType: (r['sale_type'] as string) ?? "Cash",
     status: (r['status'] as string) ?? "CONFIRMED",
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -405,6 +430,7 @@ function mapPurchaseRow(r: Record<string, unknown>): Purchase {
     amount: r['amount'] as number,
     paymentMethod: (r['payment_method'] as PaymentMethod) ?? "Cash",
     note: (r['note'] as string) ?? "",
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -419,6 +445,7 @@ function mapStockLotRow(r: Record<string, unknown>): StockLot {
     supplier: r['supplier'] as string,
     qty: r['qty'] as number,
     purchasePrice: r['purchase_price'] as number,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -428,6 +455,7 @@ function mapSaleAllocationRow(r: Record<string, unknown>): SaleAllocation {
     saleId: r['sale_id'] as string,
     lotId: r['lot_id'] as string,
     qtyTaken: r['qty_taken'] as number,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -442,6 +470,7 @@ function mapStockAdjustmentRow(r: Record<string, unknown>): StockAdjustment {
     qtyAdjusted: r['qty_adjusted'] as number,
     reason: r['reason'] as string,
     createdAt: r['created_at'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -470,6 +499,7 @@ function mapPurchaseHeaderRow(r: Record<string, unknown>): PurchaseHeader {
     remainingBalance: Number(r['remaining_balance'] ?? 0),
     vendorId: (r['vendor_id'] as string) ?? "",
     createdAt: r['created_at'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -494,6 +524,7 @@ function mapPurchaseItemRow(r: Record<string, unknown>): PurchaseItem {
     vatAmount: Number(r['vat_amount'] ?? 0),
     total: Number(r['total'] ?? 0),
     lotNo: (r['lot_no'] as string) ?? "",
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -502,6 +533,7 @@ function mapPurchaseImeiRow(r: Record<string, unknown>): PurchaseItemImei {
     id: r['id'] as string,
     purchaseItemId: r['purchase_item_id'] as string,
     imei: r['imei'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -513,6 +545,7 @@ function mapPurchaseAttachmentRow(r: Record<string, unknown>): PurchaseAttachmen
     fileType: (r['file_type'] as string) ?? "",
     fileSize: Number(r['file_size'] ?? 0),
     fileData: (r['file_data'] as string) ?? "",
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -521,6 +554,7 @@ function mapSaleImeiRow(r: Record<string, unknown>): SaleItemImei {
     id: r['id'] as string,
     saleId: r['sale_id'] as string,
     imei: r['imei'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -541,6 +575,7 @@ function mapSalesReturnRow(r: Record<string, unknown>): SalesReturn {
     status: (r['status'] as string) ?? "COMPLETED",
     createdBy: (r['created_by'] as string) ?? "",
     createdAt: r['created_at'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -567,6 +602,7 @@ function mapVendorRow(r: Record<string, unknown>): Vendor {
     remarks: (r['remarks'] as string) ?? "",
     createdBy: (r['created_by'] as string) ?? "",
     createdAt: r['created_at'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -583,6 +619,7 @@ function mapVendorTransactionRow(r: Record<string, unknown>): VendorTransaction 
     balance: Number(r['balance'] ?? 0),
     remarks: (r['remarks'] as string) ?? "",
     createdAt: r['created_at'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -599,6 +636,7 @@ function mapVendorPaymentRow(r: Record<string, unknown>): VendorPayment {
     remarks: (r['remarks'] as string) ?? "",
     createdBy: (r['created_by'] as string) ?? "",
     createdAt: r['created_at'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -609,6 +647,7 @@ function mapVendorPaymentAllocationRow(r: Record<string, unknown>): VendorPaymen
     purchaseHeaderId: (r['purchase_header_id'] as string) ?? "",
     amount: Number(r['amount'] ?? 0),
     allocationType: (r['allocation_type'] as string) ?? "bill",
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -630,6 +669,7 @@ function mapPurchaseReturnRow(r: Record<string, unknown>): PurchaseReturn {
     status: (r['status'] as string) ?? "COMPLETED",
     createdBy: (r['created_by'] as string) ?? "",
     createdAt: r['created_at'] as string,
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -641,6 +681,7 @@ function mapVendorDocumentRow(r: Record<string, unknown>): VendorDocument {
     fileType: (r['file_type'] as string) ?? "",
     fileSize: Number(r['file_size'] ?? 0),
     fileData: (r['file_data'] as string) ?? "",
+    storeId: (r['store_id'] as string) ?? "",
   };
 }
 
@@ -725,6 +766,7 @@ export async function addBill(
     sale_type: saleType,
     status,
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   }));
 
   // Calculate remaining from first item (will be set on all rows for grouping)
@@ -745,6 +787,7 @@ export async function addBill(
         const imeiRows = imeis.map((imei) => ({
           sale_id: inserted.id,
           imei,
+          store_id: _currentStoreId,
         }));
         await supabase.from("sale_item_imeis").insert(imeiRows);
       }
@@ -909,6 +952,7 @@ export async function upsertStock(item: StockItem, originalCode?: string) {
       qty: item.qty,
       purchase_price: item.purchasePrice,
       selling_price: item.sellingPrice,
+      store_id: _currentStoreId,
     });
   }
   await reload();
@@ -1018,6 +1062,7 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
     payment_method: entry.paymentMethod,
     note: entry.note,
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   }).select("id").single();
 
   if (error) return { error };
@@ -1044,6 +1089,7 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
       supplier: entry.supplier,
       qty: entry.qty,
       purchase_price: entry.rate,
+      store_id: _currentStoreId,
     });
 
     if (lotInsertErr) {
@@ -1117,6 +1163,7 @@ export async function addPurchaseHeader(
     remaining_balance: header.grandTotal - header.paidAmount,
     vendor_id: (header as Record<string, unknown>)['vendorId'] || null,
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   }).select("id").single();
 
   if (error) return { error: error.message };
@@ -1181,6 +1228,7 @@ export async function addPurchaseHeader(
       vat_amount: item.vatAmount,
       total: item.total,
       lot_no: lotNo,
+      store_id: _currentStoreId,
     }).select("id").single();
 
     if (itemErr) return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
@@ -1193,6 +1241,7 @@ export async function addPurchaseHeader(
       const imeiRows = imeis.map((imei) => ({
         purchase_item_id: itemId,
         imei,
+        store_id: _currentStoreId,
       }));
       const { error: imeiErr } = await supabase.from("purchase_item_imeis").insert(imeiRows);
       if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
@@ -1207,6 +1256,7 @@ export async function addPurchaseHeader(
       supplier: header.supplierName,
       qty: item.qty,
       purchase_price: item.rate,
+      store_id: _currentStoreId,
     });
 
     if (lotInsertErr) {
@@ -1229,6 +1279,7 @@ export async function addPurchaseHeader(
       credit: 0,
       balance: newBalance,
       remarks: `Purchase ${purchaseNo}`,
+      store_id: _currentStoreId,
     });
   }
 
@@ -1282,6 +1333,7 @@ export async function addPurchaseAttachment(
     file_type: fileType,
     file_size: fileSize,
     file_data: fileData,
+    store_id: _currentStoreId,
   });
   if (error) return { error: error.message };
   await reload();
@@ -1309,6 +1361,7 @@ export async function addStockAdjustment(
     qty_adjusted: qtyAdjusted,
     reason,
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   });
   if (error) return { error: new Error(error.message) };
 
@@ -1447,6 +1500,7 @@ export async function addSalesReturn(
     refund_amount: refundAmount,
     status: "COMPLETED",
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   });
   if (error) return { error: error.message };
 
@@ -1556,6 +1610,7 @@ async function applyStockDelta(
         qty: delta,
         purchase_price: entry.rate,
         selling_price: 0,
+        store_id: _currentStoreId,
       });
       if (!insertErr) {
         inserted = true;
@@ -1571,6 +1626,7 @@ async function applyStockDelta(
           qty: delta,
           purchasePrice: entry.rate,
           sellingPrice: 0,
+          storeId: _currentStoreId ?? "",
         });
       } else {
         lastErr = insertErr.message;
@@ -1626,6 +1682,7 @@ export async function addVendor(
     status: vendor.status,
     remarks: vendor.remarks,
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   }).select("id").single();
 
   if (error) return { error: error.message };
@@ -1642,6 +1699,7 @@ export async function addVendor(
       credit: vendor.openingBalance,
       balance: vendor.openingBalance,
       remarks: "Opening balance",
+      store_id: _currentStoreId,
     });
   }
 
@@ -1692,6 +1750,7 @@ export async function addVendorDocument(
     file_type: fileType,
     file_size: fileSize,
     file_data: fileData,
+    store_id: _currentStoreId,
   });
   if (error) return { error: error.message };
   await reload();
@@ -1740,6 +1799,7 @@ export async function addVendorPayment(
     reference_no: referenceNo,
     remarks,
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   }).select("id").single();
 
   if (error) return { error: error.message };
@@ -1754,6 +1814,7 @@ export async function addVendorPayment(
         purchase_header_id: allocType === "bill" ? alloc.purchaseHeaderId : null,
         amount: alloc.amount,
         allocation_type: allocType,
+        store_id: _currentStoreId,
       });
       // Update purchase_headers remaining_balance only for bill allocations
       if (allocType === "bill" && alloc.purchaseHeaderId) {
@@ -1780,6 +1841,7 @@ export async function addVendorPayment(
     credit: amount,
     balance: newBalance,
     remarks: remarks || `Payment ${paymentNo}`,
+    store_id: _currentStoreId,
   });
 
   await reload();
@@ -1829,6 +1891,7 @@ export async function addPurchaseReturn(
     refund_amount: refundAmount,
     status: "COMPLETED",
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   });
   if (error) return { error: error.message };
 
@@ -1862,6 +1925,7 @@ export async function addPurchaseReturn(
       credit: refundAmount,
       balance: newBalance,
       remarks: reason || `Return ${returnNo}`,
+      store_id: _currentStoreId,
     });
   }
 
@@ -1938,6 +2002,7 @@ export async function applyVendorAdvance(
     reference_no: "",
     remarks: `Advance applied to purchase`,
     created_by: user?.id ?? null,
+    store_id: _currentStoreId,
   }).select("id").single();
 
   if (error) return { error: error.message };
@@ -1948,6 +2013,7 @@ export async function applyVendorAdvance(
     purchase_header_id: purchaseHeaderId,
     amount,
     allocation_type: "bill",
+    store_id: _currentStoreId,
   });
 
   const ph = state.purchaseHeaders.find((h) => h.id === purchaseHeaderId);
@@ -1968,6 +2034,7 @@ export async function applyVendorAdvance(
     credit: 0,
     balance: prevBalance + amount,
     remarks: `Advance applied to purchase`,
+    store_id: _currentStoreId,
   });
 
   await reload();
@@ -1976,20 +2043,41 @@ export async function applyVendorAdvance(
 
 async function reload() {
   nextStockCode = null; // Reset so next insert reads fresh MAX(code) from DB
+
+  let stockQuery = supabase.from("stock").select("*").order("name");
+  let salesQuery = supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(5000);
+  let purchasesQuery = supabase.from("purchases").select("*").order("created_at", { ascending: false }).limit(5000);
+
+  if (_currentStoreId) {
+    stockQuery = stockQuery.eq("store_id", _currentStoreId);
+    salesQuery = salesQuery.eq("store_id", _currentStoreId);
+    purchasesQuery = purchasesQuery.eq("store_id", _currentStoreId);
+  }
+
   const [stockRes, salesRes, purchasesRes] = await Promise.all([
-    supabase.from("stock").select("*").order("name"),
-    supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(5000),
-    supabase.from("purchases").select("*").order("created_at", { ascending: false }).limit(5000),
+    stockQuery,
+    salesQuery,
+    purchasesQuery,
   ]);
 
   let lots: StockLot[] = [];
   let allocs: SaleAllocation[] = [];
   let adjustments: StockAdjustment[] = [];
   try {
+    let lotsQuery = supabase.from("stock_lots").select("*").order("created_at", { ascending: false }).limit(10000);
+    let allocQuery = supabase.from("sale_lot_allocations").select("*").limit(10000);
+    let adjQuery = supabase.from("stock_adjustments").select("*").order("created_at", { ascending: false }).limit(10000);
+
+    if (_currentStoreId) {
+      lotsQuery = lotsQuery.eq("store_id", _currentStoreId);
+      allocQuery = allocQuery.eq("store_id", _currentStoreId);
+      adjQuery = adjQuery.eq("store_id", _currentStoreId);
+    }
+
     const [lotsRes, allocRes, adjRes] = await Promise.all([
-      supabase.from("stock_lots").select("*").order("created_at", { ascending: false }).limit(10000),
-      supabase.from("sale_lot_allocations").select("*").limit(10000),
-      supabase.from("stock_adjustments").select("*").order("created_at", { ascending: false }).limit(10000),
+      lotsQuery,
+      allocQuery,
+      adjQuery,
     ]);
     lots = (lotsRes.data ?? []).map(mapStockLotRow);
     allocs = (allocRes.data ?? []).map(mapSaleAllocationRow);
@@ -2001,11 +2089,23 @@ async function reload() {
   let pImeis: PurchaseItemImei[] = [];
   let pAttach: PurchaseAttachment[] = [];
   try {
+    let headersQuery = supabase.from("purchase_headers").select("*").order("created_at", { ascending: false }).limit(5000);
+    let itemsQuery = supabase.from("purchase_items").select("*").order("sn", { ascending: true }).limit(10000);
+    let imeisQuery = supabase.from("purchase_item_imeis").select("*").limit(20000);
+    let attachQuery = supabase.from("purchase_attachments").select("*").limit(10000);
+
+    if (_currentStoreId) {
+      headersQuery = headersQuery.eq("store_id", _currentStoreId);
+      itemsQuery = itemsQuery.eq("store_id", _currentStoreId);
+      imeisQuery = imeisQuery.eq("store_id", _currentStoreId);
+      attachQuery = attachQuery.eq("store_id", _currentStoreId);
+    }
+
     const [headersRes, itemsRes, imeisRes, attachRes] = await Promise.all([
-      supabase.from("purchase_headers").select("*").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("purchase_items").select("*").order("sn", { ascending: true }).limit(10000),
-      supabase.from("purchase_item_imeis").select("*").limit(20000),
-      supabase.from("purchase_attachments").select("*").limit(10000),
+      headersQuery,
+      itemsQuery,
+      imeisQuery,
+      attachQuery,
     ]);
     ph = (headersRes.data ?? []).map(mapPurchaseHeaderRow);
     pi = (itemsRes.data ?? []).map(mapPurchaseItemRow);
@@ -2016,9 +2116,17 @@ async function reload() {
   let saleImeis: SaleItemImei[] = [];
   let salesReturns: SalesReturn[] = [];
   try {
+    let saleImeiQuery = supabase.from("sale_item_imeis").select("*").limit(20000);
+    let returnsQuery = supabase.from("sales_returns").select("*").order("created_at", { ascending: false }).limit(5000);
+
+    if (_currentStoreId) {
+      saleImeiQuery = saleImeiQuery.eq("store_id", _currentStoreId);
+      returnsQuery = returnsQuery.eq("store_id", _currentStoreId);
+    }
+
     const [saleImeiRes, returnsRes] = await Promise.all([
-      supabase.from("sale_item_imeis").select("*").limit(20000),
-      supabase.from("sales_returns").select("*").order("created_at", { ascending: false }).limit(5000),
+      saleImeiQuery,
+      returnsQuery,
     ]);
     saleImeis = (saleImeiRes.data ?? []).map(mapSaleImeiRow);
     salesReturns = (returnsRes.data ?? []).map(mapSalesReturnRow);
@@ -2031,13 +2139,29 @@ async function reload() {
   let purchaseReturnsList: PurchaseReturn[] = [];
   let vendorDocs: VendorDocument[] = [];
   try {
+    let vendorsQuery = supabase.from("vendors").select("*").order("vendor_name");
+    let txnsQuery = supabase.from("vendor_transactions").select("*").order("transaction_date", { ascending: true }).limit(20000);
+    let vpQuery = supabase.from("vendor_payments").select("*").order("created_at", { ascending: false }).limit(5000);
+    let vpaQuery = supabase.from("vendor_payment_allocations").select("*").limit(10000);
+    let prQuery = supabase.from("purchase_returns").select("*").order("created_at", { ascending: false }).limit(5000);
+    let vdQuery = supabase.from("vendor_documents").select("*").limit(10000);
+
+    if (_currentStoreId) {
+      vendorsQuery = vendorsQuery.eq("store_id", _currentStoreId);
+      txnsQuery = txnsQuery.eq("store_id", _currentStoreId);
+      vpQuery = vpQuery.eq("store_id", _currentStoreId);
+      vpaQuery = vpaQuery.eq("store_id", _currentStoreId);
+      prQuery = prQuery.eq("store_id", _currentStoreId);
+      vdQuery = vdQuery.eq("store_id", _currentStoreId);
+    }
+
     const [vendorsRes, txnsRes, vpRes, vpaRes, prRes, vdRes] = await Promise.all([
-      supabase.from("vendors").select("*").order("vendor_name"),
-      supabase.from("vendor_transactions").select("*").order("transaction_date", { ascending: true }).limit(20000),
-      supabase.from("vendor_payments").select("*").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("vendor_payment_allocations").select("*").limit(10000),
-      supabase.from("purchase_returns").select("*").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("vendor_documents").select("*").limit(10000),
+      vendorsQuery,
+      txnsQuery,
+      vpQuery,
+      vpaQuery,
+      prQuery,
+      vdQuery,
     ]);
     vendors = (vendorsRes.data ?? []).map(mapVendorRow);
     vendorTransactions = (txnsRes.data ?? []).map(mapVendorTransactionRow);

@@ -21,31 +21,47 @@ import {
 import { toast } from "sonner";
 import { supabase, type Profile } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { useStoreContext } from "@/lib/store-context";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
+type Store = { id: string; name: string };
+
 export function UserManager({ open, onOpenChange }: Props) {
-  const { user: currentUser, refreshProfile } = useAuth();
+  const { user: currentUser } = useAuth();
+  const { isSuperAdmin, currentStoreId, stores } = useStoreContext();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePassword, setInvitePassword] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "salesman">("salesman");
+  const [inviteRole, setInviteRole] = useState<string>("salesman");
+  const [inviteStoreId, setInviteStoreId] = useState<string>("");
   const [inviting, setInviting] = useState(false);
+
+  const myRole = currentUser ? users.find((u) => u.id === currentUser.id)?.role : null;
+  const canCreateStoreOwner = isSuperAdmin;
+  const canCreateSalesman = isSuperAdmin || myRole === "store_owner";
 
   async function loadUsers() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: true });
+    let query = supabase.from("profiles").select("*").order("created_at", { ascending: true });
+    if (!isSuperAdmin && currentStoreId) {
+      query = query.eq("store_id", currentStoreId);
+    }
+    const { data, error } = await query;
     if (error) {
       toast.error("Failed to load users");
     } else {
-      setUsers(data as Profile[]);
+      setUsers((data as any[]).map((r) => ({
+        id: r.id,
+        email: r.email,
+        role: r.role,
+        storeId: r.store_id ?? null,
+        created_at: r.created_at,
+      })));
     }
     setLoading(false);
   }
@@ -58,6 +74,10 @@ export function UserManager({ open, onOpenChange }: Props) {
     e.preventDefault();
     if (!inviteEmail.trim() || !invitePassword.trim()) {
       toast.error("Email and password are required");
+      return;
+    }
+    if (!inviteStoreId) {
+      toast.error("Please select a store");
       return;
     }
     setInviting(true);
@@ -78,6 +98,7 @@ export function UserManager({ open, onOpenChange }: Props) {
         id: data.user.id,
         email: inviteEmail,
         role: inviteRole,
+        store_id: inviteStoreId,
       });
     }
 
@@ -85,16 +106,22 @@ export function UserManager({ open, onOpenChange }: Props) {
     setInviteEmail("");
     setInvitePassword("");
     setInviteRole("salesman");
+    setInviteStoreId("");
     setInviting(false);
     loadUsers();
   }
 
-  async function toggleRole(userId: string, currentRole: "admin" | "salesman") {
+  async function toggleRole(userId: string, currentRole: string) {
     if (userId === currentUser?.id) {
       toast.error("Cannot change your own role");
       return;
     }
-    const newRole = currentRole === "admin" ? "salesman" : "admin";
+    let newRole: string;
+    if (isSuperAdmin) {
+      newRole = currentRole === "store_owner" ? "salesman" : "store_owner";
+    } else {
+      newRole = currentRole === "admin" ? "salesman" : "admin";
+    }
     const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
     if (error) {
       toast.error("Failed to update role");
@@ -103,6 +130,10 @@ export function UserManager({ open, onOpenChange }: Props) {
       loadUsers();
     }
   }
+
+  const availableRoles = isSuperAdmin
+    ? [{ value: "store_owner", label: "Store Owner" }, { value: "salesman", label: "Salesman" }]
+    : [{ value: "salesman", label: "Salesman" }];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,16 +169,23 @@ export function UserManager({ open, onOpenChange }: Props) {
             </div>
             <div>
               <Label>Role</Label>
-              <Select
-                value={inviteRole}
-                onValueChange={(v) => setInviteRole(v as "admin" | "salesman")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="salesman">Salesman</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {availableRoles.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Store</Label>
+              <Select value={inviteStoreId} onValueChange={setInviteStoreId}>
+                <SelectTrigger><SelectValue placeholder="Select store" /></SelectTrigger>
+                <SelectContent>
+                  {stores.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -164,33 +202,34 @@ export function UserManager({ open, onOpenChange }: Props) {
             <p className="text-sm text-muted-foreground">Loading...</p>
           ) : (
             <div className="space-y-2">
-              {users.map((u) => (
-                <div key={u.id} className="flex items-center justify-between rounded-md border p-3">
-                  <div>
-                    <p className="text-sm font-medium">{u.email}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Joined {new Date(u.created_at).toLocaleDateString()}
-                    </p>
+              {users.map((u) => {
+                const storeName = stores.find((s) => s.id === u.storeId)?.name ?? "-";
+                return (
+                  <div key={u.id} className="flex items-center justify-between rounded-md border p-3">
+                    <div>
+                      <p className="text-sm font-medium">{u.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Store: {storeName} | Joined {new Date(u.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={u.role === "super_admin" ? "default" : u.role === "store_owner" ? "default" : "secondary"}>
+                        {u.role}
+                      </Badge>
+                      {u.id !== currentUser?.id && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => toggleRole(u.id, u.role)}
+                          title={`Change role`}
+                        >
+                          {u.role === "salesman" ? <Shield className="size-4" /> : <ShieldOff className="size-4" />}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge>
-                    {u.id !== currentUser?.id && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => toggleRole(u.id, u.role)}
-                        title={u.role === "admin" ? "Demote to salesman" : "Promote to admin"}
-                      >
-                        {u.role === "admin" ? (
-                          <ShieldOff className="size-4" />
-                        ) : (
-                          <Shield className="size-4" />
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {users.length === 0 && (
                 <p className="text-sm text-muted-foreground">No users found.</p>
               )}
@@ -199,9 +238,7 @@ export function UserManager({ open, onOpenChange }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

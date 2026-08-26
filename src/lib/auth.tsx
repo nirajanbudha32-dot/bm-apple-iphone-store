@@ -18,44 +18,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Login system disabled: the app runs as a local admin session with no sign-in.
 export const AUTH_ENABLED = true;
-
-const GUEST_USER = {
-  id: "00000000-0000-0000-0000-000000000000",
-  email: "admin@bmstore.com",
-} as unknown as User;
-
-const GUEST_PROFILE: Profile = {
-  id: "00000000-0000-0000-0000-000000000000",
-  email: "admin@bmstore.com",
-  role: "admin",
-  created_at: new Date(0).toISOString(),
-};
-
-function GuestAuthProvider({ children }: { children: ReactNode }) {
-  const noop = async () => ({ error: null });
-  return (
-    <AuthContext.Provider
-      value={{
-        user: GUEST_USER,
-        profile: GUEST_PROFILE,
-        loading: false,
-        signIn: noop,
-        signUp: noop,
-        signOut: async () => {},
-        refreshProfile: async () => {},
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  if (!AUTH_ENABLED) return <GuestAuthProvider>{children}</GuestAuthProvider>;
-  return <SupabaseAuthProvider>{children}</SupabaseAuthProvider>;
-}
 
 function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -69,23 +32,29 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         console.error("[BM Store] fetchProfile error:", error.message);
       }
       if (data) {
-        setProfile(data as Profile);
+        setProfile({
+          id: data.id,
+          email: data.email,
+          role: data.role,
+          storeId: data.store_id ?? null,
+          created_at: data.created_at,
+        } as Profile);
       } else {
-        // Auto-heal missing profile row
         const { data: userData } = await supabase.auth.getUser();
         const currentUser = userData?.user;
         if (currentUser) {
-          const role: "admin" | "salesman" = currentUser.email === "admin@bmstore.com" ? "admin" : "salesman";
           const fallbackProfile: Profile = {
             id: currentUser.id,
             email: currentUser.email || "",
-            role,
+            role: "salesman",
+            storeId: null,
             created_at: new Date().toISOString(),
           };
           await supabase.from("profiles").upsert({
             id: currentUser.id,
             email: currentUser.email || "",
-            role,
+            role: "salesman",
+            store_id: null,
           });
           setProfile(fallbackProfile);
         } else {
@@ -161,11 +130,12 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         data: { user: newUser },
       } = await supabase.auth.getUser();
       if (newUser) {
-        const role: "admin" | "salesman" = (asAdmin || email === "admin@bmstore.com") ? "admin" : "salesman";
+        const role = asAdmin ? "admin" : "salesman";
         await supabase.from("profiles").upsert({
           id: newUser.id,
           email: newUser.email!,
           role,
+          store_id: null,
         });
       }
 
@@ -193,6 +163,27 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  if (!AUTH_ENABLED) {
+    return (
+      <AuthContext.Provider
+        value={{
+          user: null,
+          profile: null,
+          loading: false,
+          signIn: async () => ({ error: null }),
+          signUp: async () => ({ error: null }),
+          signOut: async () => {},
+          refreshProfile: async () => {},
+        }}
+      >
+        {children}
+      </AuthContext.Provider>
+    );
+  }
+  return <SupabaseAuthProvider>{children}</SupabaseAuthProvider>;
 }
 
 export function useAuth() {

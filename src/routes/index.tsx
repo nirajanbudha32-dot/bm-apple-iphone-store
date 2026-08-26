@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, AlertCircle } from "lucide-react";
+import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, Building2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,11 @@ import { VendorLedger } from "@/components/VendorLedger";
 import { VendorPayments } from "@/components/VendorPayments";
 import { PurchaseReturns } from "@/components/PurchaseReturns";
 import { VendorReports } from "@/components/VendorReports";
+import { StoreSwitcher } from "@/components/StoreSwitcher";
+import { StoreManager } from "@/components/StoreManager";
+import { CrossStoreSummary } from "@/components/CrossStoreSummary";
+import { StoreProvider, useStoreContext } from "@/lib/store-context";
+import { setCurrentStoreIdForStore } from "@/lib/store";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -44,11 +49,17 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-function Index() {
+function IndexInner() {
   const { user, profile, loading, signOut } = useAuth();
+  const { currentStoreId, currentStore, isSuperAdmin } = useStoreContext();
   const navigate = useNavigate();
   const [userManagerOpen, setUserManagerOpen] = useState(false);
+  const [storeManagerOpen, setStoreManagerOpen] = useState(false);
   const [vendorSubTab, setVendorSubTab] = useState("dashboard");
+
+  useEffect(() => {
+    setCurrentStoreIdForStore(currentStoreId);
+  }, [currentStoreId]);
 
   useEffect(() => {
     if (AUTH_ENABLED && !loading && !user) {
@@ -66,27 +77,36 @@ function Index() {
 
   if (!user) return null;
 
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = profile?.role === "admin" || profile?.role === "store_owner" || profile?.role === "super_admin";
+  const roleLabel = profile?.role === "super_admin" ? "Super Admin" : profile?.role === "store_owner" ? "Store Owner" : profile?.role === "admin" ? "Admin" : "Salesman";
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
       <header className="mb-6 flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between sm:border-b-0 sm:pb-0">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">BM Apple Iphone Store Stock Management V1</h1>
-          <p className="text-xs text-muted-foreground sm:text-sm">Stock management &amp; sales register</p>
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            {currentStore ? currentStore.name : "All Stores"} — Stock management &amp; sales register
+          </p>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+          <StoreSwitcher />
           {AUTH_ENABLED && (
             <div className="flex items-center gap-2">
               <span className="max-w-[140px] truncate text-xs text-muted-foreground sm:max-w-none sm:text-sm" title={user.email || ""}>
                 {user.email}
               </span>
               <Badge variant={isAdmin ? "default" : "secondary"} className="capitalize text-xs">
-                {isAdmin ? "Admin" : "Salesman"}
+                {roleLabel}
               </Badge>
             </div>
           )}
           <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <Button variant="outline" size="sm" onClick={() => setStoreManagerOpen(true)} className="h-8 text-xs sm:h-9 sm:text-sm">
+                <Building2 className="mr-1 size-3.5 sm:size-4" /> Stores
+              </Button>
+            )}
             {isAdmin && (
               <Button variant="outline" size="sm" onClick={() => setUserManagerOpen(true)} className="h-8 text-xs sm:h-9 sm:text-sm">
                 <Users className="mr-1 size-3.5 sm:size-4" /> Users
@@ -103,6 +123,11 @@ function Index() {
 
       <Tabs defaultValue="sales">
         <TabsList className="mb-6 grid h-auto w-full grid-cols-4 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
+          {isSuperAdmin && (
+            <TabsTrigger value="crossstore" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <Building2 className="mr-1.5 size-3.5 sm:size-4" /> All Stores
+            </TabsTrigger>
+          )}
           <TabsTrigger value="sales" className="py-2 text-xs sm:py-1.5 sm:text-sm">
             <ReceiptText className="mr-1.5 size-3.5 sm:size-4" /> Sales
           </TabsTrigger>
@@ -140,6 +165,12 @@ function Index() {
             <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
           </TabsTrigger>
         </TabsList>
+
+        {isSuperAdmin && (
+          <TabsContent value="crossstore">
+            <CrossStoreSummary />
+          </TabsContent>
+        )}
         <TabsContent value="sales">
           <SalesRegister />
         </TabsContent>
@@ -204,6 +235,15 @@ function Index() {
       </Tabs>
 
       {isAdmin && <UserManager open={userManagerOpen} onOpenChange={setUserManagerOpen} />}
+      {isSuperAdmin && <StoreManager open={storeManagerOpen} onOpenChange={setStoreManagerOpen} />}
     </main>
+  );
+}
+
+function Index() {
+  return (
+    <StoreProvider>
+      <IndexInner />
+    </StoreProvider>
   );
 }
