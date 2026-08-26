@@ -33,6 +33,7 @@ const TYPE_LABELS: Record<string, string> = {
   PURCHASE: "Purchase",
   PURCHASE_RETURN: "Purchase Return",
   PAYMENT: "Payment",
+  ADVANCE_APPLIED: "Advance Applied",
   CREDIT_NOTE: "Credit Note",
   DEBIT_NOTE: "Debit Note",
   ADJUSTMENT: "Adjustment",

@@ -21,6 +21,7 @@ import {
   useStore,
   PAYMENT_METHODS,
   VAT_RATE,
+  getVendorAdvance,
   type PaymentMethod,
   type PurchaseHeader,
   type PurchaseItem,
@@ -98,6 +99,11 @@ export function PurchaseManager() {
   const [headerDiscount, setHeaderDiscount] = useState(0);
   const [otherCharges, setOtherCharges] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
+
+  const vendorAdvance = useMemo(() => {
+    if (!selectedVendorId) return 0;
+    return getVendorAdvance(selectedVendorId);
+  }, [selectedVendorId, vendors]);
 
   const [draft, setDraft] = useState<PurchaseItemDraft>(emptyDraft());
   const [draftQty, setDraftQty] = useState(1);
@@ -498,6 +504,12 @@ export function PurchaseManager() {
               </SelectContent>
             </Select>
           </div>
+          {selectedVendorId && vendorAdvance > 0 && (
+            <div className="sm:col-span-2 md:col-span-3 rounded-md border border-blue-200 bg-blue-50 p-2 text-xs sm:text-sm text-blue-800">
+              Vendor Advance Available: <span className="font-semibold">{money(vendorAdvance)}</span>
+              <span className="ml-2 text-blue-600">(can be applied to this purchase)</span>
+            </div>
+          )}
           <div>
             <Label className="text-xs sm:text-sm">Purchase No</Label>
             <Input value="Auto-generated" readOnly className="h-9 text-xs sm:text-sm bg-muted/50 font-mono" />

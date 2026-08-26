@@ -258,6 +258,7 @@ export type VendorPaymentAllocation = {
   paymentId: string;
   purchaseHeaderId: string;
   amount: number;
+  allocationType: string;
 };
 
 export type PurchaseReturn = {
@@ -605,8 +606,9 @@ function mapVendorPaymentAllocationRow(r: Record<string, unknown>): VendorPaymen
   return {
     id: r['id'] as string,
     paymentId: r['payment_id'] as string,
-    purchaseHeaderId: r['purchase_header_id'] as string,
+    purchaseHeaderId: (r['purchase_header_id'] as string) ?? "",
     amount: Number(r['amount'] ?? 0),
+    allocationType: (r['allocation_type'] as string) ?? "bill",
   };
 }
 
@@ -1723,7 +1725,7 @@ export async function addVendorPayment(
   bankName: string,
   referenceNo: string,
   remarks: string,
-  allocations: { purchaseHeaderId: string; amount: number }[],
+  allocations: { purchaseHeaderId: string; amount: number; allocationType: string }[],
 ): Promise<{ error?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
   const paymentNo = await nextVendorPaymentNo();
@@ -1746,16 +1748,20 @@ export async function addVendorPayment(
   // Insert allocations
   for (const alloc of allocations) {
     if (alloc.amount > 0) {
+      const allocType = alloc.allocationType || "bill";
       await supabase.from("vendor_payment_allocations").insert({
         payment_id: paymentId,
-        purchase_header_id: alloc.purchaseHeaderId,
+        purchase_header_id: allocType === "bill" ? alloc.purchaseHeaderId : null,
         amount: alloc.amount,
+        allocation_type: allocType,
       });
-      // Update purchase_headers remaining_balance
-      const ph = state.purchaseHeaders.find((h) => h.id === alloc.purchaseHeaderId);
-      if (ph) {
-        const newRemaining = Math.max(0, ph.remainingBalance - alloc.amount);
-        await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", alloc.purchaseHeaderId);
+      // Update purchase_headers remaining_balance only for bill allocations
+      if (allocType === "bill" && alloc.purchaseHeaderId) {
+        const ph = state.purchaseHeaders.find((h) => h.id === alloc.purchaseHeaderId);
+        if (ph) {
+          const newRemaining = Math.max(0, ph.remainingBalance - alloc.amount);
+          await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", alloc.purchaseHeaderId);
+        }
       }
     }
   }
@@ -1776,7 +1782,6 @@ export async function addVendorPayment(
     remarks: remarks || `Payment ${paymentNo}`,
   });
 
-  // Update vendor opening_balance equivalent (we track via ledger now)
   await reload();
   return {};
 }
@@ -1902,6 +1907,71 @@ export function getVendorLedger(vendorId: string) {
   return state.vendorTransactions
     .filter((t) => t.vendorId === vendorId)
     .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
+}
+
+export function getVendorAdvance(vendorId: string): number {
+  const vendor = state.vendors.find((v) => v.id === vendorId);
+  if (!vendor) return 0;
+  const balance = getVendorBalance(vendorId);
+  return balance < 0 ? Math.abs(balance) : 0;
+}
+
+export async function applyVendorAdvance(
+  vendorId: string,
+  purchaseHeaderId: string,
+  amount: number,
+  paymentDate: string,
+): Promise<{ error?: string }> {
+  const advance = getVendorAdvance(vendorId);
+  if (amount > advance) return { error: `Advance available is Rs. ${advance.toFixed(2)}` };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const paymentNo = await nextVendorPaymentNo();
+
+  const { data: inserted, error } = await supabase.from("vendor_payments").insert({
+    payment_no: paymentNo,
+    vendor_id: vendorId,
+    payment_date: paymentDate,
+    payment_method: "Cash",
+    amount,
+    bank_name: "",
+    reference_no: "",
+    remarks: `Advance applied to purchase`,
+    created_by: user?.id ?? null,
+  }).select("id").single();
+
+  if (error) return { error: error.message };
+  const paymentId = inserted!.id as string;
+
+  await supabase.from("vendor_payment_allocations").insert({
+    payment_id: paymentId,
+    purchase_header_id: purchaseHeaderId,
+    amount,
+    allocation_type: "bill",
+  });
+
+  const ph = state.purchaseHeaders.find((h) => h.id === purchaseHeaderId);
+  if (ph) {
+    const newRemaining = Math.max(0, ph.remainingBalance - amount);
+    await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", purchaseHeaderId);
+  }
+
+  const vendor = state.vendors.find((v) => v.id === vendorId);
+  const prevBalance = vendor ? getVendorBalance(vendorId) : 0;
+  await supabase.from("vendor_transactions").insert({
+    vendor_id: vendorId,
+    transaction_type: "ADVANCE_APPLIED",
+    reference_no: paymentNo,
+    reference_id: paymentId,
+    transaction_date: paymentDate,
+    debit: amount,
+    credit: 0,
+    balance: prevBalance + amount,
+    remarks: `Advance applied to purchase`,
+  });
+
+  await reload();
+  return {};
 }
 
 async function reload() {

@@ -18,6 +18,7 @@ import {
   addVendorPayment,
   nextVendorPaymentNo,
   getVendorPurchases,
+  getVendorAdvance,
   type Vendor,
   type PurchaseHeader,
 } from "@/lib/store";
@@ -29,6 +30,7 @@ import { toast } from "sonner";
 type AllocationEntry = {
   purchaseHeaderId: string;
   amount: number;
+  allocationType: string;
 };
 
 export function VendorPayments() {
@@ -47,6 +49,7 @@ export function VendorPayments() {
   const [allocations, setAllocations] = useState<AllocationEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [paymentType, setPaymentType] = useState<"bill" | "advance" | "unallocated">("bill");
 
   const showBankFields = paymentMethod === "Bank" || paymentMethod === "Card";
 
@@ -58,6 +61,11 @@ export function VendorPayments() {
   }, [selectedVendorId, purchaseHeaders]);
 
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
+
+  const advanceBalance = useMemo(() => {
+    if (!selectedVendorId) return 0;
+    return getVendorAdvance(selectedVendorId);
+  }, [selectedVendorId, vendorPayments]);
 
   const totalAllocated = useMemo(
     () => allocations.reduce((sum, a) => sum + a.amount, 0),
@@ -76,12 +84,26 @@ export function VendorPayments() {
     setBankName("");
     setReferenceNo("");
     setRemarks("");
+    setPaymentType("bill");
     nextVendorPaymentNo().then((no) => setPaymentNo(no));
   }
 
   function handleAmountChange(newAmount: number) {
     setAmount(newAmount);
-    autoAllocate(newAmount);
+    if (paymentType === "bill") {
+      autoAllocate(newAmount);
+    } else {
+      setAllocations([]);
+    }
+  }
+
+  function handlePaymentTypeChange(type: "bill" | "advance" | "unallocated") {
+    setPaymentType(type);
+    if (type === "bill") {
+      autoAllocate(amount);
+    } else {
+      setAllocations([]);
+    }
   }
 
   function autoAllocate(totalAmount: number) {
@@ -93,6 +115,7 @@ export function VendorPayments() {
       newAllocations.push({
         purchaseHeaderId: bill.id,
         amount: Math.round(toAllocate * 100) / 100,
+        allocationType: "bill",
       });
       remaining -= toAllocate;
     }
@@ -112,7 +135,7 @@ export function VendorPayments() {
       }
       return [
         ...prev,
-        { purchaseHeaderId, amount: Math.round(num * 100) / 100 },
+        { purchaseHeaderId, amount: Math.round(num * 100) / 100, allocationType: "bill" },
       ];
     });
   }
@@ -135,27 +158,35 @@ export function VendorPayments() {
       toast.error("Please select a payment date.");
       return;
     }
-    if (Math.abs(allocationDifference) > 0.01) {
-      toast.error(
-        `Allocation total (${money(totalAllocated)}) must equal payment amount (${money(amount)}).`
-      );
-      return;
-    }
-    for (const alloc of allocations) {
-      if (alloc.amount > 0) {
-        const bill = unpaidBills.find((b) => b.id === alloc.purchaseHeaderId);
-        if (bill && alloc.amount > bill.remainingBalance + 0.01) {
-          toast.error(
-            `Allocation for ${bill.purchaseNo} exceeds remaining balance.`
-          );
-          return;
+
+    if (paymentType === "bill") {
+      if (Math.abs(allocationDifference) > 0.01) {
+        toast.error(
+          `Allocation total (${money(totalAllocated)}) must equal payment amount (${money(amount)}).`
+        );
+        return;
+      }
+      for (const alloc of allocations) {
+        if (alloc.amount > 0) {
+          const bill = unpaidBills.find((b) => b.id === alloc.purchaseHeaderId);
+          if (bill && alloc.amount > bill.remainingBalance + 0.01) {
+            toast.error(
+              `Allocation for ${bill.purchaseNo} exceeds remaining balance.`
+            );
+            return;
+          }
         }
       }
     }
 
     setSaving(true);
     try {
-      const allocData = allocations.filter((a) => a.amount > 0);
+      let allocData: AllocationEntry[];
+      if (paymentType === "bill") {
+        allocData = allocations.filter((a) => a.amount > 0);
+      } else {
+        allocData = [{ purchaseHeaderId: "", amount, allocationType: paymentType }];
+      }
       const result = await addVendorPayment(
         selectedVendorId,
         paymentDate,
@@ -189,6 +220,7 @@ export function VendorPayments() {
     setReferenceNo("");
     setRemarks("");
     setAllocations([]);
+    setPaymentType("bill");
   }
 
   function onExport() {
@@ -239,6 +271,16 @@ export function VendorPayments() {
             Vendor Payment Entry
           </h2>
         </div>
+
+        {selectedVendorId && advanceBalance > 0 && (
+          <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 p-2 text-xs sm:text-sm text-blue-800">
+            Available Vendor Advance: <span className="font-semibold">{money(advanceBalance)}</span>
+            {advanceBalance > 0 && paymentType === "bill" && (
+              <span className="ml-2 text-blue-600">(can be applied to bills)</span>
+            )}
+          </div>
+        )}
+
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           <div className="sm:col-span-2 md:col-span-1">
             <Label className="text-xs sm:text-sm">Vendor *</Label>
@@ -272,6 +314,19 @@ export function VendorPayments() {
               onChange={(e) => setPaymentDate(e.target.value)}
               className="h-9 text-xs sm:text-sm"
             />
+          </div>
+          <div>
+            <Label className="text-xs sm:text-sm">Payment Type *</Label>
+            <Select value={paymentType} onValueChange={(v) => handlePaymentTypeChange(v as "bill" | "advance" | "unallocated")}>
+              <SelectTrigger className="h-9 text-xs sm:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bill">Against Bill</SelectItem>
+                <SelectItem value="advance">Vendor Advance</SelectItem>
+                <SelectItem value="unallocated">Unallocated Payment</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label className="text-xs sm:text-sm">Payment Method *</Label>
@@ -331,7 +386,7 @@ export function VendorPayments() {
           </div>
         </div>
 
-        {selectedVendorId && unpaidBills.length > 0 && amount > 0 && (
+        {paymentType === "bill" && selectedVendorId && unpaidBills.length > 0 && amount > 0 && (
           <div className="mt-4">
             <div className="mb-2 flex items-center justify-between">
               <Label className="text-xs font-semibold sm:text-sm">
@@ -417,6 +472,26 @@ export function VendorPayments() {
                 </tfoot>
               </table>
             </div>
+          </div>
+        )}
+
+        {paymentType === "bill" && selectedVendorId && unpaidBills.length === 0 && amount > 0 && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs sm:text-sm text-amber-800">
+            No unpaid bills found. Consider using "Vendor Advance" or "Unallocated Payment" instead.
+          </div>
+        )}
+
+        {paymentType === "advance" && (
+          <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs sm:text-sm text-blue-800">
+            This payment will be recorded as <strong>Vendor Advance</strong>. 
+            The advance can be applied against future purchase bills.
+          </div>
+        )}
+
+        {paymentType === "unallocated" && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs sm:text-sm text-amber-800">
+            This payment will be recorded as <strong>Unallocated Payment</strong>. 
+            An accountant can allocate it to a specific bill later.
           </div>
         )}
 
