@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase, type Profile } from "@/lib/supabase";
 import { useStoreContext } from "@/lib/store-context";
 
@@ -356,7 +356,6 @@ let state: State = {
   purchaseReturns: [],
   vendorDocuments: [],
 };
-let loaded = false;
 
 function emit() {
   listeners.forEach((l) => l());
@@ -687,21 +686,18 @@ function mapVendorDocumentRow(r: Record<string, unknown>): VendorDocument {
 
 export function useStore() {
   const [snapshot, setSnapshot] = useState(state);
-
-  const load = useCallback(async () => {
-    await reload();
-    loaded = true;
-  }, []);
+  const { currentStoreId } = useStoreContext();
 
   useEffect(() => {
+    setCurrentStoreIdForStore(currentStoreId);
     const l = () => setSnapshot({ ...state });
     listeners.add(l);
-    if (!loaded) load();
+    reload();
     l();
     return () => {
       listeners.delete(l);
     };
-  }, [load]);
+  }, [currentStoreId]);
 
   return snapshot;
 }

@@ -1,6 +1,7 @@
 -- ============================================
--- BM iPhone Store - Create Accounts
--- Run this ENTIRE file in Supabase SQL Editor
+-- DO NOT RUN - This file is SUPERSEDED.
+-- Running this will break multi-store data isolation.
+-- Use: multi-store-migration.sql + create-accounts.sql + security-harden.sql
 -- ============================================
 
 -- 1. Fix profiles policies (remove recursion)

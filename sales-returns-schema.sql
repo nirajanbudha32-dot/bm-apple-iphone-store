@@ -1,6 +1,7 @@
 -- ============================================
--- SALES RETURNS
--- Run in Supabase SQL Editor
+-- DO NOT RUN - This file is SUPERSEDED.
+-- Running this will break multi-store data isolation.
+-- Use: multi-store-migration.sql + create-accounts.sql + security-harden.sql
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS public.sales_returns (

@@ -1,8 +1,8 @@
--- Allow anyone to read stock (even before login)
-DROP POLICY IF EXISTS "Authenticated users can read stock" ON public.stock;
-CREATE POLICY "Anyone can read stock"
-  ON public.stock FOR SELECT
-  USING (true);
+-- ============================================
+-- DO NOT RUN - This file is SUPERSEDED.
+-- Running this will break multi-store data isolation.
+-- Use: multi-store-migration.sql + create-accounts.sql + security-harden.sql
+-- ============================================
 
 -- Allow anyone to read sales
 DROP POLICY IF EXISTS "Authenticated users can read sales" ON public.sales;
