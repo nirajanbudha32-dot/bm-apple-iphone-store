@@ -12,7 +12,7 @@ import { useStoreContext } from "@/lib/store-context";
 export function StoreSwitcher() {
   const { stores, currentStoreId, currentStore, setCurrentStoreId, isAdmin } = useStoreContext();
 
-  if (!isAdmin && stores.length <= 1) {
+  if (!isAdmin) {
     return (
       <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground">
         <Store className="size-3.5 sm:size-4" />
