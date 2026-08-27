@@ -79,7 +79,6 @@ export function SalesRegister() {
   const [draftImeis, setDraftImeis] = useState<string[]>([]);
   const [availableImeis, setAvailableImeis] = useState<string[]>([]);
   const [expandedBillItem, setExpandedBillItem] = useState<number | null>(null);
-  const [hsCode, setHsCode] = useState("8517");
 
   const [headerDiscount, setHeaderDiscount] = useState(0);
   const [otherCharges, setOtherCharges] = useState(0);
@@ -165,7 +164,7 @@ export function SalesRegister() {
       subCategory: matched?.subCategory ?? "",
       brand: matched?.brand ?? "",
       model: matched?.model ?? "",
-      hsCode: hsCode.trim() || "8517",
+      hsCode: "",
       qty: itemQty,
       rate: itemRate,
       discount: itemDiscount,
@@ -286,7 +285,6 @@ export function SalesRegister() {
     setHeaderDiscount(0);
     setOtherCharges(0);
     setPaidAmount(0);
-    setHsCode("8517");
     setSalesPage(0);
     toast.success(`${invoiceNo} saved with ${billItems.length} items`);
   }
@@ -422,7 +420,7 @@ export function SalesRegister() {
       <div style="font-weight:500">${esc(it.itemName)}</div>
       <div style="font-size:10px;color:#6b7280">${esc(it.subCategory)} | ${esc(it.brand)} | ${esc(it.model)}</div>
     </td>
-    <td class="text-center" style="font-family:monospace;font-size:10.5px">${esc(it.hsCode || "8517")}</td>
+    <td class="text-center" style="font-family:monospace;font-size:10.5px">${esc(it.hsCode || "")}</td>
     <td class="text-right">${it.qty}</td>
     <td class="text-right">${money(it.rate)}</td>
     <td class="text-right">${it.discount > 0 ? money(it.discount) : "-"}</td>
@@ -496,7 +494,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
         Location: s.customerLocation,
         "Item Code": s.itemCode,
         Item: s.itemName,
-        "HS Code": "8517",
+        "HS Code": "",
         "Sub Category": s.subCategory,
         Category: s.category,
         Brand: s.brand,
@@ -745,15 +743,6 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                 </div>
               </div>
               <div className="mt-2 flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-[11px] text-muted-foreground whitespace-nowrap">HS Code</Label>
-                  <Input
-                    value={hsCode}
-                    onChange={(e) => setHsCode(e.target.value)}
-                    placeholder="8517"
-                    className="h-8 w-[90px] text-xs font-mono"
-                  />
-                </div>
                 <button
                   type="button"
                   onClick={() => setShowImeiInput(!showImeiInput)}
@@ -999,7 +988,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                                 subCategory: s.subCategory,
                                 brand: s.brand,
                                 model: s.model,
-                                hsCode: "8517",
+                                hsCode: "",
                                 qty: s.qty,
                                 rate: s.rate,
                                 discount: s.discount,
