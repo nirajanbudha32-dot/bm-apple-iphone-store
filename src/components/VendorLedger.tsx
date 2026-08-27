@@ -71,8 +71,7 @@ export function VendorLedger() {
 
   const ledgerRows = useMemo(() => {
     if (!selectedVendor) return [];
-    const openingBalance = selectedVendor.openingBalance;
-    let runningBalance = openingBalance;
+    let runningBalance = 0;
     return filteredTransactions.map((t) => {
       runningBalance = runningBalance + t.debit - t.credit;
       return { ...t, runningBalance };

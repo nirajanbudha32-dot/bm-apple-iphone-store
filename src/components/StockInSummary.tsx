@@ -101,7 +101,7 @@ export function StockInSummary() {
   }, [purchaseRows, dateFrom, dateTo, q]);
 
   const totalQty = filtered.reduce((a, l) => a + l.qty, 0);
-  const totalValue = filtered.reduce((a, l) => a + l.qty * l.purchasePrice, 0);
+  const totalValue = filtered.reduce((a, l) => a + l.value, 0);
 
   const PER_PAGE = 50;
   const [page, setPage] = useState(0);
@@ -123,7 +123,7 @@ export function StockInSummary() {
         "Bill No": l.billNo,
         "Qty In": l.qty,
         "Purchase Price": l.purchasePrice,
-        Value: l.qty * l.purchasePrice,
+        Value: l.value,
       })),
       "Stock In",
       `BM_StockIn_${new Date().toISOString().slice(0, 10)}.xlsx`,
@@ -209,7 +209,7 @@ export function StockInSummary() {
                   <td className="p-2.5">{l.supplier}</td>
                   <td className="p-2.5 text-right font-semibold">{l.qty}</td>
                   <td className="p-2.5 text-right">{money(l.purchasePrice)}</td>
-                  <td className="p-2.5 text-right font-medium">{money(l.qty * l.purchasePrice)}</td>
+                  <td className="p-2.5 text-right font-medium">{money(l.value)}</td>
                   <td className="p-2.5 font-mono">{l.billNo || "-"}</td>
                 </tr>
               ))}

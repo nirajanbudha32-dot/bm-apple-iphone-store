@@ -711,14 +711,23 @@ export async function nextInvoiceNo(): Promise<string> {
     const { data, error } = await supabase.rpc("next_invoice_no");
     if (!error && data) return data as string;
   } catch (_) {}
-  // Fallback: query MAX directly from sales table (bypasses RLS via SECURITY DEFINER)
+  // Fallback: query MAX directly from sales table
   const { data: rows } = await supabase.from("sales").select("invoice_no").order("invoice_no", { ascending: false }).limit(1);
   let max = 0;
   if (rows && rows.length > 0) {
     const n = Number(String((rows[0] as any).invoice_no ?? "").replace(/\D/g, ""));
     if (Number.isFinite(n) && n > max) max = n;
   }
-  return `BM-AIS-${String(max + 1).padStart(4, "0")}`;
+  let candidate = max + 1;
+  let noStr = `BM-AIS-${String(candidate).padStart(4, "0")}`;
+  const { data: existing } = await supabase.from("sales").select("invoice_no").eq("invoice_no", noStr);
+  while (existing && existing.length > 0) {
+    candidate++;
+    noStr = `BM-AIS-${String(candidate).padStart(4, "0")}`;
+    const { data: check } = await supabase.from("sales").select("invoice_no").eq("invoice_no", noStr);
+    if (!check || check.length === 0) break;
+  }
+  return noStr;
 }
 
 export async function addBill(
@@ -1126,7 +1135,16 @@ export async function nextPurchaseNo(): Promise<string> {
     const n = Number(String((rows[0] as any).purchase_no ?? "").replace(/\D/g, ""));
     if (Number.isFinite(n) && n > max) max = n;
   }
-  return `PUR-${String(max + 1).padStart(4, "0")}`;
+  let candidate = max + 1;
+  let noStr = `PUR-${String(candidate).padStart(4, "0")}`;
+  const { data: existing } = await supabase.from("purchase_headers").select("purchase_no").eq("purchase_no", noStr);
+  while (existing && existing.length > 0) {
+    candidate++;
+    noStr = `PUR-${String(candidate).padStart(4, "0")}`;
+    const { data: check } = await supabase.from("purchase_headers").select("purchase_no").eq("purchase_no", noStr);
+    if (!check || check.length === 0) break;
+  }
+  return noStr;
 }
 
 export async function addPurchaseHeader(
@@ -1273,7 +1291,8 @@ export async function addPurchaseHeader(
   const vendorIdForTxn = (header as Record<string, unknown>)['vendorId'] as string | undefined;
   if (vendorIdForTxn && header.grandTotal > 0) {
     const prevBalance = getVendorBalance(vendorIdForTxn);
-    const newBalance = prevBalance + header.grandTotal;
+    const paidAmount = header.paidAmount ?? 0;
+    // Record the full purchase as debit
     await supabase.from("vendor_transactions").insert({
       vendor_id: vendorIdForTxn,
       transaction_type: "PURCHASE",
@@ -1282,10 +1301,26 @@ export async function addPurchaseHeader(
       transaction_date: header.date,
       debit: header.grandTotal,
       credit: 0,
-      balance: newBalance,
+      balance: prevBalance + header.grandTotal,
       remarks: `Purchase ${purchaseNo}`,
       store_id: _currentStoreId,
     });
+    // If paid at purchase time, record the payment as credit
+    if (paidAmount > 0) {
+      const balanceAfterPurchase = prevBalance + header.grandTotal;
+      await supabase.from("vendor_transactions").insert({
+        vendor_id: vendorIdForTxn,
+        transaction_type: "PAYMENT",
+        reference_no: purchaseNo,
+        reference_id: headerId,
+        transaction_date: header.date,
+        debit: 0,
+        credit: paidAmount,
+        balance: balanceAfterPurchase - paidAmount,
+        remarks: `Payment at purchase ${purchaseNo}`,
+        store_id: _currentStoreId,
+      });
+    }
   }
 
   await reload();
@@ -1657,7 +1692,16 @@ export async function nextVendorCode(): Promise<string> {
     const n = Number(String((rows[0] as any).vendor_code ?? "").replace(/\D/g, ""));
     if (Number.isFinite(n) && n > max) max = n;
   }
-  return `VEN-${String(max + 1).padStart(4, "0")}`;
+  let candidate = max + 1;
+  let code = `VEN-${String(candidate).padStart(4, "0")}`;
+  const { data: existing } = await supabase.from("vendors").select("vendor_code").eq("vendor_code", code);
+  while (existing && existing.length > 0) {
+    candidate++;
+    code = `VEN-${String(candidate).padStart(4, "0")}`;
+    const { data: check } = await supabase.from("vendors").select("vendor_code").eq("vendor_code", code);
+    if (!check || check.length === 0) break;
+  }
+  return code;
 }
 
 export async function addVendor(
@@ -1781,7 +1825,16 @@ export async function nextVendorPaymentNo(): Promise<string> {
     const n = Number(String((rows[0] as any).payment_no ?? "").replace(/\D/g, ""));
     if (Number.isFinite(n) && n > max) max = n;
   }
-  return `VP-${String(max + 1).padStart(4, "0")}`;
+  let candidate = max + 1;
+  let noStr = `VP-${String(candidate).padStart(4, "0")}`;
+  const { data: existing } = await supabase.from("vendor_payments").select("payment_no").eq("payment_no", noStr);
+  while (existing && existing.length > 0) {
+    candidate++;
+    noStr = `VP-${String(candidate).padStart(4, "0")}`;
+    const { data: check } = await supabase.from("vendor_payments").select("payment_no").eq("payment_no", noStr);
+    if (!check || check.length === 0) break;
+  }
+  return noStr;
 }
 
 export async function addVendorPayment(
@@ -1867,7 +1920,16 @@ export async function nextPurchaseReturnNo(): Promise<string> {
     const n = Number(String((rows[0] as any).return_no ?? "").replace(/\D/g, ""));
     if (Number.isFinite(n) && n > max) max = n;
   }
-  return `PR-${String(max + 1).padStart(4, "0")}`;
+  let candidate = max + 1;
+  let noStr = `PR-${String(candidate).padStart(4, "0")}`;
+  const { data: existing } = await supabase.from("purchase_returns").select("return_no").eq("return_no", noStr);
+  while (existing && existing.length > 0) {
+    candidate++;
+    noStr = `PR-${String(candidate).padStart(4, "0")}`;
+    const { data: check } = await supabase.from("purchase_returns").select("return_no").eq("return_no", noStr);
+    if (!check || check.length === 0) break;
+  }
+  return noStr;
 }
 
 export async function addPurchaseReturn(
@@ -1948,15 +2010,11 @@ export function getVendorBalance(vendorId: string): number {
     .filter((t) => t.vendorId === vendorId)
     .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
 
-  let balance = 0;
-  for (const txn of txns) {
-    balance = txn.debit - txn.credit + (txns.indexOf(txn) === 0 ? balance : 0);
-  }
   // Recalculate properly: opening + purchases - payments - returns
   const vendor = state.vendors.find((v) => v.id === vendorId);
   const openingBalance = vendor?.openingBalance ?? 0;
-  const totalDebit = txns.filter((t) => t.transactionType === "PURCHASE" || t.transactionType === "OPENING_BALANCE").reduce((a, t) => a + t.debit, 0);
-  const totalCredit = txns.filter((t) => t.transactionType !== "PURCHASE" && t.transactionType !== "OPENING_BALANCE").reduce((a, t) => a + t.credit, 0);
+  const totalDebit = txns.filter((t) => t.transactionType === "PURCHASE" || t.transactionType === "OPENING_BALANCE" || t.transactionType === "ADVANCE_APPLIED").reduce((a, t) => a + t.debit, 0);
+  const totalCredit = txns.filter((t) => t.transactionType !== "PURCHASE" && t.transactionType !== "OPENING_BALANCE" && t.transactionType !== "ADVANCE_APPLIED").reduce((a, t) => a + t.credit, 0);
   // Opening balance is what vendor owes us at start (credit side from vendor perspective)
   // Purchases increase what we owe (debit)
   // Payments/returns decrease what we owe (credit)

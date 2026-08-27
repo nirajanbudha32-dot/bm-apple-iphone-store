@@ -945,7 +945,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                                 total: s.total,
                               })),
                               subtotal: g.items.reduce((a, i) => a + i.amount, 0),
-                              headerDiscount: 0,
+                              headerDiscount: Math.max(0, g.items.reduce((a, i) => a + i.amount, 0) + (g.header.otherCharges ?? 0) - invPaid - invRemaining),
                               otherCharges: g.header.otherCharges,
                               vat: g.items.reduce((a, i) => a + i.vat, 0),
                               total: invTotal,
