@@ -32,7 +32,7 @@ import { useAuth, AUTH_ENABLED } from "@/lib/auth";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BM Apple Iphone Store Stock Management V1" },
+      { title: "BM Apple Iphone Store" },
       {
         name: "description",
         content:
@@ -83,7 +83,7 @@ function IndexInner() {
     <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
       <header className="mb-6 flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between sm:border-b-0 sm:pb-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">BM Apple Iphone Store Stock Management V1</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{currentStore ? currentStore.name : "All Stores"}</h1>
           <p className="text-xs text-muted-foreground sm:text-sm">
             {currentStore ? currentStore.name : "All Stores"} — Stock management &amp; sales register
           </p>
