@@ -1,9 +1,2 @@
--- Reference: Account setup
--- Run AFTER multi-store-migration.sql
--- Step 1: Create accounts via app (Sign Up) with these emails:
---   admin@bmstore.com / admin123
---   sales1@bmstore.com / sales123
---   sales2@bmstore.com / sales123
---   sales3@bmstore.com / sales123
---
--- Step 2: Run assign-store-roles.sql to set correct roles and store_ids
+-- SUPERSEDED by create-accounts.sql
+-- Use create-accounts.sql instead
