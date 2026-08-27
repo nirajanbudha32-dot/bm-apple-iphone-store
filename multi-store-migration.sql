@@ -23,7 +23,7 @@ INSERT INTO public.stores (id, name, address, phone, pan, vat_number) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'BM Store - Lakeside', 'Lakeside, Pokhara', '9800000001', '123456789', '123456789'),
   ('a0000000-0000-0000-0000-000000000002', 'BM Store - Newroad', 'Newroad, Pokhara', '9800000002', '987654321', '987654321'),
   ('a0000000-0000-0000-0000-000000000003', 'BM Store - Airport', 'Airport, Pokhara', '9800000003', '456789123', '456789123')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address, phone = EXCLUDED.phone, pan = EXCLUDED.pan, vat_number = EXCLUDED.vat_number;
 
 -- PART 2: Add store_id to profiles (nullable — admin has NULL)
 -- ============================================================
