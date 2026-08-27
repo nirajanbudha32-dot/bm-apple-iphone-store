@@ -10,9 +10,9 @@ import {
 import { useStoreContext } from "@/lib/store-context";
 
 export function StoreSwitcher() {
-  const { stores, currentStoreId, currentStore, setCurrentStoreId, isSuperAdmin } = useStoreContext();
+  const { stores, currentStoreId, currentStore, setCurrentStoreId, isAdmin } = useStoreContext();
 
-  if (!isSuperAdmin && stores.length <= 1) {
+  if (!isAdmin && stores.length <= 1) {
     return (
       <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground">
         <Store className="size-3.5 sm:size-4" />
@@ -32,7 +32,7 @@ export function StoreSwitcher() {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {isSuperAdmin && (
+          {isAdmin && (
             <SelectItem value="__all__">All Stores</SelectItem>
           )}
           {stores.map((s) => (

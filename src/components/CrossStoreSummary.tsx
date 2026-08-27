@@ -7,7 +7,7 @@ import { useStoreContext } from "@/lib/store-context";
 import { money } from "@/lib/utils";
 
 export function CrossStoreSummary() {
-  const { stores, isSuperAdmin } = useStoreContext();
+  const { stores, isAdmin } = useStoreContext();
   const { stock, sales, purchaseHeaders, vendors, vendorTransactions } = useStore();
 
   const storeData = useMemo(() => {
@@ -54,10 +54,10 @@ export function CrossStoreSummary() {
     salesCount: storeData.reduce((a, s) => a + s.salesCount, 0),
   }), [storeData]);
 
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <Card className="p-6 text-center text-sm text-muted-foreground">
-        Cross-store summary is available to Super Admin only.
+        Cross-store summary is available to Admin only.
       </Card>
     );
   }

@@ -706,11 +706,18 @@ export function useStore() {
   return snapshot;
 }
 
-export function nextInvoiceNo(sales: Sale[]) {
-  const max = sales.reduce((acc, s) => {
-    const n = Number(s.invoiceNo.replace(/\D/g, ""));
-    return Number.isFinite(n) && n > acc ? n : acc;
-  }, 0);
+export async function nextInvoiceNo(): Promise<string> {
+  try {
+    const { data, error } = await supabase.rpc("next_invoice_no");
+    if (!error && data) return data as string;
+  } catch (_) {}
+  // Fallback: query MAX directly from sales table (bypasses RLS via SECURITY DEFINER)
+  const { data: rows } = await supabase.from("sales").select("invoice_no").order("invoice_no", { ascending: false }).limit(1);
+  let max = 0;
+  if (rows && rows.length > 0) {
+    const n = Number(String((rows[0] as any).invoice_no ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(n) && n > max) max = n;
+  }
   return `BM-AIS-${String(max + 1).padStart(4, "0")}`;
 }
 
@@ -972,20 +979,12 @@ export async function calculateMaxStockCode(): Promise<number> {
     }
   } catch (_) {}
 
-  // Fallback: query all codes from stock table
-  const { data: allRows } = await supabase.from("stock").select("code");
+  // Fallback: query max code from stock table directly
+  const { data: allRows } = await supabase.from("stock").select("code").order("code", { ascending: false }).limit(1);
   let max = 0;
   if (allRows && allRows.length > 0) {
-    for (const row of allRows) {
-      const codeStr = String((row as Record<string, unknown>)["code"] ?? "");
-      const n = parseInt(codeStr.replace(/\D/g, ""), 10);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  } else if (state.stock && state.stock.length > 0) {
-    for (const item of state.stock) {
-      const n = parseInt(String(item.code).replace(/\D/g, ""), 10);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
+    const n = parseInt(String((allRows[0] as any).code ?? "").replace(/\D/g, ""), 10);
+    if (Number.isFinite(n) && n > max) max = n;
   }
   return max;
 }
@@ -993,9 +992,12 @@ export async function calculateMaxStockCode(): Promise<number> {
 export async function nextItemCode(): Promise<string> {
   const max = await calculateMaxStockCode();
   let candidate = max + 1;
-  const existingCodes = new Set(state.stock.map((s) => String(s.code).trim()));
-  while (existingCodes.has(String(candidate))) {
+  // Dedup: check against DB
+  const { data: existing } = await supabase.from("stock").select("code").eq("code", String(candidate));
+  while (existing && existing.length > 0) {
     candidate++;
+    const { data: check } = await supabase.from("stock").select("code").eq("code", String(candidate));
+    if (!check || check.length === 0) break;
   }
   return String(candidate);
 }
@@ -1009,20 +1011,12 @@ export async function calculateMaxLotNo(): Promise<number> {
     }
   } catch (_) {}
 
-  // Fallback: query from stock_lots table
-  const { data: allLots } = await supabase.from("stock_lots").select("lot_no");
+  // Fallback: query from stock_lots table directly
+  const { data: allLots } = await supabase.from("stock_lots").select("lot_no").order("lot_no", { ascending: false }).limit(1);
   let max = 0;
   if (allLots && allLots.length > 0) {
-    for (const row of allLots) {
-      const lotStr = String((row as Record<string, unknown>)["lot_no"] ?? "");
-      const n = parseInt(lotStr.replace(/\D/g, ""), 10);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  } else if (state.stockLots && state.stockLots.length > 0) {
-    for (const lot of state.stockLots) {
-      const n = parseInt(String(lot.lotNo).replace(/\D/g, ""), 10);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
+    const n = parseInt(String((allLots[0] as any).lot_no ?? "").replace(/\D/g, ""), 10);
+    if (Number.isFinite(n) && n > max) max = n;
   }
   return max;
 }
@@ -1030,9 +1024,14 @@ export async function calculateMaxLotNo(): Promise<number> {
 export async function getNextLotNo(): Promise<string> {
   const max = await calculateMaxLotNo();
   let candidate = max + 1;
-  const existingLots = new Set(state.stockLots.map((l) => String(l.lotNo).trim()));
-  while (existingLots.has(`LOT-${String(candidate).padStart(4, "0")}`)) {
+  // Dedup: check against DB
+  const lotNoStr = `LOT-${String(candidate).padStart(4, "0")}`;
+  const { data: existing } = await supabase.from("stock_lots").select("lot_no").eq("lot_no", lotNoStr);
+  while (existing && existing.length > 0) {
     candidate++;
+    const nextStr = `LOT-${String(candidate).padStart(4, "0")}`;
+    const { data: check } = await supabase.from("stock_lots").select("lot_no").eq("lot_no", nextStr);
+    if (!check || check.length === 0) break;
   }
   return `LOT-${String(candidate).padStart(4, "0")}`;
 }
@@ -1116,11 +1115,17 @@ export async function deletePurchase(id: string) {
   await reload();
 }
 
-export function nextPurchaseNo(headers: PurchaseHeader[]) {
-  const max = headers.reduce((acc, h) => {
-    const n = Number(h.purchaseNo.replace(/\D/g, ""));
-    return Number.isFinite(n) && n > acc ? n : acc;
-  }, 0);
+export async function nextPurchaseNo(): Promise<string> {
+  try {
+    const { data, error } = await supabase.rpc("next_purchase_no");
+    if (!error && data) return data as string;
+  } catch (_) {}
+  const { data: rows } = await supabase.from("purchase_headers").select("purchase_no").order("purchase_no", { ascending: false }).limit(1);
+  let max = 0;
+  if (rows && rows.length > 0) {
+    const n = Number(String((rows[0] as any).purchase_no ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(n) && n > max) max = n;
+  }
   return `PUR-${String(max + 1).padStart(4, "0")}`;
 }
 
@@ -1646,11 +1651,12 @@ export async function nextVendorCode(): Promise<string> {
     const { data, error } = await supabase.rpc("next_vendor_code");
     if (!error && data) return data as string;
   } catch (_) {}
-  // Fallback
-  const max = state.vendors.reduce((acc, v) => {
-    const n = Number(v.vendorCode.replace(/\D/g, ""));
-    return Number.isFinite(n) && n > acc ? n : acc;
-  }, 0);
+  const { data: rows } = await supabase.from("vendors").select("vendor_code").order("vendor_code", { ascending: false }).limit(1);
+  let max = 0;
+  if (rows && rows.length > 0) {
+    const n = Number(String((rows[0] as any).vendor_code ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(n) && n > max) max = n;
+  }
   return `VEN-${String(max + 1).padStart(4, "0")}`;
 }
 
@@ -1769,10 +1775,12 @@ export async function nextVendorPaymentNo(): Promise<string> {
     const { data, error } = await supabase.rpc("next_vendor_payment_no");
     if (!error && data) return data as string;
   } catch (_) {}
-  const max = state.vendorPayments.reduce((acc, p) => {
-    const n = Number(p.paymentNo.replace(/\D/g, ""));
-    return Number.isFinite(n) && n > acc ? n : acc;
-  }, 0);
+  const { data: rows } = await supabase.from("vendor_payments").select("payment_no").order("payment_no", { ascending: false }).limit(1);
+  let max = 0;
+  if (rows && rows.length > 0) {
+    const n = Number(String((rows[0] as any).payment_no ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(n) && n > max) max = n;
+  }
   return `VP-${String(max + 1).padStart(4, "0")}`;
 }
 
@@ -1853,10 +1861,12 @@ export async function nextPurchaseReturnNo(): Promise<string> {
     const { data, error } = await supabase.rpc("next_purchase_return_no");
     if (!error && data) return data as string;
   } catch (_) {}
-  const max = state.purchaseReturns.reduce((acc, r) => {
-    const n = Number(r.returnNo.replace(/\D/g, ""));
-    return Number.isFinite(n) && n > acc ? n : acc;
-  }, 0);
+  const { data: rows } = await supabase.from("purchase_returns").select("return_no").order("return_no", { ascending: false }).limit(1);
+  let max = 0;
+  if (rows && rows.length > 0) {
+    const n = Number(String((rows[0] as any).return_no ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(n) && n > max) max = n;
+  }
   return `PR-${String(max + 1).padStart(4, "0")}`;
 }
 

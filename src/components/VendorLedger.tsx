@@ -20,10 +20,11 @@ import {
 } from "@/lib/store";
 import { money } from "@/lib/utils";
 import { exportRows } from "@/lib/excel";
+import { useStoreContext } from "@/lib/store-context";
 
-const COMPANY = {
+const DEFAULT_COMPANY = {
   name: "BM Apple iPhone Store",
-  address: "Birendranagar, Surkhet",
+  address: "Pokhara, Nepal",
   pan: "123456789",
   vatNo: "123456789",
 };
@@ -41,9 +42,17 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function VendorLedger() {
   const { vendors } = useStore();
+  const { currentStore } = useStoreContext();
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+
+  const COMPANY = {
+    name: DEFAULT_COMPANY.name,
+    address: currentStore?.address || DEFAULT_COMPANY.address,
+    pan: currentStore?.pan || DEFAULT_COMPANY.pan,
+    vatNo: currentStore?.vatNumber || DEFAULT_COMPANY.vatNo,
+  };
 
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
 

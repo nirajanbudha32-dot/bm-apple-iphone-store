@@ -19,7 +19,7 @@ type StoreContextType = {
   currentStoreId: string | null;
   currentStore: Store | null;
   setCurrentStoreId: (id: string | null) => void;
-  isSuperAdmin: boolean;
+  isAdmin: boolean;
   loading: boolean;
 };
 
@@ -31,7 +31,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [currentStoreId, setCurrentStoreId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const isSuperAdmin = profile?.role === "super_admin";
+  const isAdmin = profile?.role === "admin" && profile?.storeId === null;
 
   useEffect(() => {
     async function fetchStores() {
@@ -59,20 +59,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCurrentStoreId(null);
       return;
     }
-    if (isSuperAdmin) {
+    if (isAdmin) {
       if (!currentStoreId && stores.length > 0) {
         setCurrentStoreId(null);
       }
     } else if (profile.storeId) {
       setCurrentStoreId(profile.storeId);
     }
-  }, [profile, isSuperAdmin, stores, currentStoreId]);
+  }, [profile, isAdmin, stores, currentStoreId]);
 
   const handleSetCurrentStoreId = useCallback((id: string | null) => {
-    if (isSuperAdmin || id === null) {
+    if (isAdmin || id === null) {
       setCurrentStoreId(id);
     }
-  }, [isSuperAdmin]);
+  }, [isAdmin]);
 
   const currentStore = stores.find((s) => s.id === currentStoreId) ?? null;
 
@@ -83,7 +83,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         currentStoreId,
         currentStore,
         setCurrentStoreId: handleSetCurrentStoreId,
-        isSuperAdmin,
+        isAdmin,
         loading,
       }}
     >

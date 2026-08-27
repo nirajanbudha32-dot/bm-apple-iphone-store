@@ -51,7 +51,7 @@ export const Route = createFileRoute("/")({
 
 function IndexInner() {
   const { user, profile, loading, signOut } = useAuth();
-  const { currentStoreId, currentStore, isSuperAdmin } = useStoreContext();
+  const { currentStoreId, currentStore, isAdmin } = useStoreContext();
   const navigate = useNavigate();
   const [userManagerOpen, setUserManagerOpen] = useState(false);
   const [storeManagerOpen, setStoreManagerOpen] = useState(false);
@@ -77,8 +77,7 @@ function IndexInner() {
 
   if (!user) return null;
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "store_owner" || profile?.role === "super_admin";
-  const roleLabel = profile?.role === "super_admin" ? "Super Admin" : profile?.role === "store_owner" ? "Store Owner" : profile?.role === "admin" ? "Admin" : "Salesman";
+  const roleLabel = profile?.role === "admin" ? "Admin" : "Salesman";
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
@@ -102,7 +101,7 @@ function IndexInner() {
             </div>
           )}
           <div className="flex items-center gap-2">
-            {isSuperAdmin && (
+            {isAdmin && (
               <Button variant="outline" size="sm" onClick={() => setStoreManagerOpen(true)} className="h-8 text-xs sm:h-9 sm:text-sm">
                 <Building2 className="mr-1 size-3.5 sm:size-4" /> Stores
               </Button>
@@ -123,7 +122,7 @@ function IndexInner() {
 
       <Tabs defaultValue="sales">
         <TabsList className="mb-6 grid h-auto w-full grid-cols-4 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
-          {isSuperAdmin && (
+          {isAdmin && (
             <TabsTrigger value="crossstore" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <Building2 className="mr-1.5 size-3.5 sm:size-4" /> All Stores
             </TabsTrigger>
@@ -166,7 +165,7 @@ function IndexInner() {
           </TabsTrigger>
         </TabsList>
 
-        {isSuperAdmin && (
+        {isAdmin && (
           <TabsContent value="crossstore">
             <CrossStoreSummary />
           </TabsContent>
@@ -235,7 +234,7 @@ function IndexInner() {
       </Tabs>
 
       {isAdmin && <UserManager open={userManagerOpen} onOpenChange={setUserManagerOpen} />}
-      {isSuperAdmin && <StoreManager open={storeManagerOpen} onOpenChange={setStoreManagerOpen} />}
+      {isAdmin && <StoreManager open={storeManagerOpen} onOpenChange={setStoreManagerOpen} />}
     </main>
   );
 }

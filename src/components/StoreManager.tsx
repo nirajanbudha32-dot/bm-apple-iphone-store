@@ -22,7 +22,7 @@ type Props = {
 };
 
 export function StoreManager({ open, onOpenChange }: Props) {
-  const { isSuperAdmin } = useStoreContext();
+  const { isAdmin } = useStoreContext();
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -94,7 +94,7 @@ export function StoreManager({ open, onOpenChange }: Props) {
     }
   }
 
-  if (!isSuperAdmin) return null;
+  if (!isAdmin) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

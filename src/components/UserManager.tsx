@@ -32,7 +32,7 @@ type Store = { id: string; name: string };
 
 export function UserManager({ open, onOpenChange }: Props) {
   const { user: currentUser } = useAuth();
-  const { isSuperAdmin, currentStoreId, stores } = useStoreContext();
+  const { isAdmin, currentStoreId, stores } = useStoreContext();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -41,14 +41,10 @@ export function UserManager({ open, onOpenChange }: Props) {
   const [inviteStoreId, setInviteStoreId] = useState<string>("");
   const [inviting, setInviting] = useState(false);
 
-  const myRole = currentUser ? users.find((u) => u.id === currentUser.id)?.role : null;
-  const canCreateStoreOwner = isSuperAdmin;
-  const canCreateSalesman = isSuperAdmin || myRole === "store_owner";
-
   async function loadUsers() {
     setLoading(true);
     let query = supabase.from("profiles").select("*").order("created_at", { ascending: true });
-    if (!isSuperAdmin && currentStoreId) {
+    if (!isAdmin && currentStoreId) {
       query = query.eq("store_id", currentStoreId);
     }
     const { data, error } = await query;
@@ -116,12 +112,7 @@ export function UserManager({ open, onOpenChange }: Props) {
       toast.error("Cannot change your own role");
       return;
     }
-    let newRole: string;
-    if (isSuperAdmin) {
-      newRole = currentRole === "store_owner" ? "salesman" : "store_owner";
-    } else {
-      newRole = currentRole === "admin" ? "salesman" : "admin";
-    }
+    const newRole = currentRole === "admin" ? "salesman" : "admin";
     const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
     if (error) {
       toast.error("Failed to update role");
@@ -131,9 +122,7 @@ export function UserManager({ open, onOpenChange }: Props) {
     }
   }
 
-  const availableRoles = isSuperAdmin
-    ? [{ value: "store_owner", label: "Store Owner" }, { value: "salesman", label: "Salesman" }]
-    : [{ value: "salesman", label: "Salesman" }];
+  const availableRoles = [{ value: "admin", label: "Admin" }, { value: "salesman", label: "Salesman" }];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -213,7 +202,7 @@ export function UserManager({ open, onOpenChange }: Props) {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={u.role === "super_admin" ? "default" : u.role === "store_owner" ? "default" : "secondary"}>
+                      <Badge variant={u.role === "admin" ? "default" : "secondary"}>
                         {u.role}
                       </Badge>
                       {u.id !== currentUser?.id && (

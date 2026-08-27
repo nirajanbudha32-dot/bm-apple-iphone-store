@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Trash2, Plus, Check, Printer, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,10 +28,11 @@ import {
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
 import { money } from "@/lib/utils";
+import { useStoreContext } from "@/lib/store-context";
 
-const COMPANY = {
+const DEFAULT_COMPANY = {
   name: "BM Apple iPhone Store",
-  address: "Birendranagar, Surkhet",
+  address: "Pokhara, Nepal",
   pan: "123456789",
   vatNo: "123456789",
 };
@@ -42,7 +43,19 @@ function esc(s: string) {
 
 export function SalesRegister() {
   const { stock, sales, saleImeis, stockLots } = useStore();
-  const invoiceNo = nextInvoiceNo(sales);
+  const { currentStore } = useStoreContext();
+  const [invoiceNo, setInvoiceNo] = useState("BM-AIS-0001");
+
+  useEffect(() => {
+    nextInvoiceNo().then(setInvoiceNo);
+  }, [sales.length]);
+
+  const COMPANY = {
+    name: DEFAULT_COMPANY.name,
+    address: currentStore?.address || DEFAULT_COMPANY.address,
+    pan: currentStore?.pan || DEFAULT_COMPANY.pan,
+    vatNo: currentStore?.vatNumber || DEFAULT_COMPANY.vatNo,
+  };
 
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [customer, setCustomer] = useState("");
