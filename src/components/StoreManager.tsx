@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useStoreContext, type Store } from "@/lib/store-context";
+import { WAREHOUSE_ID } from "@/lib/store";
 
 type Props = {
   open: boolean;
@@ -140,7 +141,7 @@ export function StoreManager({ open, onOpenChange }: Props) {
             <p className="text-sm text-muted-foreground">Loading...</p>
           ) : (
             <div className="space-y-2">
-              {stores.map((s) => (
+              {stores.filter((s) => s.id !== WAREHOUSE_ID).map((s) => (
                 <Card key={s.id} className="flex items-center justify-between p-3">
                   <div>
                     <div className="flex items-center gap-2">

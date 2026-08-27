@@ -21,6 +21,8 @@ import {
   useStore,
   PAYMENT_METHODS,
   VAT_RATE,
+  WAREHOUSE_ID,
+  LOCATION_LABELS,
   getVendorAdvance,
   type PaymentMethod,
   type PurchaseHeader,
@@ -31,6 +33,7 @@ import {
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
 import { money } from "@/lib/utils";
+import { useStoreContext } from "@/lib/store-context";
 
 type PurchaseItemDraft = {
   itemCode: string;
@@ -84,6 +87,7 @@ const emptyDraft = (): PurchaseItemDraft => ({
 
 export function PurchaseManager() {
   const { stock, purchaseHeaders, purchaseItems, purchaseImeis, purchaseAttachments, vendors } = useStore();
+  const { stores } = useStoreContext();
 
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -99,6 +103,7 @@ export function PurchaseManager() {
   const [headerDiscount, setHeaderDiscount] = useState(0);
   const [otherCharges, setOtherCharges] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
+  const [destinationStoreId, setDestinationStoreId] = useState<string>(WAREHOUSE_ID);
 
   const vendorAdvance = useMemo(() => {
     if (!selectedVendorId) return 0;
@@ -363,7 +368,7 @@ export function PurchaseManager() {
       vendorId: selectedVendorId || "",
     };
 
-    const result = await addPurchaseHeader(header, items, imeisByItem);
+    const result = await addPurchaseHeader(header, items, imeisByItem, destinationStoreId);
     setSaving(false);
 
     if (result.error) {
@@ -399,6 +404,7 @@ export function PurchaseManager() {
     setHeaderDiscount(0);
     setOtherCharges(0);
     setPaidAmount(0);
+    setDestinationStoreId(WAREHOUSE_ID);
     setPurchaseItemsDraft([]);
     setAttachments([]);
   }
@@ -557,6 +563,18 @@ export function PurchaseManager() {
               <SelectContent>
                 {PAYMENT_METHODS.map((m) => (
                   <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs sm:text-sm">Send To *</Label>
+            <Select value={destinationStoreId} onValueChange={setDestinationStoreId}>
+              <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={WAREHOUSE_ID}>Warehouse (Central)</SelectItem>
+                {stores.filter((s) => s.id !== WAREHOUSE_ID && s.status === "active").map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

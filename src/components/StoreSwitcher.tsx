@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStoreContext } from "@/lib/store-context";
+import { WAREHOUSE_ID } from "@/lib/store";
 
 export function StoreSwitcher() {
   const { stores, currentStoreId, currentStore, setCurrentStoreId, isAdmin } = useStoreContext();
@@ -35,7 +36,7 @@ export function StoreSwitcher() {
           {isAdmin && (
             <SelectItem value="__all__">All Stores</SelectItem>
           )}
-          {stores.map((s) => (
+          {stores.filter((s) => s.id !== WAREHOUSE_ID).map((s) => (
             <SelectItem key={s.id} value={s.id}>
               {s.name}
             </SelectItem>

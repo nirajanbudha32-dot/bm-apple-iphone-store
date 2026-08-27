@@ -25,6 +25,14 @@ export type PaymentMethod = "Cash" | "Bank" | "Khalti" | "eSewa" | "Other Bank" 
 
 export const PAYMENT_METHODS: PaymentMethod[] = ["Cash", "Bank", "Card", "Khalti", "eSewa", "Online", "Other Bank"];
 
+export const WAREHOUSE_ID = "a0000000-0000-0000-0000-000000000004";
+export const LOCATION_LABELS: Record<string, string> = {
+  [WAREHOUSE_ID]: "Warehouse",
+  "a0000000-0000-0000-0000-000000000001": "BM Apple Iphone Store",
+  "a0000000-0000-0000-0000-000000000002": "BM Iphone Store",
+  "a0000000-0000-0000-0000-000000000003": "BM Electronic",
+};
+
 export type BillItem = {
   itemCode: string;
   itemName: string;
@@ -307,10 +315,36 @@ export type VendorDocument = {
   id: string;
   vendorId: string;
   fileName: string;
+  fileUrl: string;
   fileType: string;
   fileSize: number;
   fileData: string;
+  uploadedAt: string;
   storeId?: string;
+};
+
+export type StockTransfer = {
+  id: string;
+  transferNo: string;
+  date: string;
+  fromStoreId: string | null;
+  toStoreId: string | null;
+  status: string;
+  remarks: string;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+export type StockTransferItem = {
+  id: string;
+  transferId: string;
+  itemCode: string;
+  itemName: string;
+  lotId: string | null;
+  qty: number;
+  imei: string | null;
+  purchasePrice: number;
+  createdAt: string;
 };
 
 export const VAT_RATE = 0.13;
@@ -679,8 +713,10 @@ function mapVendorDocumentRow(r: Record<string, unknown>): VendorDocument {
     vendorId: r['vendor_id'] as string,
     fileName: r['file_name'] as string,
     fileType: (r['file_type'] as string) ?? "",
+    fileUrl: "",
     fileSize: Number(r['file_size'] ?? 0),
     fileData: (r['file_data'] as string) ?? "",
+    uploadedAt: (r['created_at'] as string) ?? "",
     storeId: (r['store_id'] as string) ?? "",
   };
 }
@@ -1167,8 +1203,10 @@ export async function addPurchaseHeader(
   header: Omit<PurchaseHeader, "id" | "createdAt">,
   items: Omit<PurchaseItem, "id" | "purchaseHeaderId">[],
   imeisByItem: Record<number, string[]>,
+  destinationStoreId?: string,
 ): Promise<{ error?: string; headerId?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
+  const targetStoreId = destinationStoreId || _currentStoreId;
 
   // Generate purchase_no server-side to avoid duplicates
   let purchaseNo = header.purchaseNo;
@@ -1202,7 +1240,7 @@ export async function addPurchaseHeader(
     remaining_balance: header.grandTotal - header.paidAmount,
     vendor_id: (header as Record<string, unknown>)['vendorId'] || null,
     created_by: user?.id ?? null,
-    store_id: _currentStoreId,
+    store_id: targetStoreId,
   }).select("id").single();
 
   if (error) return { error: error.message };
@@ -1267,7 +1305,7 @@ export async function addPurchaseHeader(
       vat_amount: item.vatAmount,
       total: item.total,
       lot_no: lotNo,
-      store_id: _currentStoreId,
+      store_id: targetStoreId,
     }).select("id").single();
 
     if (itemErr) return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
@@ -1280,7 +1318,7 @@ export async function addPurchaseHeader(
       const imeiRows = imeis.map((imei) => ({
         purchase_item_id: itemId,
         imei,
-        store_id: _currentStoreId,
+        store_id: targetStoreId,
       }));
       const { error: imeiErr } = await supabase.from("purchase_item_imeis").insert(imeiRows);
       if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
@@ -1295,7 +1333,7 @@ export async function addPurchaseHeader(
       supplier: header.supplierName,
       qty: item.qty,
       purchase_price: item.rate,
-      store_id: _currentStoreId,
+      store_id: targetStoreId,
     });
 
     if (lotInsertErr) {
@@ -1319,7 +1357,7 @@ export async function addPurchaseHeader(
       credit: 0,
       balance: prevBalance + header.grandTotal,
       remarks: `Purchase ${purchaseNo}`,
-      store_id: _currentStoreId,
+      store_id: targetStoreId,
     });
     // If paid at purchase time, record the payment as credit
     if (paidAmount > 0) {
@@ -1336,7 +1374,7 @@ export async function addPurchaseHeader(
         reference_no: purchaseNo,
         remarks: `Payment at purchase ${purchaseNo}`,
         created_by: user?.id ?? null,
-        store_id: _currentStoreId,
+        store_id: targetStoreId,
       }).select("id").single();
 
       if (paymentInserted) {
@@ -1346,7 +1384,7 @@ export async function addPurchaseHeader(
           purchase_header_id: headerId,
           amount: paidAmount,
           allocation_type: "bill",
-          store_id: _currentStoreId,
+          store_id: targetStoreId,
         });
       }
 
@@ -2250,6 +2288,243 @@ export async function applyVendorAdvance(
 
   await reload();
   return {};
+}
+
+export async function getNextTransferNo(): Promise<string> {
+  try {
+    const { data } = await supabase.rpc("next_transfer_no");
+    if (data) return data as string;
+  } catch (_) {}
+  return "TRF-0001";
+}
+
+export async function createTransfer(
+  fromStoreId: string,
+  toStoreId: string,
+  items: Array<{ itemCode: string; itemName: string; lotId: string; qty: number; imei?: string; purchasePrice: number }>,
+  remarks: string = "",
+): Promise<{ error?: string; transferNo?: string }> {
+  if (fromStoreId === toStoreId) return { error: "Source and destination cannot be the same" };
+  if (items.length === 0) return { error: "Add at least one item to transfer" };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const transferNo = await getNextTransferNo();
+
+  for (const item of items) {
+    const { data: lot } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
+    if (!lot) return { error: `Lot not found for "${item.itemName}"` };
+    const lotQty = (lot as Record<string, unknown>)['qty'] as number;
+    if (lotQty < item.qty) return { error: `Insufficient qty in lot for "${item.itemName}". Available: ${lotQty}, requested: ${item.qty}` };
+  }
+
+  const { data: transferRow, error: tErr } = await supabase.from("stock_transfers").insert({
+    transfer_no: transferNo,
+    date: new Date().toISOString().slice(0, 10),
+    from_store_id: fromStoreId,
+    to_store_id: toStoreId,
+    status: "COMPLETED",
+    remarks,
+    created_by: user?.id ?? null,
+  }).select("id").single();
+
+  if (tErr) return { error: tErr.message };
+  const transferId = (transferRow as Record<string, unknown>)['id'] as string;
+
+  for (const item of items) {
+    await supabase.from("stock_transfer_items").insert({
+      transfer_id: transferId,
+      item_code: item.itemCode,
+      item_name: item.itemName,
+      lot_id: item.lotId,
+      qty: item.qty,
+      imei: item.imei || null,
+      purchase_price: item.purchasePrice,
+    });
+
+    const { data: srcLot } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
+    if (srcLot) {
+      const newSrcQty = ((srcLot as Record<string, unknown>)['qty'] as number) - item.qty;
+      if (newSrcQty > 0) {
+        await supabase.from("stock_lots").update({ qty: newSrcQty }).eq("id", item.lotId);
+      } else {
+        await supabase.from("stock_lots").delete().eq("id", item.lotId);
+      }
+    }
+
+    const { data: existingDestLot } = await supabase.from("stock_lots")
+      .select("id, qty")
+      .eq("item_name", item.itemName)
+      .eq("store_id", toStoreId)
+      .eq("purchase_price", item.purchasePrice)
+      .maybeSingle();
+
+    if (existingDestLot) {
+      const destLotQty = (existingDestLot as Record<string, unknown>)['qty'] as number;
+      await supabase.from("stock_lots").update({ qty: destLotQty + item.qty }).eq("id", (existingDestLot as Record<string, unknown>)['id']);
+    } else {
+      const destLotNo = await getNextLotNo();
+      await supabase.from("stock_lots").insert({
+        lot_no: destLotNo,
+        purchase_id: null,
+        item_code: item.itemCode,
+        item_name: item.itemName,
+        date: new Date().toISOString().slice(0, 10),
+        supplier: "Transfer",
+        qty: item.qty,
+        purchase_price: item.purchasePrice,
+        store_id: toStoreId,
+      });
+    }
+
+    if (item.imei) {
+      await supabase.from("purchase_item_imeis").delete().eq("imei", item.imei);
+      const { data: newLot } = await supabase.from("stock_lots").select("id").eq("item_name", item.itemName).eq("store_id", toStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (newLot) {
+        await supabase.from("purchase_item_imeis").insert({
+          imei: item.imei,
+          item_code: item.itemCode,
+          item_name: item.itemName,
+          lot_id: (newLot as Record<string, unknown>)['id'],
+          is_sold: false,
+          store_id: toStoreId,
+        });
+      }
+    }
+  }
+
+  await reconcileStockQty(fromStoreId);
+  await reconcileStockQty(toStoreId);
+  await reload();
+  return { transferNo };
+}
+
+async function reconcileStockQty(storeId: string) {
+  const { data: lots } = await supabase.from("stock_lots").select("item_name, qty").eq("store_id", storeId);
+  if (!lots) return;
+  const qtyMap = new Map<string, number>();
+  for (const l of lots) {
+    const name = (l as Record<string, unknown>)['item_name'] as string;
+    const qty = (l as Record<string, unknown>)['qty'] as number;
+    qtyMap.set(name, (qtyMap.get(name) || 0) + qty);
+  }
+  const { data: stockItems } = await supabase.from("stock").select("name").eq("store_id", storeId);
+  if (stockItems) {
+    for (const s of stockItems) {
+      const name = (s as Record<string, unknown>)['name'] as string;
+      const totalQty = qtyMap.get(name) || 0;
+      await supabase.from("stock").update({ qty: totalQty }).eq("name", name).eq("store_id", storeId);
+    }
+  }
+}
+
+export async function deleteTransfer(transferId: string): Promise<{ error?: string }> {
+  const { data: items } = await supabase.from("stock_transfer_items").select("*").eq("transfer_id", transferId);
+  if (!items || items.length === 0) return { error: "Transfer not found" };
+
+  const { data: transfer } = await supabase.from("stock_transfers").select("from_store_id, to_store_id").eq("id", transferId).maybeSingle();
+  if (!transfer) return { error: "Transfer not found" };
+
+  const fromStoreId = (transfer as Record<string, unknown>)['from_store_id'] as string;
+  const toStoreId = (transfer as Record<string, unknown>)['to_store_id'] as string;
+
+  for (const item of items) {
+    const ti = item as Record<string, unknown>;
+    const lotId = ti['lot_id'] as string;
+    const qty = ti['qty'] as number;
+    const itemName = ti['item_name'] as string;
+    const itemCode = ti['item_code'] as string;
+    const purchasePrice = ti['purchase_price'] as number;
+    const imei = ti['imei'] as string | null;
+
+    const { data: destLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
+    if (destLot) {
+      const destQty = (destLot as Record<string, unknown>)['qty'] as number;
+      const newDestQty = destQty - qty;
+      if (newDestQty > 0) {
+        await supabase.from("stock_lots").update({ qty: newDestQty }).eq("id", lotId);
+      } else {
+        await supabase.from("stock_lots").delete().eq("id", lotId);
+      }
+    }
+
+    const { data: srcLots } = await supabase.from("stock_lots")
+      .select("id, qty")
+      .eq("item_name", itemName)
+      .eq("store_id", fromStoreId)
+      .eq("purchase_price", purchasePrice)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (srcLots) {
+      const srcQty = (srcLots as Record<string, unknown>)['qty'] as number;
+      await supabase.from("stock_lots").update({ qty: srcQty + qty }).eq("id", (srcLots as Record<string, unknown>)['id']);
+    } else {
+      const srcLotNo = await getNextLotNo();
+      await supabase.from("stock_lots").insert({
+        lot_no: srcLotNo,
+        purchase_id: null,
+        item_code: itemCode,
+        item_name: itemName,
+        date: new Date().toISOString().slice(0, 10),
+        supplier: "Transfer Reversal",
+        qty,
+        purchase_price: purchasePrice,
+        store_id: fromStoreId,
+      });
+    }
+
+    if (imei) {
+      const { data: restoredLot } = await supabase.from("stock_lots").select("id").eq("item_name", itemName).eq("store_id", fromStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (restoredLot) {
+        await supabase.from("purchase_item_imeis").insert({
+          imei,
+          item_code: itemCode,
+          item_name: itemName,
+          lot_id: (restoredLot as Record<string, unknown>)['id'],
+          is_sold: false,
+          store_id: fromStoreId,
+        });
+      }
+    }
+  }
+
+  await supabase.from("stock_transfer_items").delete().eq("transfer_id", transferId);
+  await supabase.from("stock_transfers").delete().eq("id", transferId);
+  await reconcileStockQty(fromStoreId);
+  await reconcileStockQty(toStoreId);
+  await reload();
+  return {};
+}
+
+export async function getTransfers(): Promise<StockTransfer[]> {
+  const { data } = await supabase.from("stock_transfers").select("*").order("created_at", { ascending: false }).limit(500);
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    id: r['id'] as string,
+    transferNo: r['transfer_no'] as string,
+    date: r['date'] as string,
+    fromStoreId: r['from_store_id'] as string | null,
+    toStoreId: r['to_store_id'] as string | null,
+    status: r['status'] as string,
+    remarks: r['remarks'] as string,
+    createdBy: r['created_by'] as string | null,
+    createdAt: r['created_at'] as string,
+  }));
+}
+
+export async function getTransferItems(transferId: string): Promise<StockTransferItem[]> {
+  const { data } = await supabase.from("stock_transfer_items").select("*").eq("transfer_id", transferId);
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    id: r['id'] as string,
+    transferId: r['transfer_id'] as string,
+    itemCode: r['item_code'] as string,
+    itemName: r['item_name'] as string,
+    lotId: r['lot_id'] as string | null,
+    qty: r['qty'] as number,
+    imei: r['imei'] as string | null,
+    purchasePrice: r['purchase_price'] as number,
+    createdAt: r['created_at'] as string,
+  }));
 }
 
 async function reload() {
