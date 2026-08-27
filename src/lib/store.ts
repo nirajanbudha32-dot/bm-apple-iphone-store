@@ -781,10 +781,12 @@ export async function addBill(
     store_id: _currentStoreId,
   }));
 
-  // Calculate remaining from first item (will be set on all rows for grouping)
+  // Calculate remaining from first item (set only on first row — other rows keep 0)
   const grossTotal = items.reduce((a, i) => a + i.total, 0);
   const remaining = Math.max(0, grossTotal - headerDiscount + otherCharges - paidAmount);
-  rows.forEach((r) => { r.remaining = remaining; });
+  if (rows[0]) {
+    rows[0].remaining = remaining;
+  }
 
   const { data: insertedSales, error: salesError } = await supabase.from("sales").insert(rows).select("id, item_name, qty");
 
@@ -846,9 +848,10 @@ export async function deleteSale(id: string) {
       for (const alloc of allocations) {
         const lotId = alloc['lot_id'] as string;
         const qtyTaken = alloc['qty_taken'] as number;
-        const lot = state.stockLots.find((l) => l.id === lotId);
-        if (lot) {
-          await supabase.from("stock_lots").update({ qty: lot.qty + qtyTaken }).eq("id", lotId);
+        const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
+        if (freshLot) {
+          const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
+          await supabase.from("stock_lots").update({ qty: currentQty + qtyTaken }).eq("id", lotId);
         }
       }
       await supabase.from("sale_lot_allocations").delete().eq("sale_id", id);
@@ -865,11 +868,14 @@ export async function deleteSale(id: string) {
 
   if (!lotRestored) {
     await supabase.rpc("increment_stock", { item_name: sale.itemName, qty_returned: sale.qty });
-  } else {
+  }
+
+  // Reconcile stock qty from lot totals (always, to ensure consistency)
+  try {
     const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", sale.itemName);
     const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
     await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", sale.itemName);
-  }
+  } catch (_) {}
 
   await reload();
 }
@@ -890,9 +896,10 @@ export async function deleteInvoice(invoiceNo: string) {
         for (const alloc of allocations) {
           const lotId = alloc['lot_id'] as string;
           const qtyTaken = alloc['qty_taken'] as number;
-          const lot = state.stockLots.find((l) => l.id === lotId);
-          if (lot) {
-            await supabase.from("stock_lots").update({ qty: lot.qty + qtyTaken }).eq("id", lotId);
+          const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
+          if (freshLot) {
+            const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
+            await supabase.from("stock_lots").update({ qty: currentQty + qtyTaken }).eq("id", lotId);
           }
         }
         await supabase.from("sale_lot_allocations").delete().eq("sale_id", sale.id);
@@ -917,13 +924,16 @@ export async function deleteInvoice(invoiceNo: string) {
         supabase.rpc("increment_stock", { item_name: item.itemName, qty_returned: item.qty })
       )
     );
-  } else {
-    const affectedItems = new Set(items.map((i) => i.itemName));
-    for (const itemName of affectedItems) {
+  }
+
+  // Reconcile stock qty from lot totals for all affected items
+  const affectedItems = new Set(items.map((i) => i.itemName));
+  for (const itemName of affectedItems) {
+    try {
       const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
       const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
       await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
-    }
+    } catch (_) {}
   }
 
   await reload();
@@ -971,6 +981,13 @@ export async function upsertStock(item: StockItem, originalCode?: string) {
 }
 
 export async function deleteStock(code: string) {
+  // Delete orphan lots for this stock item
+  try {
+    const { data: stockItem } = await supabase.from("stock").select("name").eq("code", code).maybeSingle();
+    if (stockItem) {
+      await supabase.from("stock_lots").delete().eq("item_name", (stockItem as Record<string, unknown>)['name'] as string);
+    }
+  } catch (_) {}
   await supabase.from("stock").delete().eq("code", code);
   await reload();
 }
@@ -1304,11 +1321,37 @@ export async function addPurchaseHeader(
     // If paid at purchase time, record the payment as credit
     if (paidAmount > 0) {
       const balanceAfterPurchase = prevBalance + header.grandTotal;
+      // Create vendor_transactions PAYMENT entry (for ledger)
+      const purchasePaymentNo = await nextVendorPaymentNo();
+      const { data: paymentInserted } = await supabase.from("vendor_payments").insert({
+        payment_no: purchasePaymentNo,
+        vendor_id: vendorIdForTxn,
+        payment_date: header.date,
+        payment_method: header.paymentMethod,
+        amount: paidAmount,
+        bank_name: "",
+        reference_no: purchaseNo,
+        remarks: `Payment at purchase ${purchaseNo}`,
+        created_by: user?.id ?? null,
+        store_id: _currentStoreId,
+      }).select("id").single();
+
+      if (paymentInserted) {
+        // Create allocation linking payment to this purchase bill
+        await supabase.from("vendor_payment_allocations").insert({
+          payment_id: paymentInserted.id,
+          purchase_header_id: headerId,
+          amount: paidAmount,
+          allocation_type: "bill",
+          store_id: _currentStoreId,
+        });
+      }
+
       await supabase.from("vendor_transactions").insert({
         vendor_id: vendorIdForTxn,
         transaction_type: "PAYMENT",
-        reference_no: purchaseNo,
-        reference_id: headerId,
+        reference_no: purchasePaymentNo,
+        reference_id: paymentInserted?.id ?? headerId,
         transaction_date: header.date,
         debit: 0,
         credit: paidAmount,
@@ -1325,9 +1368,42 @@ export async function addPurchaseHeader(
 
 export async function deletePurchaseHeader(id: string): Promise<{ error?: string }> {
   try {
+    // Clean up vendor financial records first
+    // 1. Delete vendor_payment_allocations linked to this purchase
+    const { data: linkedPayments } = await supabase.from("vendor_payment_allocations").select("payment_id").eq("purchase_header_id", id);
+    const linkedPaymentIds = [...new Set((linkedPayments ?? []).map((p) => p.payment_id as string))];
+
+    // Delete allocations for this purchase
+    await supabase.from("vendor_payment_allocations").delete().eq("purchase_header_id", id);
+
+    // Delete vendor_payments that were auto-created for this purchase (reference_no matches purchase_no)
+    const header = state.purchaseHeaders.find((h) => h.id === id);
+    if (header) {
+      const { data: autoPayments } = await supabase.from("vendor_payments").select("id").eq("reference_no", header.purchaseNo);
+      if (autoPayments && autoPayments.length > 0) {
+        for (const ap of autoPayments) {
+          // Delete allocations for this payment first
+          await supabase.from("vendor_payment_allocations").delete().eq("payment_id", ap.id);
+          await supabase.from("vendor_payments").delete().eq("id", ap.id);
+        }
+      }
+    }
+
+    // Delete vendor_transactions referencing this purchase header
+    await supabase.from("vendor_transactions").delete().eq("reference_id", id);
+    // Also delete vendor_transactions referencing auto-created payments
+    if (header) {
+      const { data: autoVtxns } = await supabase.from("vendor_transactions").select("id").eq("reference_no", header.purchaseNo);
+      if (autoVtxns && autoVtxns.length > 0) {
+        for (const vt of autoVtxns) {
+          await supabase.from("vendor_transactions").delete().eq("id", vt.id);
+        }
+      }
+    }
+
     const items = state.purchaseItems.filter((pi) => pi.purchaseHeaderId === id);
     for (const item of items) {
-      const lots = state.stockLots.filter((l) => l.purchaseId === item.id || l.purchaseId === id);
+      const lots = state.stockLots.filter((l) => l.purchaseId === item.id);
       for (const lot of lots) {
         try {
           await supabase.from("stock_lots").delete().eq("id", lot.id);
@@ -1542,10 +1618,18 @@ export async function addSalesReturn(
 
   // Restore lot qty
   if (lotId) {
-    const lot = state.stockLots.find((l) => l.id === lotId);
-    if (lot) {
-      await supabase.from("stock_lots").update({ qty: lot.qty + qty }).eq("id", lotId);
+    const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
+    if (freshLot) {
+      const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
+      await supabase.from("stock_lots").update({ qty: currentQty + qty }).eq("id", lotId);
     }
+  }
+
+  // Remove sale_lot_allocations for this sale item
+  if (saleId && lotId) {
+    try {
+      await supabase.from("sale_lot_allocations").delete().eq("sale_id", saleId).eq("lot_id", lotId);
+    } catch (_) {}
   }
 
   // Delete sale IMEI if present
@@ -1563,6 +1647,16 @@ export async function addSalesReturn(
       await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
     }
   } catch (_) {}
+
+  // Update original sale status to reflect return
+  if (saleId) {
+    try {
+      const { data: existingReturns } = await supabase.from("sales_returns").select("qty").eq("sale_id", saleId);
+      const totalReturned = (existingReturns ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + (r['qty'] as number), 0);
+      const newStatus = totalReturned >= qty ? "RETURNED" : "PARTIALLY_RETURNED";
+      await supabase.from("sales").update({ status: newStatus }).eq("id", saleId);
+    } catch (_) {}
+  }
 
   await reload();
   return {};
@@ -1740,9 +1834,10 @@ export async function addVendor(
       vendor_id: vendorId,
       transaction_type: "OPENING_BALANCE",
       reference_no: "Opening",
+      reference_id: vendorId,
       transaction_date: vendor.openingBalanceDate,
-      debit: 0,
-      credit: vendor.openingBalance,
+      debit: vendor.openingBalance,
+      credit: 0,
       balance: vendor.openingBalance,
       remarks: "Opening balance",
       store_id: _currentStoreId,
@@ -1779,6 +1874,34 @@ export async function updateVendor(
     updated_at: new Date().toISOString(),
   }).eq("id", id);
   if (error) return { error: error.message };
+
+  // Sync opening balance to vendor_transactions OPENING_BALANCE entry
+  const { data: existingOb } = await supabase.from("vendor_transactions").select("id, debit, credit").eq("vendor_id", id).eq("transaction_type", "OPENING_BALANCE").maybeSingle();
+  if (existingOb) {
+    const oldDebit = (existingOb as Record<string, unknown>)['debit'] as number;
+    if (vendor.openingBalance !== oldDebit) {
+      await supabase.from("vendor_transactions").update({
+        debit: vendor.openingBalance,
+        credit: 0,
+        transaction_date: vendor.openingBalanceDate || new Date().toISOString().slice(0, 10),
+      }).eq("id", (existingOb as Record<string, unknown>)['id'] as string);
+    }
+  } else if (vendor.openingBalance > 0 && vendor.openingBalanceDate) {
+    // Create opening balance entry if it doesn't exist
+    await supabase.from("vendor_transactions").insert({
+      vendor_id: id,
+      transaction_type: "OPENING_BALANCE",
+      reference_no: "Opening",
+      reference_id: id,
+      transaction_date: vendor.openingBalanceDate,
+      debit: vendor.openingBalance,
+      credit: 0,
+      balance: vendor.openingBalance,
+      remarks: "Opening balance",
+      store_id: _currentStoreId,
+    });
+  }
+
   await reload();
   return {};
 }
@@ -1873,12 +1996,15 @@ export async function addVendorPayment(
         allocation_type: allocType,
         store_id: _currentStoreId,
       });
-      // Update purchase_headers remaining_balance only for bill allocations
+      // Update purchase_headers remaining_balance and paid_amount for bill allocations
       if (allocType === "bill" && alloc.purchaseHeaderId) {
-        const ph = state.purchaseHeaders.find((h) => h.id === alloc.purchaseHeaderId);
-        if (ph) {
-          const newRemaining = Math.max(0, ph.remainingBalance - alloc.amount);
-          await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", alloc.purchaseHeaderId);
+        const { data: phRow } = await supabase.from("purchase_headers").select("remaining_balance, paid_amount").eq("id", alloc.purchaseHeaderId).maybeSingle();
+        if (phRow) {
+          const currentRemaining = (phRow as Record<string, unknown>)['remaining_balance'] as number;
+          const currentPaid = (phRow as Record<string, unknown>)['paid_amount'] as number;
+          const newRemaining = Math.max(0, currentRemaining - alloc.amount);
+          const newPaid = currentPaid + alloc.amount;
+          await supabase.from("purchase_headers").update({ remaining_balance: newRemaining, paid_amount: newPaid }).eq("id", alloc.purchaseHeaderId);
         }
       }
     }
@@ -1965,9 +2091,10 @@ export async function addPurchaseReturn(
 
   // Restore lot qty (reduce it — we're returning stock)
   if (lotId) {
-    const lot = state.stockLots.find((l) => l.id === lotId);
-    if (lot) {
-      await supabase.from("stock_lots").update({ qty: Math.max(0, lot.qty - qty) }).eq("id", lotId);
+    const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
+    if (freshLot) {
+      const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
+      await supabase.from("stock_lots").update({ qty: Math.max(0, currentQty - qty) }).eq("id", lotId);
     }
   }
 
@@ -1997,6 +2124,25 @@ export async function addPurchaseReturn(
     });
   }
 
+  // Update purchase_headers.remaining_balance for this purchase
+  if (purchaseHeaderId) {
+    const ph = state.purchaseHeaders.find((h) => h.id === purchaseHeaderId);
+    if (ph) {
+      const newRemaining = Math.max(0, ph.remainingBalance - refundAmount);
+      await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", purchaseHeaderId);
+    }
+  }
+
+  // Clean up purchase_item_imeis for returned IMEI
+  if (imei) {
+    try {
+      const { data: piRow } = await supabase.from("purchase_items").select("id").eq("item_code", itemCode).eq("purchase_header_id", purchaseHeaderId).maybeSingle();
+      if (piRow) {
+        await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", piRow.id).eq("imei", imei);
+      }
+    } catch (_) {}
+  }
+
   await reload();
   return {};
 }
@@ -2006,15 +2152,11 @@ export function getVendorBalance(vendorId: string): number {
     .filter((t) => t.vendorId === vendorId)
     .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
 
-  // Recalculate properly: opening + purchases - payments - returns
-  const vendor = state.vendors.find((v) => v.id === vendorId);
-  const openingBalance = vendor?.openingBalance ?? 0;
+  // Purchases and opening balance increase what we owe (debit)
+  // Payments, returns, and advance applications decrease what we owe (credit)
   const totalDebit = txns.filter((t) => t.transactionType === "PURCHASE" || t.transactionType === "OPENING_BALANCE" || t.transactionType === "ADVANCE_APPLIED").reduce((a, t) => a + t.debit, 0);
   const totalCredit = txns.filter((t) => t.transactionType !== "PURCHASE" && t.transactionType !== "OPENING_BALANCE" && t.transactionType !== "ADVANCE_APPLIED").reduce((a, t) => a + t.credit, 0);
-  // Opening balance is what vendor owes us at start (credit side from vendor perspective)
-  // Purchases increase what we owe (debit)
-  // Payments/returns decrease what we owe (credit)
-  return totalDebit + openingBalance - totalCredit;
+  return totalDebit - totalCredit;
 }
 
 export function getVendorPurchases(vendorId: string) {
@@ -2080,10 +2222,12 @@ export async function applyVendorAdvance(
     store_id: _currentStoreId,
   });
 
-  const ph = state.purchaseHeaders.find((h) => h.id === purchaseHeaderId);
-  if (ph) {
-    const newRemaining = Math.max(0, ph.remainingBalance - amount);
-    await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", purchaseHeaderId);
+  const { data: phRow } = await supabase.from("purchase_headers").select("remaining_balance, paid_amount").eq("id", purchaseHeaderId).maybeSingle();
+  if (phRow) {
+    const currentRemaining = (phRow as Record<string, unknown>)['remaining_balance'] as number;
+    const currentPaid = (phRow as Record<string, unknown>)['paid_amount'] as number;
+    const newRemaining = Math.max(0, currentRemaining - amount);
+    await supabase.from("purchase_headers").update({ remaining_balance: newRemaining, paid_amount: currentPaid + amount }).eq("id", purchaseHeaderId);
   }
 
   const vendor = state.vendors.find((v) => v.id === vendorId);
@@ -2094,9 +2238,9 @@ export async function applyVendorAdvance(
     reference_no: paymentNo,
     reference_id: paymentId,
     transaction_date: paymentDate,
-    debit: amount,
-    credit: 0,
-    balance: prevBalance + amount,
+    debit: 0,
+    credit: amount,
+    balance: prevBalance - amount,
     remarks: `Advance applied to purchase`,
     store_id: _currentStoreId,
   });

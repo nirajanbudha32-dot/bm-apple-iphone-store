@@ -63,16 +63,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!currentStoreId && stores.length > 0) {
         setCurrentStoreId(null);
       }
-    } else if (profile.storeId) {
+    } else if (profile.storeId && currentStoreId === null) {
       setCurrentStoreId(profile.storeId);
     }
   }, [profile, isAdmin, stores, currentStoreId]);
 
   const handleSetCurrentStoreId = useCallback((id: string | null) => {
-    if (isAdmin || id === null) {
-      setCurrentStoreId(id);
-    }
-  }, [isAdmin]);
+    setCurrentStoreId(id);
+  }, []);
 
   const currentStore = stores.find((s) => s.id === currentStoreId) ?? null;
 

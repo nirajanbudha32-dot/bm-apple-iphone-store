@@ -55,9 +55,9 @@ export function VendorPayments() {
 
   const unpaidBills = useMemo(() => {
     if (!selectedVendorId) return [];
-    return getVendorPurchases(selectedVendorId).filter(
-      (h) => h.remainingBalance > 0
-    );
+    return getVendorPurchases(selectedVendorId)
+      .filter((h) => h.remainingBalance > 0)
+      .sort((a, b) => a.date.localeCompare(b.date)); // FIFO: oldest first
   }, [selectedVendorId, purchaseHeaders]);
 
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
