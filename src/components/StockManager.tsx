@@ -168,7 +168,9 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
                         type="number"
                         value={draft[key]}
                         onChange={(e) => setDraft({ ...draft, [key]: Number(e.target.value) })}
-                        className="h-9 text-xs sm:text-sm"
+                        readOnly={key === "qty"}
+                        className={`h-9 text-xs sm:text-sm${key === "qty" ? " bg-muted cursor-not-allowed" : ""}`}
+                        title={key === "qty" ? "Quantity is managed by stock lots. Use Purchases to add stock." : ""}
                       />
                     </div>
                   ))}

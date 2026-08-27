@@ -77,6 +77,18 @@ export function SalesReturns() {
     return saleImeis.filter((si) => si.saleId === selectedSaleId);
   }, [selectedSaleId, saleImeis]);
 
+  const alreadyReturnedQty = useMemo(() => {
+    if (!selectedSaleId) return 0;
+    return salesReturns
+      .filter((r) => r.saleId === selectedSaleId)
+      .reduce((sum, r) => sum + r.qty, 0);
+  }, [selectedSaleId, salesReturns]);
+
+  const maxReturnableQty = useMemo(() => {
+    if (!selectedSaleItem) return 0;
+    return Math.max(0, selectedSaleItem.qty - alreadyReturnedQty);
+  }, [selectedSaleItem, alreadyReturnedQty]);
+
   function handleInvoiceChange(invoiceNo: string) {
     setSelectedInvoice(invoiceNo);
     setSelectedSaleId("");
@@ -116,8 +128,8 @@ export function SalesReturns() {
       toast.error("Return quantity must be at least 1");
       return;
     }
-    if (selectedSaleItem && returnQty > selectedSaleItem.qty) {
-      toast.error(`Cannot return more than sold quantity (${selectedSaleItem.qty})`);
+    if (selectedSaleItem && returnQty > maxReturnableQty) {
+      toast.error(`Cannot return more than remaining quantity (${maxReturnableQty} of ${selectedSaleItem.qty} already returned ${alreadyReturnedQty})`);
       return;
     }
     if (!returnReason.trim()) {
@@ -281,7 +293,7 @@ export function SalesReturns() {
                 <Input
                   type="number"
                   min="1"
-                  max={selectedSaleItem?.qty ?? 1}
+                  max={maxReturnableQty || 1}
                   value={returnQty}
                   onChange={(e) => setReturnQty(Number(e.target.value))}
                   className="h-9 text-xs sm:text-sm"

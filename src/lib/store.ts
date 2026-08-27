@@ -795,7 +795,17 @@ export async function addBill(
     for (let idx = 0; idx < insertedSales.length; idx++) {
       const inserted = insertedSales[idx]!;
 
-      // Insert IMEIs for this sale row
+      // FIFO deduct first — only insert IMEIs after stock is confirmed deducted
+      const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
+        p_item_name: inserted.item_name,
+        p_qty: inserted.qty,
+        p_sale_id: inserted.id,
+      });
+      if (fifoErr) {
+        await supabase.rpc("decrement_stock", { item_name: inserted.item_name, qty_sold: inserted.qty });
+      }
+
+      // Insert IMEIs for this sale row (after FIFO succeeds)
       const imeis = imeisByItem[idx] || [];
       if (imeis.length > 0) {
         const imeiRows = imeis.map((imei) => ({
@@ -806,14 +816,6 @@ export async function addBill(
         await supabase.from("sale_item_imeis").insert(imeiRows);
       }
 
-      const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
-        p_item_name: inserted.item_name,
-        p_qty: inserted.qty,
-        p_sale_id: inserted.id,
-      });
-      if (fifoErr) {
-        await supabase.rpc("decrement_stock", { item_name: inserted.item_name, qty_sold: inserted.qty });
-      }
       affectedItems.add(inserted.item_name);
     }
 
