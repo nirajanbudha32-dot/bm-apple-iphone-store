@@ -1,0 +1,1 @@
+SELECT u.email, p.role, s.name AS store_name, CASE WHEN u.email_confirmed_at IS NOT NULL THEN 'Yes' ELSE 'No' END AS confirmed FROM auth.users u JOIN public.profiles p ON p.id = u.id LEFT JOIN public.stores s ON s.id = p.store_id WHERE u.email IN ('admin@bmstore.com', 'apple@bmstore.com', 'iphone@bmstore.com', 'electronic@bmstore.com') ORDER BY u.email;

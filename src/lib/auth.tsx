@@ -7,11 +7,7 @@ type AuthContextType = {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (
-    email: string,
-    password: string,
-    asAdmin?: boolean,
-  ) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -40,26 +36,8 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
           created_at: data.created_at,
         } as Profile);
       } else {
-        const { data: userData } = await supabase.auth.getUser();
-        const currentUser = userData?.user;
-        if (currentUser) {
-          const fallbackProfile: Profile = {
-            id: currentUser.id,
-            email: currentUser.email || "",
-            role: "salesman",
-            storeId: null,
-            created_at: new Date().toISOString(),
-          };
-          await supabase.from("profiles").upsert({
-            id: currentUser.id,
-            email: currentUser.email || "",
-            role: "salesman",
-            store_id: null,
-          });
-          setProfile(fallbackProfile);
-        } else {
-          setProfile(null);
-        }
+        console.error("[BM Store] No profile found for user. Profile must be created via SQL.");
+        setProfile(null);
       }
     } catch (err) {
       console.error("[BM Store] fetchProfile exception:", err);
@@ -121,29 +99,8 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function signUp(email: string, password: string, asAdmin = false) {
-    try {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) return { error };
-
-      const {
-        data: { user: newUser },
-      } = await supabase.auth.getUser();
-      if (newUser) {
-        const role = asAdmin ? "admin" : "salesman";
-        await supabase.from("profiles").upsert({
-          id: newUser.id,
-          email: newUser.email!,
-          role,
-          store_id: null,
-        });
-      }
-
-      return { error: null };
-    } catch (err) {
-      console.error("[BM Store] signUp exception:", err);
-      return { error: { message: err instanceof Error ? err.message : "Sign up failed" } as AuthError };
-    }
+  async function signUp(_email: string, _password: string, _asAdmin = false) {
+    return { error: { message: "Account creation is disabled. Contact admin to create accounts via SQL." } as AuthError };
   }
 
   async function signOut() {
