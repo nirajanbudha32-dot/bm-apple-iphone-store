@@ -32,6 +32,7 @@ export type BillItem = {
   subCategory: string;
   brand: string;
   model: string;
+  hsCode: string;
   qty: number;
   rate: number;
   discount: number;

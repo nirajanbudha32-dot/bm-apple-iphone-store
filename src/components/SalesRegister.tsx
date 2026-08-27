@@ -27,7 +27,7 @@ import {
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
-import { money } from "@/lib/utils";
+import { money, numberToWords } from "@/lib/utils";
 import { useStoreContext } from "@/lib/store-context";
 
 const DEFAULT_COMPANY = {
@@ -79,6 +79,7 @@ export function SalesRegister() {
   const [draftImeis, setDraftImeis] = useState<string[]>([]);
   const [availableImeis, setAvailableImeis] = useState<string[]>([]);
   const [expandedBillItem, setExpandedBillItem] = useState<number | null>(null);
+  const [hsCode, setHsCode] = useState("8517");
 
   const [headerDiscount, setHeaderDiscount] = useState(0);
   const [otherCharges, setOtherCharges] = useState(0);
@@ -97,7 +98,9 @@ export function SalesRegister() {
     customerLocation: string;
     paymentMethod: PaymentMethod;
     saleType: string;
+    status: string;
     items: BillItem[];
+    itemImeis: Record<number, string[]>;
     subtotal: number;
     headerDiscount: number;
     otherCharges: number;
@@ -162,6 +165,7 @@ export function SalesRegister() {
       subCategory: matched?.subCategory ?? "",
       brand: matched?.brand ?? "",
       model: matched?.model ?? "",
+      hsCode: hsCode.trim() || "8517",
       qty: itemQty,
       rate: itemRate,
       discount: itemDiscount,
@@ -256,7 +260,9 @@ export function SalesRegister() {
       customerLocation: customerLocation.trim(),
       paymentMethod,
       saleType,
+      status: "CONFIRMED",
       items: [...billItems],
+      itemImeis: { ...billItemImeis },
       subtotal: billSubtotal,
       headerDiscount,
       otherCharges,
@@ -280,6 +286,7 @@ export function SalesRegister() {
     setHeaderDiscount(0);
     setOtherCharges(0);
     setPaidAmount(0);
+    setHsCode("8517");
     setSalesPage(0);
     toast.success(`${invoiceNo} saved with ${billItems.length} items`);
   }
@@ -288,6 +295,19 @@ export function SalesRegister() {
     if (!printData) return;
     const w = window.open("", "_blank", "width=800,height=600");
     if (!w) { toast.error("Pop-up blocked. Allow pop-ups to print."); return; }
+
+    const storePhone = currentStore?.phone || "";
+    const storeEmail = currentStore?.email || "";
+    const contactLine = [storePhone, storeEmail].filter(Boolean).join(" | ");
+
+    function renderImeiRow(idx: number): string {
+      const pd = printData;
+      if (!pd) return "";
+      const imeis = pd.itemImeis[idx];
+      if (!imeis || imeis.length === 0) return "";
+      return `<tr class="imei-row"><td></td><td colspan="10" style="font-size:10px;color:#6b7280;padding:2px 8px 6px;font-family:monospace">IMEI: ${imeis.map(esc).join(", ")}</td></tr>`;
+    }
+
     w.document.write(`<!DOCTYPE html>
 <html><head><title>Invoice ${esc(printData.invoiceNo)}</title>
 <style>
@@ -298,6 +318,7 @@ export function SalesRegister() {
   .header { text-align: center; margin-bottom: 24px; }
   .company-name { font-size: 22px; font-weight: 700; color: #16a34a; letter-spacing: 0.5px; }
   .company-address { font-size: 10px; color: #6b7280; margin-top: 3px; letter-spacing: 0.2px; }
+  .company-contact { font-size: 10px; color: #6b7280; margin-top: 2px; letter-spacing: 0.2px; }
   .company-tagline { font-size: 11px; color: #6b7280; margin-top: 2px; letter-spacing: 0.3px; }
   .header-bar { width: 60px; height: 3px; background: #16a34a; margin: 10px auto 0; border-radius: 2px; }
 
@@ -313,11 +334,12 @@ export function SalesRegister() {
   tbody td { padding: 7px 8px; font-size: 11px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
   tbody tr:nth-child(even) { background: #f8faf9; }
   tbody tr:last-child td { border-bottom: 1px solid #e5e7eb; }
+  .imei-row td { background: #f9fafb !important; border-bottom: 1px solid #f0f0f0 !important; }
   .text-right { text-align: right; }
   .text-center { text-align: center; }
   .row-num { color: #9ca3af; font-weight: 500; }
 
-  .summary-section { display: flex; justify-content: flex-end; gap: 30px; margin-bottom: 20px; }
+  .summary-section { display: flex; justify-content: flex-end; gap: 30px; margin-bottom: 16px; }
   .totals-box { width: 280px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
   .totals-header { background: #f0fdf4; padding: 8px 14px; font-weight: 700; font-size: 11px; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb; }
   .totals-body { padding: 4px 0; }
@@ -329,12 +351,21 @@ export function SalesRegister() {
   .payment-row { display: flex; justify-content: space-between; padding: 5px 14px; font-size: 11px; border-top: 1px solid #f0f0f0; }
   .badge-paid { display: inline-block; background: #dcfce7; color: #15803d; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
   .badge-remaining { display: inline-block; background: #fee2e2; color: #dc2626; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .badge-status { display: inline-block; background: #dbeafe; color: #1d4ed8; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
 
-  .remarks-section { margin-bottom: 20px; padding: 10px 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 11px; }
+  .amount-words { margin-bottom: 16px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 11px; }
+  .amount-words .aw-label { font-weight: 700; color: #15803d; }
+
+  .remarks-section { margin-bottom: 16px; padding: 10px 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 11px; }
   .remarks-section .r-label { font-weight: 700; color: #374151; }
   .remarks-section .r-value { color: #6b7280; margin-left: 4px; }
 
-  .footer { text-align: center; padding-top: 16px; border-top: 2px solid #e5e7eb; }
+  .signatures { display: flex; justify-content: space-between; margin-top: 30px; padding-top: 20px; }
+  .sig-box { width: 200px; text-align: center; }
+  .sig-line { border-top: 1px solid #374151; margin-top: 50px; padding-top: 6px; font-size: 11px; font-weight: 600; color: #374151; }
+  .sig-sub { font-size: 9.5px; color: #6b7280; font-weight: 400; }
+
+  .footer { text-align: center; padding-top: 16px; border-top: 2px solid #e5e7eb; margin-top: 20px; }
   .footer-thanks { font-size: 13px; font-weight: 600; color: #16a34a; margin-bottom: 3px; }
   .footer-note { font-size: 9.5px; color: #9ca3af; font-style: italic; }
 
@@ -350,6 +381,7 @@ export function SalesRegister() {
 <div class="header">
   <div class="company-name">${esc(COMPANY.name)}</div>
   <div class="company-address">${esc(COMPANY.address)} | PAN: ${esc(COMPANY.pan)} | VAT: ${esc(COMPANY.vatNo)}</div>
+  ${contactLine ? `<div class="company-contact">${esc(contactLine)}</div>` : ""}
   <div class="company-tagline">Stock Management &amp; Sales</div>
   <div class="header-bar"></div>
 </div>
@@ -360,44 +392,44 @@ export function SalesRegister() {
     <div class="info-row"><span class="lbl">Customer</span><span class="val">${esc(printData.customer)}</span></div>
     ${printData.hasVatPan ? `<div class="info-row"><span class="lbl">PAN Number</span><span class="val">${esc(printData.customerPan)}</span></div>` : ""}
     ${printData.customerContact ? `<div class="info-row"><span class="lbl">Contact</span><span class="val">${esc(printData.customerContact)}</span></div>` : ""}
-    ${printData.customerLocation ? `<div class="info-row"><span class="lbl">Location</span><span class="val">${esc(printData.customerLocation)}</span></div>` : ""}
+    ${printData.customerLocation ? `<div class="info-row"><span class="lbl">Address</span><span class="val">${esc(printData.customerLocation)}</span></div>` : ""}
   </div>
   <div class="info-card">
     <div class="info-label">Invoice Details</div>
     <div class="info-row"><span class="lbl">Invoice No</span><span class="val">${esc(printData.invoiceNo)}</span></div>
     <div class="info-row"><span class="lbl">Date</span><span class="val">${esc(printData.date)}</span></div>
     <div class="info-row"><span class="lbl">Payment</span><span class="val">${esc(printData.paymentMethod)} (${esc(printData.saleType)})</span></div>
+    <div class="info-row"><span class="lbl">Status</span><span class="val"><span class="badge-status">${esc(printData.status || "CONFIRMED")}</span></span></div>
   </div>
 </div>
 
 <table>
   <thead><tr>
-    <th class="text-center" style="width:32px">#</th>
-    <th>Item</th>
-    <th>Sub Category</th>
-    <th>Brand</th>
-    <th>Model</th>
-    <th class="text-right" style="width:42px">Qty</th>
-    <th class="text-right" style="width:72px">Rate</th>
-    <th class="text-right" style="width:62px">Disc</th>
-    <th class="text-right" style="width:78px">Amount</th>
-    <th class="text-right" style="width:68px">VAT 13%</th>
-    <th class="text-right" style="width:82px">Total</th>
+    <th class="text-center" style="width:30px">#</th>
+    <th>Item Description</th>
+    <th class="text-center" style="width:68px">HS Code</th>
+    <th class="text-right" style="width:38px">Qty</th>
+    <th class="text-right" style="width:68px">Rate</th>
+    <th class="text-right" style="width:58px">Disc</th>
+    <th class="text-right" style="width:74px">Amount</th>
+    <th class="text-right" style="width:64px">VAT 13%</th>
+    <th class="text-right" style="width:78px">Total</th>
   </tr></thead>
   <tbody>
   ${printData.items.map((it, i) => `<tr>
     <td class="text-center row-num">${i + 1}</td>
-    <td>${esc(it.itemName)}</td>
-    <td>${esc(it.subCategory)}</td>
-    <td>${esc(it.brand)}</td>
-    <td>${esc(it.model)}</td>
+    <td>
+      <div style="font-weight:500">${esc(it.itemName)}</div>
+      <div style="font-size:10px;color:#6b7280">${esc(it.subCategory)} | ${esc(it.brand)} | ${esc(it.model)}</div>
+    </td>
+    <td class="text-center" style="font-family:monospace;font-size:10.5px">${esc(it.hsCode || "8517")}</td>
     <td class="text-right">${it.qty}</td>
     <td class="text-right">${money(it.rate)}</td>
     <td class="text-right">${it.discount > 0 ? money(it.discount) : "-"}</td>
     <td class="text-right">${money(it.amount)}</td>
     <td class="text-right">${money(it.vat)}</td>
     <td class="text-right" style="font-weight:600">${money(it.total)}</td>
-  </tr>`).join("")}
+  </tr>${renderImeiRow(i)}`).join("")}
   </tbody>
 </table>
 
@@ -417,11 +449,30 @@ export function SalesRegister() {
   </div>
 </div>
 
+<div class="amount-words">
+  <span class="aw-label">Amount in Words: </span>${esc(numberToWords(printData.total))}
+</div>
+
 ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remarks:</span><span class="r-value">${esc(printData.remarks)}</span></div>` : ""}
+
+<div class="signatures">
+  <div class="sig-box">
+    <div class="sig-line">
+      Seller's Signature
+      <div class="sig-sub">${esc(COMPANY.name)}</div>
+    </div>
+  </div>
+  <div class="sig-box">
+    <div class="sig-line">
+      Buyer's Signature
+      <div class="sig-sub">${esc(printData.customer)}</div>
+    </div>
+  </div>
+</div>
 
 <div class="footer">
   <div class="footer-thanks">Thank you for your purchase!</div>
-  <div class="footer-note">This is a computer-generated invoice. BM Apple iPhone Store</div>
+  <div class="footer-note">This is a computer-generated invoice. ${esc(COMPANY.name)}</div>
 </div>
 
 <script>window.onload=function(){window.print();}</script>
@@ -445,6 +496,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
         Location: s.customerLocation,
         "Item Code": s.itemCode,
         Item: s.itemName,
+        "HS Code": "8517",
         "Sub Category": s.subCategory,
         Category: s.category,
         Brand: s.brand,
@@ -692,7 +744,16 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                   />
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-2 flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-[11px] text-muted-foreground whitespace-nowrap">HS Code</Label>
+                  <Input
+                    value={hsCode}
+                    onChange={(e) => setHsCode(e.target.value)}
+                    placeholder="8517"
+                    className="h-8 w-[90px] text-xs font-mono"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowImeiInput(!showImeiInput)}
@@ -930,6 +991,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                               customerLocation: g.header.customerLocation,
                               paymentMethod: g.header.paymentMethod,
                               saleType: g.header.saleType,
+                              status: g.header.status || "CONFIRMED",
                               items: g.items.map((s) => ({
                                 itemCode: s.itemCode,
                                 itemName: s.itemName,
@@ -937,6 +999,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                                 subCategory: s.subCategory,
                                 brand: s.brand,
                                 model: s.model,
+                                hsCode: "8517",
                                 qty: s.qty,
                                 rate: s.rate,
                                 discount: s.discount,
@@ -944,6 +1007,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                                 vat: s.vat,
                                 total: s.total,
                               })),
+                              itemImeis: {},
                               subtotal: g.items.reduce((a, i) => a + i.amount, 0),
                               headerDiscount: Math.max(0, g.items.reduce((a, i) => a + i.amount, 0) + (g.header.otherCharges ?? 0) - invPaid - invRemaining),
                               otherCharges: g.header.otherCharges,
