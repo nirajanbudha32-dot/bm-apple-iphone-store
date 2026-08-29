@@ -1,20 +1,41 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { useStore } from "@/lib/store";
+import { useStore, getTransfers, getTransferItems, LOCATION_LABELS, WAREHOUSE_ID, type StockTransfer, type StockTransferItem } from "@/lib/store";
+import { useStoreContext } from "@/lib/store-context";
 import { exportRows } from "@/lib/excel";
 import { money } from "@/lib/utils";
 
 export function StockInSummary() {
   const { stockLots, purchases, purchaseHeaders, purchaseItems } = useStore();
+  const { currentStoreId, isAdmin } = useStoreContext();
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
+  const [incomingTransfers, setIncomingTransfers] = useState<StockTransfer[]>([]);
+  const [transferItemsMap, setTransferItemsMap] = useState<Record<string, StockTransferItem[]>>({});
+
+  useEffect(() => {
+    async function loadTransfers() {
+      const transfers = await getTransfers();
+      const relevant = transfers.filter((t) => {
+        if (currentStoreId) return t.toStoreId === currentStoreId;
+        return true;
+      });
+      setIncomingTransfers(relevant);
+      const itemsMap: Record<string, StockTransferItem[]> = {};
+      for (const t of relevant) {
+        itemsMap[t.id] = await getTransferItems(t.id);
+      }
+      setTransferItemsMap(itemsMap);
+    }
+    loadTransfers();
+  }, [currentStoreId]);
 
   const purchaseRows = useMemo(() => {
     const rows: {
@@ -79,8 +100,28 @@ export function StockInSummary() {
       }
     }
 
+    // Transfer-in rows
+    for (const t of incomingTransfers) {
+      const items = transferItemsMap[t.id] || [];
+      for (const item of items) {
+        const fromName = LOCATION_LABELS[t.fromStoreId ?? ""] || "Unknown";
+        rows.push({
+          id: `transfer-${t.id}-${item.id}`,
+          lotNo: "-",
+          date: t.date,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          supplier: `Transfer from ${fromName}`,
+          billNo: t.transferNo,
+          qty: item.qty,
+          purchasePrice: item.purchasePrice,
+          value: item.qty * item.purchasePrice,
+        });
+      }
+    }
+
     return rows;
-  }, [purchases, purchaseHeaders, purchaseItems, stockLots]);
+  }, [purchases, purchaseHeaders, purchaseItems, stockLots, incomingTransfers, transferItemsMap]);
 
   const filtered = useMemo(() => {
     let result = purchaseRows;

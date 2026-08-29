@@ -2331,16 +2331,6 @@ export async function createTransfer(
   const transferId = (transferRow as Record<string, unknown>)['id'] as string;
 
   for (const item of items) {
-    await supabase.from("stock_transfer_items").insert({
-      transfer_id: transferId,
-      item_code: item.itemCode,
-      item_name: item.itemName,
-      lot_id: item.lotId,
-      qty: item.qty,
-      imei: item.imei || null,
-      purchase_price: item.purchasePrice,
-    });
-
     const { data: srcLot } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
     if (srcLot) {
       const newSrcQty = ((srcLot as Record<string, unknown>)['qty'] as number) - item.qty;
@@ -2351,6 +2341,7 @@ export async function createTransfer(
       }
     }
 
+    let destLotId: string | null = null;
     const { data: existingDestLot } = await supabase.from("stock_lots")
       .select("id, qty")
       .eq("item_name", item.itemName)
@@ -2359,11 +2350,12 @@ export async function createTransfer(
       .maybeSingle();
 
     if (existingDestLot) {
+      destLotId = (existingDestLot as Record<string, unknown>)['id'] as string;
       const destLotQty = (existingDestLot as Record<string, unknown>)['qty'] as number;
-      await supabase.from("stock_lots").update({ qty: destLotQty + item.qty }).eq("id", (existingDestLot as Record<string, unknown>)['id']);
+      await supabase.from("stock_lots").update({ qty: destLotQty + item.qty }).eq("id", destLotId);
     } else {
       const destLotNo = await getNextLotNo();
-      await supabase.from("stock_lots").insert({
+      const { data: newDestLot } = await supabase.from("stock_lots").insert({
         lot_no: destLotNo,
         purchase_id: null,
         item_code: item.itemCode,
@@ -2373,8 +2365,19 @@ export async function createTransfer(
         qty: item.qty,
         purchase_price: item.purchasePrice,
         store_id: toStoreId,
-      });
+      }).select("id").maybeSingle();
+      destLotId = newDestLot ? (newDestLot as Record<string, unknown>)['id'] as string : null;
     }
+
+    await supabase.from("stock_transfer_items").insert({
+      transfer_id: transferId,
+      item_code: item.itemCode,
+      item_name: item.itemName,
+      lot_id: destLotId,
+      qty: item.qty,
+      imei: item.imei || null,
+      purchase_price: item.purchasePrice,
+    });
 
     if (item.imei) {
       await supabase.from("purchase_item_imeis").delete().eq("imei", item.imei);
@@ -2407,12 +2410,33 @@ async function reconcileStockQty(storeId: string) {
     const qty = (l as Record<string, unknown>)['qty'] as number;
     qtyMap.set(name, (qtyMap.get(name) || 0) + qty);
   }
-  const { data: stockItems } = await supabase.from("stock").select("name").eq("store_id", storeId);
+  const { data: stockItems } = await supabase.from("stock").select("name, code").eq("store_id", storeId);
+  const existingNames = new Set<string>();
   if (stockItems) {
     for (const s of stockItems) {
       const name = (s as Record<string, unknown>)['name'] as string;
+      existingNames.add(name);
       const totalQty = qtyMap.get(name) || 0;
       await supabase.from("stock").update({ qty: totalQty }).eq("name", name).eq("store_id", storeId);
+    }
+  }
+  for (const [itemName, totalQty] of qtyMap) {
+    if (!existingNames.has(itemName) && totalQty > 0) {
+      const newCode = await getNextStockCode();
+      await supabase.from("stock").insert({
+        code: newCode,
+        name: itemName,
+        category: "General",
+        sub_category: "",
+        brand: "",
+        sub_brand: "",
+        model: "",
+        unit: "PCS",
+        qty: totalQty,
+        purchase_price: 0,
+        selling_price: 0,
+        store_id: storeId,
+      });
     }
   }
 }

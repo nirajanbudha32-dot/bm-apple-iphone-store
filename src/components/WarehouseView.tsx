@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, Plus, Printer } from "lucide-react";
+import { Download, Trash2, Plus, Printer, ArrowRightLeft, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Select,
@@ -23,17 +24,15 @@ import {
   LOCATION_LABELS,
   type StockTransfer,
   type StockTransferItem,
-  type StockLot,
 } from "@/lib/store";
-import { money, numberToWords } from "@/lib/utils";
-import { useStoreContext } from "@/lib/store-context";
+import { money } from "@/lib/utils";
+import { exportRows } from "@/lib/excel";
 
 function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-const ALL_LOCATIONS = [
-  { id: WAREHOUSE_ID, name: "Warehouse (Central)" },
+const STORE_LOCATIONS = [
   { id: "a0000000-0000-0000-0000-000000000001", name: "BM Apple Iphone Store" },
   { id: "a0000000-0000-0000-0000-000000000002", name: "BM Iphone Store" },
   { id: "a0000000-0000-0000-0000-000000000003", name: "BM Electronic" },
@@ -50,21 +49,179 @@ type TransferDraftItem = {
   purchasePrice: number;
 };
 
-export function StockTransfer() {
-  const { stockLots, stock } = useStore();
-  const { isAdmin, currentStoreId } = useStoreContext();
+export function WarehouseView() {
+  const { stockLots } = useStore();
+  const [subTab, setSubTab] = useState("stock");
+  const [q, setQ] = useState("");
 
-  const [fromStoreId, setFromStoreId] = useState(WAREHOUSE_ID);
+  const warehouseStock = useMemo(() => {
+    const lotMap = new Map<string, { itemName: string; itemCode: string; totalQty: number; purchasePrice: number; lotCount: number }>();
+    for (const lot of stockLots) {
+      if (lot.storeId !== WAREHOUSE_ID || lot.qty <= 0) continue;
+      const key = lot.itemName;
+      const existing = lotMap.get(key);
+      if (existing) {
+        existing.totalQty += lot.qty;
+        existing.lotCount += 1;
+      } else {
+        lotMap.set(key, {
+          itemName: lot.itemName,
+          itemCode: lot.itemCode,
+          totalQty: lot.qty,
+          purchasePrice: lot.purchasePrice,
+          lotCount: 1,
+        });
+      }
+    }
+    let items = Array.from(lotMap.values());
+    const t = q.trim().toLowerCase();
+    if (t) {
+      items = items.filter((i) =>
+        i.itemName.toLowerCase().includes(t) || i.itemCode.toLowerCase().includes(t)
+      );
+    }
+    return items;
+  }, [stockLots, q]);
+
+  const totalItems = warehouseStock.length;
+  const totalQty = warehouseStock.reduce((a, i) => a + i.totalQty, 0);
+  const totalValue = warehouseStock.reduce((a, i) => a + i.totalQty * i.purchasePrice, 0);
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Package className="size-5 text-primary" />
+            <h2 className="text-sm font-semibold sm:text-base">Warehouse Stock</h2>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span><strong className="text-foreground">{totalItems}</strong> items</span>
+            <span><strong className="text-foreground">{totalQty}</strong> units</span>
+            <span>Value: <strong className="text-foreground">{money(totalValue)}</strong></span>
+          </div>
+        </div>
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="wh-search" className="text-xs sm:text-sm">Search</Label>
+            <Input
+              id="wh-search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search items..."
+              className="h-9 text-xs sm:text-sm"
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Tabs value={subTab} onValueChange={setSubTab}>
+        <TabsList>
+          <TabsTrigger value="stock" className="text-xs sm:text-sm">
+            <Package className="mr-1.5 size-3.5 sm:size-4" /> Stock
+          </TabsTrigger>
+          <TabsTrigger value="transfer" className="text-xs sm:text-sm">
+            <ArrowRightLeft className="mr-1.5 size-3.5 sm:size-4" /> Transfer to Store
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="stock">
+          <WarehouseStockTable items={warehouseStock} />
+        </TabsContent>
+
+        <TabsContent value="transfer">
+          <WarehouseTransferSection />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function WarehouseStockTable({ items }: { items: { itemName: string; itemCode: string; totalQty: number; purchasePrice: number; lotCount: number }[] }) {
+  function onExport() {
+    if (items.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+    exportRows(
+      items.map((i) => ({
+        "Item Code": i.itemCode,
+        "Item Name": i.itemName,
+        Qty: i.totalQty,
+        "Purchase Price": i.purchasePrice,
+        Value: i.totalQty * i.purchasePrice,
+        Lots: i.lotCount,
+      })),
+      "Warehouse Stock",
+      `BM_Warehouse_Stock_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Warehouse Items</p>
+        <Button variant="outline" size="sm" onClick={onExport} className="h-8 text-xs">
+          <Download className="mr-1 size-3.5" /> Export
+        </Button>
+      </div>
+      <div className="max-h-[50vh] overflow-auto">
+        <table className="w-full min-w-[500px] text-xs sm:text-sm">
+          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
+            <tr>
+              <th className="p-2.5 text-left">Item Code</th>
+              <th className="p-2.5 text-left">Item Name</th>
+              <th className="p-2.5 text-right">Qty</th>
+              <th className="p-2.5 text-right">Purchase Price</th>
+              <th className="p-2.5 text-right">Value</th>
+              <th className="p-2.5 text-right">Lots</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.itemCode} className="border-t border-border">
+                <td className="p-2.5 font-mono">{item.itemCode}</td>
+                <td className="p-2.5 font-medium">{item.itemName}</td>
+                <td className="p-2.5 text-right font-semibold">{item.totalQty}</td>
+                <td className="p-2.5 text-right">{money(item.purchasePrice)}</td>
+                <td className="p-2.5 text-right font-medium">{money(item.totalQty * item.purchasePrice)}</td>
+                <td className="p-2.5 text-right text-muted-foreground">{item.lotCount}</td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                  No items in warehouse.
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {items.length > 0 && (
+            <tfoot className="sticky bottom-0 bg-muted">
+              <tr className="border-t border-border font-semibold">
+                <td className="p-2.5" colSpan={2}>Total</td>
+                <td className="p-2.5 text-right">{items.reduce((a, i) => a + i.totalQty, 0)}</td>
+                <td className="p-2.5 text-right" colSpan={2}>{money(items.reduce((a, i) => a + i.totalQty * i.purchasePrice, 0))}</td>
+                <td className="p-2.5 text-right">{items.reduce((a, i) => a + i.lotCount, 0)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+function WarehouseTransferSection() {
+  const { stockLots } = useStore();
   const [toStoreId, setToStoreId] = useState("a0000000-0000-0000-0000-000000000001");
   const [remarks, setRemarks] = useState("");
   const [draftItems, setDraftItems] = useState<TransferDraftItem[]>([]);
   const [saving, setSaving] = useState(false);
-
   const [itemNameSearch, setItemNameSearch] = useState("");
   const [selectedLotId, setSelectedLotId] = useState("");
   const [transferQty, setTransferQty] = useState(1);
   const [transferImei, setTransferImei] = useState("");
-
   const [transfers, setTransfers] = useState<StockTransfer[]>([]);
   const [historyItems, setHistoryItems] = useState<Record<string, StockTransferItem[]>>({});
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -73,10 +230,10 @@ export function StockTransfer() {
     if (!itemNameSearch.trim()) return [];
     const t = itemNameSearch.trim().toLowerCase();
     return stockLots.filter(
-      (l) => l.storeId === fromStoreId && l.qty > 0 &&
+      (l) => l.storeId === WAREHOUSE_ID && l.qty > 0 &&
         l.itemName.toLowerCase().includes(t)
     );
-  }, [stockLots, fromStoreId, itemNameSearch]);
+  }, [stockLots, itemNameSearch]);
 
   const selectedLot = useMemo(
     () => stockLots.find((l) => l.id === selectedLotId),
@@ -121,17 +278,13 @@ export function StockTransfer() {
   }
 
   async function handleTransfer() {
-    if (fromStoreId === toStoreId) {
-      toast.error("Source and destination must be different");
-      return;
-    }
     if (draftItems.length === 0) {
       toast.error("Add at least one item");
       return;
     }
     setSaving(true);
     const result = await createTransfer(
-      fromStoreId,
+      WAREHOUSE_ID,
       toStoreId,
       draftItems.map((d) => ({
         itemCode: d.itemCode,
@@ -157,10 +310,12 @@ export function StockTransfer() {
   async function loadHistory() {
     setLoadingHistory(true);
     const t = await getTransfers();
-    const filtered = isAdmin ? t : t.filter((tr) => tr.toStoreId === currentStoreId);
-    setTransfers(filtered);
+    const warehouseTransfers = t.filter(
+      (tr) => tr.fromStoreId === WAREHOUSE_ID || tr.toStoreId === WAREHOUSE_ID
+    );
+    setTransfers(warehouseTransfers);
     const itemsMap: Record<string, StockTransferItem[]> = {};
-    for (const tr of filtered) {
+    for (const tr of warehouseTransfers) {
       itemsMap[tr.id] = await getTransferItems(tr.id);
     }
     setHistoryItems(itemsMap);
@@ -240,7 +395,7 @@ export function StockTransfer() {
   <thead><tr>
     <th class="text-center" style="width:32px">#</th>
     <th>Item</th>
-    <th>Lot No</th>
+    <th>Code</th>
     <th class="text-right" style="width:60px">Qty</th>
     <th class="text-right" style="width:80px">Rate</th>
     <th class="text-right" style="width:90px">IMEI</th>
@@ -257,104 +412,26 @@ export function StockTransfer() {
   </tbody>
 </table>
 <div class="signatures">
-  <div class="sig-box"><div class="sig-line">Prepared By<div class="sig-sub">Admin</div></div></div>
+  <div class="sig-box"><div class="sig-line">Dispatched By<div class="sig-sub">Warehouse</div></div></div>
   <div class="sig-box"><div class="sig-line">Received By<div class="sig-sub">${esc(toName)}</div></div></div>
 </div>
-<div class="footer"><div class="footer-note">Internal Transfer Note — ${esc(LOCATION_LABELS[transfer.fromStoreId ?? ""] || "BM Apple iPhone Store")}</div></div>
+<div class="footer"><div class="footer-note">Internal Transfer Note — Warehouse Dispatch</div></div>
 <script>window.onload=function(){window.print();}</script>
 </body></html>`);
     w.document.close();
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="space-y-4">
-        <Card className="overflow-hidden p-0">
-          <div className="p-3 sm:p-4 border-b border-border">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Incoming Transfers</p>
-          </div>
-          <div className="max-h-[60vh] overflow-auto">
-            <table className="w-full min-w-[600px] text-xs sm:text-sm">
-              <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-                <tr>
-                  <th className="p-2.5">Transfer No</th>
-                  <th className="p-2.5">Date</th>
-                  <th className="p-2.5">From</th>
-                  <th className="p-2.5">Items</th>
-                  <th className="p-2.5">Status</th>
-                  <th className="p-2.5"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {transfers.map((t) => {
-                  const items = historyItems[t.id] || [];
-                  return (
-                    <tr key={t.id} className="border-t border-border">
-                      <td className="p-2.5 font-mono font-medium">{t.transferNo}</td>
-                      <td className="p-2.5 whitespace-nowrap">{t.date}</td>
-                      <td className="p-2.5">{LOCATION_LABELS[t.fromStoreId ?? ""] || "Unknown"}</td>
-                      <td className="p-2.5">
-                        <div className="space-y-0.5">
-                          {items.map((it) => (
-                            <div key={it.id} className="text-[11px]">
-                              <span className="font-medium">{it.itemName}</span>
-                              <span className="text-muted-foreground"> — {it.qty} pcs</span>
-                              {it.imei && <span className="text-muted-foreground"> ({it.imei})</span>}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-2.5">
-                        <Badge variant={t.status === "COMPLETED" ? "outline" : "destructive"} className="text-[10px]">
-                          {t.status}
-                        </Badge>
-                      </td>
-                      <td className="p-2.5 text-right">
-                        <Button size="icon" variant="ghost" onClick={() => printTransferNote(t, items)} className="h-7 w-7" title="Print">
-                          <Printer className="size-3.5 text-muted-foreground" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {transfers.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="p-6 text-center text-muted-foreground">
-                      {loadingHistory ? "Loading..." : "No incoming transfers."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* CREATE TRANSFER */}
       <Card className="p-3 sm:p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Create Stock Transfer</p>
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Transfer from Warehouse</p>
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
           <div>
-            <Label className="text-xs sm:text-sm">From *</Label>
-            <Select value={fromStoreId} onValueChange={(v) => { setFromStoreId(v); setItemNameSearch(""); setSelectedLotId(""); }}>
-              <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ALL_LOCATIONS.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs sm:text-sm">To *</Label>
+            <Label className="text-xs sm:text-sm">To Store *</Label>
             <Select value={toStoreId} onValueChange={setToStoreId}>
               <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {ALL_LOCATIONS.filter((l) => l.id !== fromStoreId).map((l) => (
+                {STORE_LOCATIONS.map((l) => (
                   <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -366,9 +443,8 @@ export function StockTransfer() {
           </div>
         </div>
 
-        {/* ITEM ENTRY */}
         <div className="mt-4 border-t border-border pt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Item from Source</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Item from Warehouse</p>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-12">
             <div className="relative sm:col-span-4">
               <Label className="text-xs sm:text-sm">Search Item</Label>
@@ -426,7 +502,6 @@ export function StockTransfer() {
           </div>
         </div>
 
-        {/* DRAFT ITEMS */}
         {draftItems.length > 0 && (
           <div className="mt-3">
             <div className="max-h-[30vh] overflow-auto rounded-md border border-border">
@@ -463,17 +538,16 @@ export function StockTransfer() {
             </div>
             <div className="mt-3 flex justify-end">
               <Button onClick={handleTransfer} disabled={saving} className="px-6">
-                {saving ? "Transferring..." : `Transfer ${draftItems.length} Item(s)`}
+                {saving ? "Transferring..." : `Transfer ${draftItems.length} Item(s) to ${STORE_LOCATIONS.find(l => l.id === toStoreId)?.name || "Store"}`}
               </Button>
             </div>
           </div>
         )}
       </Card>
 
-      {/* TRANSFER HISTORY */}
       <Card className="overflow-hidden p-0">
         <div className="p-3 sm:p-4 border-b border-border">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Transfer History</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Warehouse Transfer History</p>
         </div>
         <div className="max-h-[40vh] overflow-auto">
           <table className="w-full min-w-[600px] text-xs sm:text-sm">
@@ -481,8 +555,8 @@ export function StockTransfer() {
               <tr>
                 <th className="p-2.5">Transfer No</th>
                 <th className="p-2.5">Date</th>
-                <th className="p-2.5">From</th>
-                <th className="p-2.5">To</th>
+                <th className="p-2.5">Direction</th>
+                <th className="p-2.5">Store</th>
                 <th className="p-2.5">Items</th>
                 <th className="p-2.5">Status</th>
                 <th className="p-2.5"></th>
@@ -491,12 +565,18 @@ export function StockTransfer() {
             <tbody>
               {transfers.map((t) => {
                 const items = historyItems[t.id] || [];
+                const isOutgoing = t.fromStoreId === WAREHOUSE_ID;
+                const otherStoreId = isOutgoing ? t.toStoreId : t.fromStoreId;
                 return (
                   <tr key={t.id} className="border-t border-border">
                     <td className="p-2.5 font-mono font-medium">{t.transferNo}</td>
                     <td className="p-2.5 whitespace-nowrap">{t.date}</td>
-                    <td className="p-2.5">{LOCATION_LABELS[t.fromStoreId ?? ""] || "Unknown"}</td>
-                    <td className="p-2.5">{LOCATION_LABELS[t.toStoreId ?? ""] || "Unknown"}</td>
+                    <td className="p-2.5">
+                      <Badge variant={isOutgoing ? "default" : "secondary"} className="text-[10px]">
+                        {isOutgoing ? "OUT" : "IN"}
+                      </Badge>
+                    </td>
+                    <td className="p-2.5">{LOCATION_LABELS[otherStoreId ?? ""] || "Unknown"}</td>
                     <td className="p-2.5">{items.length} item(s)</td>
                     <td className="p-2.5">
                       <Badge variant={t.status === "COMPLETED" ? "outline" : "destructive"} className="text-[10px]">
@@ -519,7 +599,7 @@ export function StockTransfer() {
               {transfers.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-6 text-center text-muted-foreground">
-                    {loadingHistory ? "Loading..." : "No transfers yet."}
+                    {loadingHistory ? "Loading..." : "No warehouse transfers yet."}
                   </td>
                 </tr>
               )}

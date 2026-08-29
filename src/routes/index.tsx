@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, Building2, ArrowRightLeft } from "lucide-react";
+import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, Building2, Warehouse } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ import { VendorReports } from "@/components/VendorReports";
 import { StoreSwitcher } from "@/components/StoreSwitcher";
 import { StoreManager } from "@/components/StoreManager";
 import { CrossStoreSummary } from "@/components/CrossStoreSummary";
-import { StockTransfer } from "@/components/StockTransfer";
+import { WarehouseView } from "@/components/WarehouseView";
 import { StoreProvider, useStoreContext } from "@/lib/store-context";
 import { setCurrentStoreIdForStore } from "@/lib/store";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
@@ -165,8 +165,8 @@ function IndexInner() {
             <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
           </TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="transfers" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <ArrowRightLeft className="mr-1.5 size-3.5 sm:size-4" /> Transfers
+            <TabsTrigger value="warehouse" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <Warehouse className="mr-1.5 size-3.5 sm:size-4" /> Warehouse
             </TabsTrigger>
           )}
         </TabsList>
@@ -238,8 +238,8 @@ function IndexInner() {
           {vendorSubTab === "reports" && <VendorReports />}
         </TabsContent>
         {isAdmin && (
-          <TabsContent value="transfers">
-            <StockTransfer />
+          <TabsContent value="warehouse">
+            <WarehouseView />
           </TabsContent>
         )}
       </Tabs>
