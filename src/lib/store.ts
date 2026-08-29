@@ -340,6 +340,8 @@ export type StockTransferItem = {
   transferId: string;
   itemCode: string;
   itemName: string;
+  destItemCode: string | null;
+  destItemName: string | null;
   lotId: string | null;
   qty: number;
   imei: string | null;
@@ -2301,7 +2303,7 @@ export async function getNextTransferNo(): Promise<string> {
 export async function createTransfer(
   fromStoreId: string,
   toStoreId: string,
-  items: Array<{ itemCode: string; itemName: string; lotId: string; qty: number; imei?: string; purchasePrice: number }>,
+  items: Array<{ itemCode: string; itemName: string; lotId: string; qty: number; imei?: string; purchasePrice: number; destItemCode?: string; destItemName?: string }>,
   remarks: string = "",
 ): Promise<{ error?: string; transferNo?: string }> {
   if (fromStoreId === toStoreId) return { error: "Source and destination cannot be the same" };
@@ -2342,9 +2344,11 @@ export async function createTransfer(
     }
 
     let destLotId: string | null = null;
+    const destName = item.destItemName || item.itemName;
+    const destCode = item.destItemCode || item.itemCode;
     const { data: existingDestLot } = await supabase.from("stock_lots")
       .select("id, qty")
-      .eq("item_name", item.itemName)
+      .eq("item_name", destName)
       .eq("store_id", toStoreId)
       .eq("purchase_price", item.purchasePrice)
       .maybeSingle();
@@ -2358,8 +2362,8 @@ export async function createTransfer(
       const { data: newDestLot } = await supabase.from("stock_lots").insert({
         lot_no: destLotNo,
         purchase_id: null,
-        item_code: item.itemCode,
-        item_name: item.itemName,
+        item_code: destCode,
+        item_name: destName,
         date: new Date().toISOString().slice(0, 10),
         supplier: "Transfer",
         qty: item.qty,
@@ -2373,6 +2377,8 @@ export async function createTransfer(
       transfer_id: transferId,
       item_code: item.itemCode,
       item_name: item.itemName,
+      dest_item_code: destCode,
+      dest_item_name: destName,
       lot_id: destLotId,
       qty: item.qty,
       imei: item.imei || null,
@@ -2381,12 +2387,12 @@ export async function createTransfer(
 
     if (item.imei) {
       await supabase.from("purchase_item_imeis").delete().eq("imei", item.imei);
-      const { data: newLot } = await supabase.from("stock_lots").select("id").eq("item_name", item.itemName).eq("store_id", toStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const { data: newLot } = await supabase.from("stock_lots").select("id").eq("item_name", destName).eq("store_id", toStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (newLot) {
         await supabase.from("purchase_item_imeis").insert({
           imei: item.imei,
-          item_code: item.itemCode,
-          item_name: item.itemName,
+          item_code: destCode,
+          item_name: destName,
           lot_id: (newLot as Record<string, unknown>)['id'],
           is_sold: false,
           store_id: toStoreId,
@@ -2543,6 +2549,8 @@ export async function getTransferItems(transferId: string): Promise<StockTransfe
     transferId: r['transfer_id'] as string,
     itemCode: r['item_code'] as string,
     itemName: r['item_name'] as string,
+    destItemCode: (r['dest_item_code'] as string) ?? null,
+    destItemName: (r['dest_item_name'] as string) ?? null,
     lotId: r['lot_id'] as string | null,
     qty: r['qty'] as number,
     imei: r['imei'] as string | null,

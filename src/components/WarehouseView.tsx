@@ -42,6 +42,8 @@ const ALL_LOCATIONS = [
 type TransferDraftItem = {
   itemName: string;
   itemCode: string;
+  destItemName: string;
+  destItemCode: string;
   lotId: string;
   lotNo: string;
   qty: number;
@@ -214,7 +216,7 @@ function WarehouseStockTable({ items }: { items: { itemName: string; itemCode: s
 }
 
 function WarehouseTransferSection() {
-  const { stockLots } = useStore();
+  const { stockLots, stock } = useStore();
   const [fromStoreId, setFromStoreId] = useState(WAREHOUSE_ID);
   const [toStoreId, setToStoreId] = useState("a0000000-0000-0000-0000-000000000001");
   const [remarks, setRemarks] = useState("");
@@ -224,6 +226,9 @@ function WarehouseTransferSection() {
   const [selectedLotId, setSelectedLotId] = useState("");
   const [transferQty, setTransferQty] = useState(1);
   const [transferImei, setTransferImei] = useState("");
+  const [destItemSearch, setDestItemSearch] = useState("");
+  const [selectedDestItemCode, setSelectedDestItemCode] = useState("");
+  const [selectedDestItemName, setSelectedDestItemName] = useState("");
   const [transfers, setTransfers] = useState<StockTransfer[]>([]);
   const [historyItems, setHistoryItems] = useState<Record<string, StockTransferItem[]>>({});
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -244,6 +249,13 @@ function WarehouseTransferSection() {
     [stockLots, selectedLotId]
   );
 
+  const destItems = useMemo(() => {
+    const items = stock.filter((s) => s.storeId === toStoreId);
+    if (!destItemSearch.trim()) return items.slice(0, 30);
+    const t = destItemSearch.trim().toLowerCase();
+    return items.filter((s) => s.name.toLowerCase().includes(t) || s.code.toLowerCase().includes(t));
+  }, [stock, toStoreId, destItemSearch]);
+
   function addLotToTransfer() {
     if (!selectedLot) {
       toast.error("Select a lot first");
@@ -263,6 +275,8 @@ function WarehouseTransferSection() {
       {
         itemName: selectedLot.itemName,
         itemCode: selectedLot.itemCode,
+        destItemName: selectedDestItemName || selectedLot.itemName,
+        destItemCode: selectedDestItemCode || selectedLot.itemCode,
         lotId: selectedLot.id,
         lotNo: selectedLot.lotNo,
         qty: transferQty,
@@ -275,6 +289,9 @@ function WarehouseTransferSection() {
     setSelectedLotId("");
     setTransferQty(1);
     setTransferImei("");
+    setDestItemSearch("");
+    setSelectedDestItemCode("");
+    setSelectedDestItemName("");
   }
 
   function removeDraftItem(idx: number) {
@@ -297,6 +314,8 @@ function WarehouseTransferSection() {
       draftItems.map((d) => ({
         itemCode: d.itemCode,
         itemName: d.itemName,
+        destItemCode: d.destItemCode,
+        destItemName: d.destItemName,
         lotId: d.lotId,
         qty: d.qty,
         ...(d.imei ? { imei: d.imei } : {}),
@@ -400,7 +419,8 @@ function WarehouseTransferSection() {
   <thead><tr>
     <th class="text-center" style="width:32px">#</th>
     <th>Item</th>
-    <th>Code</th>
+    <th>Source Code</th>
+    <th>Dest Code</th>
     <th class="text-right" style="width:60px">Qty</th>
     <th class="text-right" style="width:80px">Rate</th>
     <th class="text-right" style="width:90px">IMEI</th>
@@ -408,8 +428,9 @@ function WarehouseTransferSection() {
   <tbody>
   ${items.map((it, i) => `<tr>
     <td class="text-center">${i + 1}</td>
-    <td>${esc(it.itemName)}</td>
+    <td>${esc(it.destItemName || it.itemName)}</td>
     <td>${esc(it.itemCode)}</td>
+    <td>${esc(it.destItemCode || it.itemCode)}</td>
     <td class="text-right">${it.qty}</td>
     <td class="text-right">${money(it.purchasePrice)}</td>
     <td class="text-right" style="font-family:monospace;font-size:10px">${esc(it.imei || "-")}</td>
@@ -462,7 +483,7 @@ function WarehouseTransferSection() {
         <div className="mt-4 border-t border-border pt-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Item</p>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-12">
-            <div className="relative sm:col-span-4">
+            <div className="relative sm:col-span-3">
               <Label className="text-xs sm:text-sm">Search Item</Label>
               <Input
                 value={itemNameSearch}
@@ -489,7 +510,36 @@ function WarehouseTransferSection() {
                 </ul>
               )}
             </div>
-            <div className="sm:col-span-3">
+            <div className="relative sm:col-span-3">
+              <Label className="text-xs sm:text-sm">Dest. Item (optional)</Label>
+              <Input
+                value={destItemSearch}
+                onChange={(e) => { setDestItemSearch(e.target.value); setSelectedDestItemCode(""); setSelectedDestItemName(""); }}
+                placeholder="Map to dest item..."
+                className="h-9 text-xs sm:text-sm"
+                disabled={!selectedLotId}
+              />
+              {destItemSearch && !selectedDestItemCode && destItems.length > 0 && (
+                <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-popover shadow-lg">
+                  {destItems.map((s) => (
+                    <li key={s.code}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-xs hover:bg-accent"
+                        onClick={() => { setSelectedDestItemCode(s.code); setSelectedDestItemName(s.name); setDestItemSearch(`${s.code} - ${s.name}`); }}
+                      >
+                        <span className="font-mono text-primary">{s.code}</span>
+                        <span className="ml-1 font-medium">{s.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {selectedLotId && !selectedDestItemCode && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">Blank = use source code</p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
               <Label className="text-xs sm:text-sm">Qty</Label>
               <Input
                 type="number"
@@ -500,7 +550,7 @@ function WarehouseTransferSection() {
                 className="h-9 text-xs sm:text-sm"
               />
             </div>
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-2">
               <Label className="text-xs sm:text-sm">IMEI (optional)</Label>
               <Input
                 value={transferImei}
@@ -521,11 +571,12 @@ function WarehouseTransferSection() {
         {draftItems.length > 0 && (
           <div className="mt-3">
             <div className="max-h-[30vh] overflow-auto rounded-md border border-border">
-              <table className="w-full min-w-[500px] text-xs sm:text-sm">
+              <table className="w-full min-w-[700px] text-xs sm:text-sm">
                 <thead className="sticky top-0 bg-secondary text-secondary-foreground">
                   <tr>
                     <th className="p-2">#</th>
-                    <th className="p-2">Item</th>
+                    <th className="p-2">Item (Source)</th>
+                    <th className="p-2">Item (Dest)</th>
                     <th className="p-2">Lot</th>
                     <th className="p-2 text-right">Qty</th>
                     <th className="p-2 text-right">Rate</th>
@@ -537,7 +588,14 @@ function WarehouseTransferSection() {
                   {draftItems.map((d, idx) => (
                     <tr key={idx} className="border-t border-border">
                       <td className="p-2">{idx + 1}</td>
-                      <td className="p-2 font-medium">{d.itemName}</td>
+                      <td className="p-2">
+                        <span className="font-mono text-[11px] text-muted-foreground">{d.itemCode}</span>
+                        <span className="ml-1 font-medium text-[11px]">{d.itemName}</span>
+                      </td>
+                      <td className="p-2">
+                        <span className="font-mono text-[11px] text-primary">{d.destItemCode}</span>
+                        <span className="ml-1 font-medium text-[11px]">{d.destItemName}</span>
+                      </td>
                       <td className="p-2 text-muted-foreground">{d.lotNo}</td>
                       <td className="p-2 text-right font-semibold">{d.qty}</td>
                       <td className="p-2 text-right">{money(d.purchasePrice)}</td>
