@@ -32,7 +32,8 @@ function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-const STORE_LOCATIONS = [
+const ALL_LOCATIONS = [
+  { id: WAREHOUSE_ID, name: "Warehouse" },
   { id: "a0000000-0000-0000-0000-000000000001", name: "BM Apple Iphone Store" },
   { id: "a0000000-0000-0000-0000-000000000002", name: "BM Iphone Store" },
   { id: "a0000000-0000-0000-0000-000000000003", name: "BM Electronic" },
@@ -214,6 +215,7 @@ function WarehouseStockTable({ items }: { items: { itemName: string; itemCode: s
 
 function WarehouseTransferSection() {
   const { stockLots } = useStore();
+  const [fromStoreId, setFromStoreId] = useState(WAREHOUSE_ID);
   const [toStoreId, setToStoreId] = useState("a0000000-0000-0000-0000-000000000001");
   const [remarks, setRemarks] = useState("");
   const [draftItems, setDraftItems] = useState<TransferDraftItem[]>([]);
@@ -230,10 +232,10 @@ function WarehouseTransferSection() {
     if (!itemNameSearch.trim()) return [];
     const t = itemNameSearch.trim().toLowerCase();
     return stockLots.filter(
-      (l) => l.storeId === WAREHOUSE_ID && l.qty > 0 &&
+      (l) => l.storeId === fromStoreId && l.qty > 0 &&
         l.itemName.toLowerCase().includes(t)
     );
-  }, [stockLots, itemNameSearch]);
+  }, [stockLots, itemNameSearch, fromStoreId]);
 
   const selectedLot = useMemo(
     () => stockLots.find((l) => l.id === selectedLotId),
@@ -278,13 +280,17 @@ function WarehouseTransferSection() {
   }
 
   async function handleTransfer() {
+    if (fromStoreId === toStoreId) {
+      toast.error("Source and destination must be different");
+      return;
+    }
     if (draftItems.length === 0) {
       toast.error("Add at least one item");
       return;
     }
     setSaving(true);
     const result = await createTransfer(
-      WAREHOUSE_ID,
+      fromStoreId,
       toStoreId,
       draftItems.map((d) => ({
         itemCode: d.itemCode,
@@ -310,12 +316,9 @@ function WarehouseTransferSection() {
   async function loadHistory() {
     setLoadingHistory(true);
     const t = await getTransfers();
-    const warehouseTransfers = t.filter(
-      (tr) => tr.fromStoreId === WAREHOUSE_ID || tr.toStoreId === WAREHOUSE_ID
-    );
-    setTransfers(warehouseTransfers);
+    setTransfers(t);
     const itemsMap: Record<string, StockTransferItem[]> = {};
-    for (const tr of warehouseTransfers) {
+    for (const tr of t) {
       itemsMap[tr.id] = await getTransferItems(tr.id);
     }
     setHistoryItems(itemsMap);
@@ -424,14 +427,25 @@ function WarehouseTransferSection() {
   return (
     <div className="space-y-4">
       <Card className="p-3 sm:p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Transfer from Warehouse</p>
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Stock Transfer</p>
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
           <div>
-            <Label className="text-xs sm:text-sm">To Store *</Label>
+            <Label className="text-xs sm:text-sm">From *</Label>
+            <Select value={fromStoreId} onValueChange={(v) => { setFromStoreId(v); setItemNameSearch(""); setSelectedLotId(""); setDraftItems([]); }}>
+              <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ALL_LOCATIONS.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs sm:text-sm">To *</Label>
             <Select value={toStoreId} onValueChange={setToStoreId}>
               <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {STORE_LOCATIONS.map((l) => (
+                {ALL_LOCATIONS.filter((l) => l.id !== fromStoreId).map((l) => (
                   <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -444,7 +458,7 @@ function WarehouseTransferSection() {
         </div>
 
         <div className="mt-4 border-t border-border pt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Item from Warehouse</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Item</p>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-12">
             <div className="relative sm:col-span-4">
               <Label className="text-xs sm:text-sm">Search Item</Label>
@@ -547,7 +561,7 @@ function WarehouseTransferSection() {
 
       <Card className="overflow-hidden p-0">
         <div className="p-3 sm:p-4 border-b border-border">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Warehouse Transfer History</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">Transfer History</p>
         </div>
         <div className="max-h-[40vh] overflow-auto">
           <table className="w-full min-w-[600px] text-xs sm:text-sm">
@@ -555,8 +569,8 @@ function WarehouseTransferSection() {
               <tr>
                 <th className="p-2.5">Transfer No</th>
                 <th className="p-2.5">Date</th>
-                <th className="p-2.5">Direction</th>
-                <th className="p-2.5">Store</th>
+                <th className="p-2.5">From</th>
+                <th className="p-2.5">To</th>
                 <th className="p-2.5">Items</th>
                 <th className="p-2.5">Status</th>
                 <th className="p-2.5"></th>
@@ -565,18 +579,12 @@ function WarehouseTransferSection() {
             <tbody>
               {transfers.map((t) => {
                 const items = historyItems[t.id] || [];
-                const isOutgoing = t.fromStoreId === WAREHOUSE_ID;
-                const otherStoreId = isOutgoing ? t.toStoreId : t.fromStoreId;
                 return (
                   <tr key={t.id} className="border-t border-border">
                     <td className="p-2.5 font-mono font-medium">{t.transferNo}</td>
                     <td className="p-2.5 whitespace-nowrap">{t.date}</td>
-                    <td className="p-2.5">
-                      <Badge variant={isOutgoing ? "default" : "secondary"} className="text-[10px]">
-                        {isOutgoing ? "OUT" : "IN"}
-                      </Badge>
-                    </td>
-                    <td className="p-2.5">{LOCATION_LABELS[otherStoreId ?? ""] || "Unknown"}</td>
+                    <td className="p-2.5">{LOCATION_LABELS[t.fromStoreId ?? ""] || "Unknown"}</td>
+                    <td className="p-2.5">{LOCATION_LABELS[t.toStoreId ?? ""] || "Unknown"}</td>
                     <td className="p-2.5">{items.length} item(s)</td>
                     <td className="p-2.5">
                       <Badge variant={t.status === "COMPLETED" ? "outline" : "destructive"} className="text-[10px]">

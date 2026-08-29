@@ -105,9 +105,10 @@ export function StockInSummary() {
       const items = transferItemsMap[t.id] || [];
       for (const item of items) {
         const fromName = LOCATION_LABELS[t.fromStoreId ?? ""] || "Unknown";
+        const lot = item.lotId ? stockLots.find((l) => l.id === item.lotId) : null;
         rows.push({
           id: `transfer-${t.id}-${item.id}`,
-          lotNo: "-",
+          lotNo: lot?.lotNo || "-",
           date: t.date,
           itemCode: item.itemCode,
           itemName: item.itemName,
