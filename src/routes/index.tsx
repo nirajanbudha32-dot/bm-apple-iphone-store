@@ -83,11 +83,14 @@ function IndexInner() {
   return (
     <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
       <header className="mb-6 flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between sm:border-b-0 sm:pb-0">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{currentStore ? currentStore.name : "All Stores"}</h1>
-          <p className="text-xs text-muted-foreground sm:text-sm">
-            {currentStore ? currentStore.name : "All Stores"} — Stock management &amp; sales register
-          </p>
+        <div className="flex items-center gap-3">
+          <img src="/logo.svg" alt="BM Store" className="h-10 w-10 sm:h-12 sm:w-12" />
+          <div>
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{currentStore ? currentStore.name : "All Stores"}</h1>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              {currentStore ? currentStore.name : "All Stores"} — Stock management &amp; sales register
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
           <StoreSwitcher />

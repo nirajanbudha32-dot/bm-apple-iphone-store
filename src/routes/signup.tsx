@@ -74,6 +74,7 @@ function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
+          <img src="/logo.svg" alt="BM Store" className="mx-auto h-16 w-16" />
           <CardTitle className="text-xl">BM iPhone Store</CardTitle>
           <CardDescription>Create a new account</CardDescription>
         </CardHeader>
