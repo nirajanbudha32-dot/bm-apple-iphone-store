@@ -229,11 +229,13 @@ function WarehouseTransferSection() {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const availableLots = useMemo(() => {
-    if (!itemNameSearch.trim()) return [];
+    const sourceLots = stockLots.filter(
+      (l) => l.storeId === fromStoreId && l.qty > 0
+    );
+    if (!itemNameSearch.trim()) return sourceLots.slice(0, 50);
     const t = itemNameSearch.trim().toLowerCase();
-    return stockLots.filter(
-      (l) => l.storeId === fromStoreId && l.qty > 0 &&
-        l.itemName.toLowerCase().includes(t)
+    return sourceLots.filter(
+      (l) => l.itemName.toLowerCase().includes(t) || l.itemCode.toLowerCase().includes(t)
     );
   }, [stockLots, itemNameSearch, fromStoreId]);
 
