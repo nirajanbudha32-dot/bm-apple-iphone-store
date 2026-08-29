@@ -1,19 +1,55 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { useStore } from "@/lib/store";
+import { useStore, getTransfers, getTransferItems, LOCATION_LABELS, type StockTransfer, type StockTransferItem } from "@/lib/store";
+import { useStoreContext } from "@/lib/store-context";
 import { exportRows } from "@/lib/excel";
 import { money } from "@/lib/utils";
 
+interface OutRow {
+  id: string;
+  date: string;
+  itemCode: string;
+  itemName: string;
+  lotInfo: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  vat: number;
+  total: number;
+  customer: string;
+  invoiceNo: string;
+}
+
 export function StockOutSummary() {
   const { sales, stockLots, saleAllocations } = useStore();
+  const { currentStoreId } = useStoreContext();
+  const [outgoingTransfers, setOutgoingTransfers] = useState<StockTransfer[]>([]);
+  const [transferItemsMap, setTransferItemsMap] = useState<Record<string, StockTransferItem[]>>({});
 
-  const salesWithLots = useMemo(() => {
-    return sales.map((s) => {
+  useEffect(() => {
+    async function loadTransfers() {
+      const transfers = await getTransfers();
+      const relevant = transfers.filter((t) => {
+        if (currentStoreId) return t.fromStoreId === currentStoreId;
+        return true;
+      });
+      setOutgoingTransfers(relevant);
+      const itemsMap: Record<string, StockTransferItem[]> = {};
+      for (const t of relevant) {
+        itemsMap[t.id] = await getTransferItems(t.id);
+      }
+      setTransferItemsMap(itemsMap);
+    }
+    loadTransfers();
+  }, [currentStoreId]);
+
+  const allRows = useMemo(() => {
+    const saleRows: OutRow[] = sales.map((s) => {
       const allocs = saleAllocations.filter((a) => a.saleId === s.id);
       const lotNos = allocs
         .map((a) => {
@@ -22,16 +58,54 @@ export function StockOutSummary() {
         })
         .filter(Boolean)
         .join(", ");
-      return { ...s, lotInfo: lotNos || "-" };
+      return {
+        id: s.id,
+        date: s.date,
+        itemCode: s.itemCode,
+        itemName: s.itemName,
+        lotInfo: lotNos || "-",
+        qty: s.qty,
+        rate: s.rate,
+        amount: s.amount,
+        vat: s.vat,
+        total: s.total,
+        customer: s.customer,
+        invoiceNo: s.invoiceNo,
+      };
     });
-  }, [sales, stockLots, saleAllocations]);
+
+    const transferRows: OutRow[] = [];
+    for (const t of outgoingTransfers) {
+      const items = transferItemsMap[t.id] || [];
+      for (const item of items) {
+        const toName = LOCATION_LABELS[t.toStoreId ?? ""] || "Unknown";
+        const lot = item.lotId ? stockLots.find((l) => l.id === item.lotId) : null;
+        transferRows.push({
+          id: `transfer-${t.id}-${item.id}`,
+          date: t.date,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          lotInfo: lot?.lotNo || "-",
+          qty: item.qty,
+          rate: item.purchasePrice,
+          amount: 0,
+          vat: 0,
+          total: 0,
+          customer: `Transfer to ${toName}`,
+          invoiceNo: t.transferNo,
+        });
+      }
+    }
+
+    return [...saleRows, ...transferRows];
+  }, [sales, stockLots, saleAllocations, outgoingTransfers, transferItemsMap]);
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
-    let result = salesWithLots;
+    let result = allRows;
     if (dateFrom) result = result.filter((s) => s.date >= dateFrom);
     if (dateTo) result = result.filter((s) => s.date <= dateTo);
     const t = q.trim().toLowerCase();
@@ -42,19 +116,16 @@ export function StockOutSummary() {
           s.itemCode.toLowerCase().includes(t) ||
           s.invoiceNo.toLowerCase().includes(t) ||
           s.customer.toLowerCase().includes(t) ||
-          s.subCategory.toLowerCase().includes(t) ||
           s.lotInfo.toLowerCase().includes(t),
       );
     }
     return result;
-  }, [salesWithLots, dateFrom, dateTo, q]);
+  }, [allRows, dateFrom, dateTo, q]);
 
   const totalQty = filtered.reduce((a, s) => a + s.qty, 0);
   const totalAmount = filtered.reduce((a, s) => a + s.amount, 0);
   const totalVat = filtered.reduce((a, s) => a + s.vat, 0);
   const totalTotal = filtered.reduce((a, s) => a + s.total, 0);
-  const totalPaid = filtered.reduce((a, s) => a + s.paidAmount, 0);
-  const totalRemaining = filtered.reduce((a, s) => a + s.remaining, 0);
 
   const PER_PAGE = 50;
   const [page, setPage] = useState(0);
@@ -69,21 +140,16 @@ export function StockOutSummary() {
     exportRows(
       filtered.map((s) => ({
         Date: s.date,
-        "Store Name": "BM iPhone Store",
         "Item Code": s.itemCode,
         "Item Name": s.itemName,
-        "Sub Category": s.subCategory,
         "Lot Info": s.lotInfo,
         "Qty Out": s.qty,
         "Unit Price": s.rate,
-        Discount: s.discount,
         Amount: s.amount,
         VAT: s.vat,
         Total: s.total,
         Customer: s.customer,
         "Invoice No": s.invoiceNo,
-        "Paid Amount": s.paidAmount,
-        Remaining: s.remaining,
       })),
       "Stock Out",
       `BM_StockOut_${new Date().toISOString().slice(0, 10)}.xlsx`,
@@ -140,12 +206,6 @@ export function StockOutSummary() {
         </div>
         <div>
           Total: <strong className="text-foreground">{money(totalTotal)}</strong>
-          {totalRemaining > 0 && (
-            <>
-              <span className="mx-2">•</span>
-              Remaining: <strong className="text-destructive">{money(totalRemaining)}</strong>
-            </>
-          )}
         </div>
       </div>
 
