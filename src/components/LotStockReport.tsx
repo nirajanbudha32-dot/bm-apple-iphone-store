@@ -163,17 +163,17 @@ export function LotStockReport() {
 
       <Card className="overflow-hidden p-0">
         <div className="max-h-[60vh] overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[900px] text-xs sm:text-sm">
+          <table className="w-full min-w-[600px] text-xs sm:text-sm">
             <thead className="sticky top-0 bg-secondary text-secondary-foreground">
               <tr className="text-left">
                 <th className="p-2.5">Lot No</th>
                 <th className="p-2.5">Item</th>
                 <th className="p-2.5">Date</th>
-                <th className="p-2.5">Bill No</th>
+                <th className="p-2.5 hidden sm:table-cell">Bill No</th>
                 <th className="p-2.5 text-right">Received</th>
                 <th className="p-2.5 text-right">Sold</th>
                 <th className="p-2.5 text-right">Available</th>
-                <th className="p-2.5 text-right">Unit Cost</th>
+                <th className="p-2.5 text-right hidden sm:table-cell">Unit Cost</th>
                 <th className="p-2.5 text-right">Total Cost</th>
                 <th className="p-2.5">Status</th>
               </tr>
@@ -184,11 +184,11 @@ export function LotStockReport() {
                   <td className="p-2.5 font-mono font-medium text-primary">{r.lotNo}</td>
                   <td className="p-2.5 font-medium">{r.itemName}</td>
                   <td className="p-2.5 whitespace-nowrap">{r.date}</td>
-                  <td className="p-2.5 font-mono">{r.billNo || "-"}</td>
+                  <td className="p-2.5 font-mono hidden sm:table-cell">{r.billNo || "-"}</td>
                   <td className="p-2.5 text-right font-semibold">{r.received}</td>
                   <td className="p-2.5 text-right">{r.sold}</td>
                   <td className={`p-2.5 text-right font-semibold ${r.available <= 0 ? "text-destructive" : ""}`}>{r.available}</td>
-                  <td className="p-2.5 text-right">{money(r.purchasePrice)}</td>
+                  <td className="p-2.5 text-right hidden sm:table-cell">{money(r.purchasePrice)}</td>
                   <td className="p-2.5 text-right font-medium">{money(r.cost)}</td>
                   <td className="p-2.5">{statusBadge(r.status)}</td>
                 </tr>

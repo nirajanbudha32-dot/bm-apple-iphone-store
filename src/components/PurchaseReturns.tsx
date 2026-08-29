@@ -292,7 +292,7 @@ export function PurchaseReturns() {
                           variant={
                             selectedItemIdx === idx ? "default" : "outline"
                           }
-                          className="h-7 text-[10px]"
+                          className="h-9 text-xs"
                           onClick={() => handleReturnClick(idx)}
                         >
                           <RotateCcw className="mr-1 size-3" /> Return

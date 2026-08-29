@@ -122,7 +122,7 @@ function IndexInner() {
       </header>
 
       <Tabs defaultValue="sales">
-        <TabsList className="mb-6 grid h-auto w-full grid-cols-4 gap-1.5 p-1.5 sm:flex sm:h-10 sm:w-auto sm:grid-cols-none sm:gap-1 sm:p-1">
+        <TabsList className="mb-6 flex h-10 w-full overflow-x-auto overflow-y-hidden p-1 sm:w-auto sm:flex-nowrap">
           {isAdmin && (
             <TabsTrigger value="crossstore" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <Building2 className="mr-1.5 size-3.5 sm:size-4" /> All Stores
@@ -210,7 +210,7 @@ function IndexInner() {
           <StockSummary />
         </TabsContent>
         <TabsContent value="vendors">
-          <div className="flex flex-wrap gap-1 border-b border-border/60 pb-2 mb-4">
+          <div className="flex flex-nowrap gap-1 overflow-x-auto overflow-y-hidden border-b border-border/60 pb-2 mb-4">
             <Button variant={vendorSubTab === "dashboard" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("dashboard")} className="h-8 text-xs sm:text-sm">
               <LayoutDashboard className="mr-1 size-3.5" /> Dashboard
             </Button>

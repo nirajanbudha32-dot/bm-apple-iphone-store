@@ -782,13 +782,13 @@ export function PurchaseManager() {
                               size="icon"
                               variant="ghost"
                               onClick={() => setExpandedItem(expandedItem === idx ? null : idx)}
-                              className="h-7 w-7"
+                              className="h-9 w-9"
                               title="Add IMEI"
                             >
                               <Smartphone className="size-3 text-muted-foreground" />
                             </Button>
                           )}
-                          <Button size="icon" variant="ghost" onClick={() => removePurchaseItem(idx)} className="h-7 w-7">
+                          <Button size="icon" variant="ghost" onClick={() => removePurchaseItem(idx)} className="h-9 w-9">
                             <Trash2 className="size-3.5 text-destructive" />
                           </Button>
                         </div>
@@ -997,7 +997,7 @@ export function PurchaseManager() {
                           });
                         }
                       }}
-                      className="h-7 w-7"
+                      className="h-9 w-9"
                     >
                       <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
                     </Button>

@@ -527,7 +527,7 @@ function WarehouseTransferSection() {
                       <td className="p-2 text-right">{money(d.purchasePrice)}</td>
                       <td className="p-2 font-mono text-[11px]">{d.imei || "-"}</td>
                       <td className="p-2 text-right">
-                        <Button size="icon" variant="ghost" onClick={() => removeDraftItem(idx)} className="h-7 w-7">
+                        <Button size="icon" variant="ghost" onClick={() => removeDraftItem(idx)} className="h-9 w-9">
                           <Trash2 className="size-3.5 text-destructive" />
                         </Button>
                       </td>
@@ -538,7 +538,7 @@ function WarehouseTransferSection() {
             </div>
             <div className="mt-3 flex justify-end">
               <Button onClick={handleTransfer} disabled={saving} className="px-6">
-                {saving ? "Transferring..." : `Transfer ${draftItems.length} Item(s) to ${STORE_LOCATIONS.find(l => l.id === toStoreId)?.name || "Store"}`}
+                {saving ? "Transferring..." : `Transfer ${draftItems.length} Item(s)`}
               </Button>
             </div>
           </div>
@@ -585,10 +585,10 @@ function WarehouseTransferSection() {
                     </td>
                     <td className="p-2.5 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => printTransferNote(t, items)} className="h-7 w-7" title="Print">
+                        <Button size="icon" variant="ghost" onClick={() => printTransferNote(t, items)} className="h-9 w-9" title="Print">
                           <Printer className="size-3.5 text-muted-foreground" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => handleDelete(t.id)} className="h-7 w-7" title="Delete">
+                        <Button size="icon" variant="ghost" onClick={() => handleDelete(t.id)} className="h-9 w-9" title="Delete">
                           <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
                         </Button>
                       </div>

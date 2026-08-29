@@ -266,7 +266,7 @@ export function VendorLedger() {
       {selectedVendorId && ledgerRows.length > 0 && (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm">
+            <table className="w-full min-w-[700px] text-xs sm:text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
                   <th className="px-3 py-2 text-left font-semibold">Date</th>

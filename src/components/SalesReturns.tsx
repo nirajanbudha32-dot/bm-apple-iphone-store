@@ -221,7 +221,7 @@ export function SalesReturns() {
           <div className="mt-3 border-t border-border pt-3">
             <p className="mb-2 text-xs font-semibold text-muted-foreground">Select item to return:</p>
             <div className="max-h-[200px] overflow-auto rounded-md border border-border">
-              <table className="w-full text-xs sm:text-sm">
+              <table className="w-full min-w-[500px] text-xs sm:text-sm">
                 <thead className="sticky top-0 bg-secondary text-secondary-foreground">
                   <tr>
                     <th className="p-2 text-left">Item</th>
@@ -244,7 +244,7 @@ export function SalesReturns() {
                         <Button
                           size="sm"
                           variant={selectedSaleId === item.id ? "default" : "outline"}
-                          className="h-7 text-[10px]"
+                          className="h-9 text-xs"
                           onClick={() => handleItemSelect(item.id, item.itemName, item.itemCode, item.rate)}
                         >
                           <RotateCcw className="mr-1 size-3" /> Return

@@ -194,15 +194,15 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
 
       <Card className="overflow-hidden p-0">
         <div className="max-h-[60vh] overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[700px] text-xs sm:text-sm">
+          <table className="w-full min-w-[500px] text-xs sm:text-sm">
             <thead className="sticky top-0 bg-secondary text-secondary-foreground">
               <tr className="text-left">
                 <th className="p-2.5">Code</th>
                 <th className="p-2.5">Item</th>
                 <th className="p-2.5">Category</th>
-                <th className="p-2.5">Sub Category</th>
-                <th className="p-2.5">Brand</th>
-                <th className="p-2.5">Model</th>
+                <th className="p-2.5 hidden sm:table-cell">Sub Category</th>
+                <th className="p-2.5 hidden sm:table-cell">Brand</th>
+                <th className="p-2.5 hidden md:table-cell">Model</th>
                 <th className="p-2.5 text-right">Qty</th>
                 <th className="p-2.5 text-right">Purchase</th>
                 <th className="p-2.5 text-right">Selling</th>
@@ -215,9 +215,9 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
                   <td className="p-2.5 font-mono">{i.code}</td>
                   <td className="p-2.5 font-medium">{i.name}</td>
                   <td className="p-2.5">{i.category}</td>
-                  <td className="p-2.5">{i.subCategory}</td>
-                  <td className="p-2.5">{i.brand}</td>
-                  <td className="p-2.5">{i.model}</td>
+                  <td className="p-2.5 hidden sm:table-cell">{i.subCategory}</td>
+                  <td className="p-2.5 hidden sm:table-cell">{i.brand}</td>
+                  <td className="p-2.5 hidden md:table-cell">{i.model}</td>
                   <td className={`p-2.5 text-right font-semibold ${i.qty <= 0 ? "text-destructive" : ""}`}>
                     {i.qty}
                   </td>
@@ -226,7 +226,7 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
                   <td className="p-2.5">
                     {isAdmin && (
                       <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => startEdit(i)} className="h-7 w-7">
+                        <Button size="icon" variant="ghost" onClick={() => startEdit(i)} className="h-9 w-9">
                           <Pencil className="size-3.5" />
                         </Button>
                         <Button
@@ -238,7 +238,7 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
                               toast.success("Item deleted");
                             }
                           }}
-                          className="h-7 w-7"
+                          className="h-9 w-9"
                         >
                           <Trash2 className="size-3.5 text-destructive" />
                         </Button>

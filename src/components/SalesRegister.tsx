@@ -826,7 +826,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                       <td className="p-2 text-right">{money(item.vat)}</td>
                       <td className="p-2 text-right font-medium">{money(item.total)}</td>
                       <td className="p-2 text-right">
-                        <Button size="icon" variant="ghost" onClick={() => removeBillItem(idx)} className="h-7 w-7">
+                        <Button size="icon" variant="ghost" onClick={() => removeBillItem(idx)} className="h-9 w-9">
                           <Trash2 className="size-3.5 text-destructive" />
                         </Button>
                       </td>
@@ -1008,7 +1008,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                             });
                             setTimeout(() => printInvoice(), 100);
                           }}
-                          className="h-7 w-7"
+                          className="h-9 w-9"
                           title="Print invoice"
                         >
                           <Printer className="size-3.5 text-muted-foreground" />
@@ -1021,7 +1021,7 @@ ${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remark
                               deleteInvoice(g.header.invoiceNo);
                             }
                           }}
-                          className="h-7 w-7"
+                          className="h-9 w-9"
                         >
                           <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
                         </Button>

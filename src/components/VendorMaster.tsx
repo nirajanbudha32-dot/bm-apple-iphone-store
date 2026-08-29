@@ -420,7 +420,7 @@ export function VendorMaster() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-7 w-7"
+                        className="h-9 w-9"
                         title="View Details"
                         onClick={() => openDetailDialog(v)}
                       >
@@ -429,7 +429,7 @@ export function VendorMaster() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-7 w-7"
+                        className="h-9 w-9"
                         title="Edit Vendor"
                         onClick={() => openEditDialog(v)}
                       >
@@ -790,7 +790,7 @@ export function VendorMaster() {
                             <a
                               href={doc.fileData}
                               download={doc.fileName}
-                              className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-accent"
+                              className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent"
                               title="Download"
                             >
                               <Download className="size-3.5 text-muted-foreground" />
@@ -799,7 +799,7 @@ export function VendorMaster() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7"
+                            className="h-9 w-9"
                             title="Delete"
                             onClick={() => handleDeleteDoc(doc)}
                           >
