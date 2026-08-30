@@ -4,6 +4,7 @@ import {
   DollarSign, BarChart3, PieChart as PieChartIcon, Building2, Download,
   Search, Filter, Boxes, Users, AlertTriangle, Truck, RotateCcw,
   Wallet, CreditCard, Banknote, Clock, Target, ArrowUpRight, ArrowDownRight,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ComposedChart,
@@ -111,10 +113,47 @@ export function BodDashboard() {
   } = useStore();
   const { currentStoreId } = useStoreContext();
   const [subTab, setSubTab] = useState("overview");
+  const [filterStoreId, setFilterStoreId] = useState<string>("__all__");
   const storeLabel = currentStoreId ? LOCATION_LABELS[currentStoreId] || "Store" : "All Stores";
+  const activeFilter = filterStoreId === "__all__" ? null : filterStoreId;
+  const filterLabel = activeFilter ? LOCATION_LABELS[activeFilter] || "Store" : "All Stores";
+
+  const stores = useMemo(() => Object.entries(LOCATION_LABELS).filter(([id]) => id !== WAREHOUSE_ID), []);
+
+  const fStock = useMemo(() => activeFilter ? stock.filter((s: any) => s.storeId === activeFilter) : stock, [stock, activeFilter]);
+  const fSales = useMemo(() => activeFilter ? sales.filter((s: any) => s.storeId === activeFilter) : sales, [sales, activeFilter]);
+  const fPurchases = useMemo(() => activeFilter ? purchases.filter((p: any) => p.storeId === activeFilter) : purchases, [purchases, activeFilter]);
+  const fStockLots = useMemo(() => activeFilter ? stockLots.filter((l: any) => l.storeId === activeFilter) : stockLots, [stockLots, activeFilter]);
+  const fSaleAllocations = useMemo(() => activeFilter ? saleAllocations.filter((a: any) => a.storeId === activeFilter) : saleAllocations, [saleAllocations, activeFilter]);
+  const fPurchaseHeaders = useMemo(() => activeFilter ? purchaseHeaders.filter((p: any) => p.storeId === activeFilter) : purchaseHeaders, [purchaseHeaders, activeFilter]);
+  const fPurchaseItems = useMemo(() => activeFilter ? purchaseItems.filter((p: any) => p.storeId === activeFilter) : purchaseItems, [purchaseItems, activeFilter]);
+  const fSalesReturns = useMemo(() => activeFilter ? salesReturns.filter((r: any) => r.storeId === activeFilter) : salesReturns, [salesReturns, activeFilter]);
+  const fVendors = useMemo(() => activeFilter ? vendors.filter((v: any) => v.storeId === activeFilter) : vendors, [vendors, activeFilter]);
+  const fVendorTransactions = useMemo(() => activeFilter ? vendorTransactions.filter((t: any) => t.storeId === activeFilter) : vendorTransactions, [vendorTransactions, activeFilter]);
+  const fVendorPayments = useMemo(() => activeFilter ? vendorPayments.filter((p: any) => p.storeId === activeFilter) : vendorPayments, [vendorPayments, activeFilter]);
+  const fStockAdjustments = useMemo(() => activeFilter ? stockAdjustments.filter((a: any) => a.storeId === activeFilter) : stockAdjustments, [stockAdjustments, activeFilter]);
+  const fPurchaseReturns = useMemo(() => activeFilter ? purchaseReturns.filter((r: any) => r.storeId === activeFilter) : purchaseReturns, [purchaseReturns, activeFilter]);
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Store className="size-3.5" />
+          <span className="font-medium">Store:</span>
+        </div>
+        <Select value={filterStoreId} onValueChange={setFilterStoreId}>
+          <SelectTrigger className="h-8 w-[200px] text-xs sm:h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Stores</SelectItem>
+            {stores.map(([id, name]) => (
+              <SelectItem key={id} value={id}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">Showing: <strong className="text-foreground">{filterLabel}</strong></span>
+      </div>
       <Tabs value={subTab} onValueChange={setSubTab}>
         <TabsList className="mb-4 flex h-10 w-full overflow-x-auto overflow-y-hidden p-1 sm:w-auto sm:flex-nowrap">
           <TabsTrigger value="overview" className="text-xs sm:text-sm"><LayoutDashboard className="mr-1 size-3.5" /> Overview</TabsTrigger>
@@ -127,14 +166,14 @@ export function BodDashboard() {
           <TabsTrigger value="stores" className="text-xs sm:text-sm"><Building2 className="mr-1 size-3.5" /> Stores</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview"><TabOverview {...{ stock, sales, purchases, stockLots, saleAllocations, purchaseHeaders, purchaseItems, salesReturns, vendors, vendorTransactions, vendorPayments, storeLabel }} /></TabsContent>
-        <TabsContent value="sales"><TabSales {...{ sales, stockLots, saleAllocations, salesReturns }} /></TabsContent>
-        <TabsContent value="purchases"><TabPurchases {...{ purchaseHeaders, purchaseItems, purchaseReturns }} /></TabsContent>
-        <TabsContent value="profitability"><TabProfitability {...{ sales, saleAllocations, stockLots, purchaseHeaders, purchaseItems }} /></TabsContent>
-        <TabsContent value="inventory"><TabInventory {...{ stock, sales, stockLots, saleAllocations, stockAdjustments }} /></TabsContent>
-        <TabsContent value="vendors"><TabVendors {...{ vendors, vendorTransactions, vendorPayments }} /></TabsContent>
-        <TabsContent value="cashflow"><TabCashFlow {...{ sales, purchases, purchaseHeaders, vendorPayments, saleAllocations, stockLots }} /></TabsContent>
-        <TabsContent value="stores"><TabStores {...{ stock, sales, purchaseHeaders, stockLots, saleAllocations, vendors, vendorTransactions }} /></TabsContent>
+        <TabsContent value="overview"><TabOverview stock={fStock} sales={fSales} purchases={fPurchases} stockLots={fStockLots} saleAllocations={fSaleAllocations} purchaseHeaders={fPurchaseHeaders} purchaseItems={fPurchaseItems} salesReturns={fSalesReturns} vendors={fVendors} vendorTransactions={fVendorTransactions} vendorPayments={fVendorPayments} storeLabel={filterLabel} /></TabsContent>
+        <TabsContent value="sales"><TabSales sales={fSales} stockLots={fStockLots} saleAllocations={fSaleAllocations} salesReturns={fSalesReturns} /></TabsContent>
+        <TabsContent value="purchases"><TabPurchases purchaseHeaders={fPurchaseHeaders} purchaseItems={fPurchaseItems} purchaseReturns={fPurchaseReturns} /></TabsContent>
+        <TabsContent value="profitability"><TabProfitability sales={fSales} saleAllocations={fSaleAllocations} stockLots={fStockLots} purchaseHeaders={fPurchaseHeaders} purchaseItems={fPurchaseItems} /></TabsContent>
+        <TabsContent value="inventory"><TabInventory stock={fStock} sales={fSales} stockLots={fStockLots} saleAllocations={fSaleAllocations} stockAdjustments={fStockAdjustments} /></TabsContent>
+        <TabsContent value="vendors"><TabVendors vendors={fVendors} vendorTransactions={fVendorTransactions} vendorPayments={fVendorPayments} /></TabsContent>
+        <TabsContent value="cashflow"><TabCashFlow sales={fSales} purchases={fPurchases} purchaseHeaders={fPurchaseHeaders} vendorPayments={fVendorPayments} saleAllocations={fSaleAllocations} stockLots={fStockLots} /></TabsContent>
+        <TabsContent value="stores"><TabStores stock={fStock} sales={fSales} purchaseHeaders={fPurchaseHeaders} stockLots={fStockLots} saleAllocations={fSaleAllocations} vendors={fVendors} vendorTransactions={fVendorTransactions} /></TabsContent>
       </Tabs>
     </div>
   );
