@@ -26,6 +26,7 @@ import { StoreSwitcher } from "@/components/StoreSwitcher";
 import { StoreManager } from "@/components/StoreManager";
 import { CrossStoreSummary } from "@/components/CrossStoreSummary";
 import { WarehouseView } from "@/components/WarehouseView";
+import { BodDashboard } from "@/components/BodDashboard";
 import { StoreProvider, useStoreContext } from "@/lib/store-context";
 import { setCurrentStoreIdForStore } from "@/lib/store";
 import { useAuth, AUTH_ENABLED } from "@/lib/auth";
@@ -52,7 +53,7 @@ export const Route = createFileRoute("/")({
 
 function IndexInner() {
   const { user, profile, loading, signOut } = useAuth();
-  const { currentStoreId, currentStore, isAdmin } = useStoreContext();
+  const { currentStoreId, currentStore, isAdmin, isBod } = useStoreContext();
   const navigate = useNavigate();
   const [userManagerOpen, setUserManagerOpen] = useState(false);
   const [storeManagerOpen, setStoreManagerOpen] = useState(false);
@@ -78,7 +79,7 @@ function IndexInner() {
 
   if (!user) return null;
 
-  const roleLabel = profile?.role === "admin" ? "Admin" : "Salesman";
+  const roleLabel = profile?.role === "admin" ? "Admin" : profile?.role === "bod" ? "BOD" : "Salesman";
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
@@ -99,7 +100,7 @@ function IndexInner() {
               <span className="max-w-[140px] truncate text-xs text-muted-foreground sm:max-w-none sm:text-sm" title={user.email || ""}>
                 {user.email}
               </span>
-              <Badge variant={isAdmin ? "default" : "secondary"} className="capitalize text-xs">
+              <Badge variant={isAdmin ? "default" : isBod ? "default" : "secondary"} className="capitalize text-xs">
                 {roleLabel}
               </Badge>
             </div>
@@ -124,55 +125,58 @@ function IndexInner() {
         </div>
       </header>
 
-      <Tabs defaultValue="sales">
-        <TabsList className="mb-6 flex h-10 w-full overflow-x-auto overflow-y-hidden p-1 sm:w-auto sm:flex-nowrap">
-          {isAdmin && (
-            <TabsTrigger value="crossstore" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <Building2 className="mr-1.5 size-3.5 sm:size-4" /> All Stores
+      {isBod ? (
+        <BodDashboard />
+      ) : (
+        <Tabs defaultValue="sales">
+          <TabsList className="mb-6 flex h-10 w-full overflow-x-auto overflow-y-hidden p-1 sm:w-auto sm:flex-nowrap">
+            {isAdmin && (
+              <TabsTrigger value="crossstore" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <Building2 className="mr-1.5 size-3.5 sm:size-4" /> All Stores
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="sales" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <ReceiptText className="mr-1.5 size-3.5 sm:size-4" /> Sales
             </TabsTrigger>
-          )}
-          <TabsTrigger value="sales" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <ReceiptText className="mr-1.5 size-3.5 sm:size-4" /> Sales
-          </TabsTrigger>
-          <TabsTrigger value="purchases" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <PackagePlus className="mr-1.5 size-3.5 sm:size-4" /> Purchases
-          </TabsTrigger>
-          <TabsTrigger value="stock" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Stock
-          </TabsTrigger>
-          <TabsTrigger value="stockin" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <PackageMinus className="mr-1.5 size-3.5 sm:size-4" /> Stock In
-          </TabsTrigger>
-          <TabsTrigger value="stockout" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <Truck className="mr-1.5 size-3.5 sm:size-4" /> Stock Out
-          </TabsTrigger>
-          <TabsTrigger value="lots" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Lot Report
-          </TabsTrigger>
-          <TabsTrigger value="lothistory" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <History className="mr-1.5 size-3.5 sm:size-4" /> Lot History
-          </TabsTrigger>
-          <TabsTrigger value="adjustments" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <ShieldAlert className="mr-1.5 size-3.5 sm:size-4" /> Adjustments
-          </TabsTrigger>
-          <TabsTrigger value="profit" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <TrendingUp className="mr-1.5 size-3.5 sm:size-4" /> Profit
-          </TabsTrigger>
-          <TabsTrigger value="returns" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <RotateCcw className="mr-1.5 size-3.5 sm:size-4" /> Returns
-          </TabsTrigger>
-          <TabsTrigger value="summary" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <BarChart3 className="mr-1.5 size-3.5 sm:size-4" /> Summary
-          </TabsTrigger>
-          <TabsTrigger value="vendors" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-            <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
-          </TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="warehouse" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <Warehouse className="mr-1.5 size-3.5 sm:size-4" /> Warehouse
+            <TabsTrigger value="purchases" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <PackagePlus className="mr-1.5 size-3.5 sm:size-4" /> Purchases
             </TabsTrigger>
-          )}
-        </TabsList>
+            <TabsTrigger value="stock" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Stock
+            </TabsTrigger>
+            <TabsTrigger value="stockin" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <PackageMinus className="mr-1.5 size-3.5 sm:size-4" /> Stock In
+            </TabsTrigger>
+            <TabsTrigger value="stockout" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <Truck className="mr-1.5 size-3.5 sm:size-4" /> Stock Out
+            </TabsTrigger>
+            <TabsTrigger value="lots" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Lot Report
+            </TabsTrigger>
+            <TabsTrigger value="lothistory" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <History className="mr-1.5 size-3.5 sm:size-4" /> Lot History
+            </TabsTrigger>
+            <TabsTrigger value="adjustments" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <ShieldAlert className="mr-1.5 size-3.5 sm:size-4" /> Adjustments
+            </TabsTrigger>
+            <TabsTrigger value="profit" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <TrendingUp className="mr-1.5 size-3.5 sm:size-4" /> Profit
+            </TabsTrigger>
+            <TabsTrigger value="returns" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <RotateCcw className="mr-1.5 size-3.5 sm:size-4" /> Returns
+            </TabsTrigger>
+            <TabsTrigger value="summary" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <BarChart3 className="mr-1.5 size-3.5 sm:size-4" /> Summary
+            </TabsTrigger>
+            <TabsTrigger value="vendors" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
+            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="warehouse" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <Warehouse className="mr-1.5 size-3.5 sm:size-4" /> Warehouse
+              </TabsTrigger>
+            )}
+          </TabsList>
 
         {isAdmin && (
           <TabsContent value="crossstore">
@@ -246,6 +250,7 @@ function IndexInner() {
           </TabsContent>
         )}
       </Tabs>
+      )}
 
       {isAdmin && <UserManager open={userManagerOpen} onOpenChange={setUserManagerOpen} />}
       {isAdmin && <StoreManager open={storeManagerOpen} onOpenChange={setStoreManagerOpen} />}

@@ -20,6 +20,7 @@ type StoreContextType = {
   currentStore: Store | null;
   setCurrentStoreId: (id: string | null) => void;
   isAdmin: boolean;
+  isBod: boolean;
   loading: boolean;
 };
 
@@ -32,6 +33,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const isAdmin = profile?.role === "admin" && profile?.storeId === null;
+  const isBod = profile?.role === "bod" && profile?.storeId === null;
 
   useEffect(() => {
     async function fetchStores() {
@@ -59,7 +61,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCurrentStoreId(null);
       return;
     }
-    if (isAdmin) {
+    if (isAdmin || isBod) {
       if (!currentStoreId && stores.length > 0) {
         setCurrentStoreId(null);
       }
@@ -82,6 +84,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         currentStore,
         setCurrentStoreId: handleSetCurrentStoreId,
         isAdmin,
+        isBod,
         loading,
       }}
     >
