@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { useStore, LOCATION_LABELS, WAREHOUSE_ID, VAT_RATE } from "@/lib/store";
@@ -131,7 +131,7 @@ export function BodDashboard() {
         <TabsContent value="sales"><TabSales {...{ sales, stockLots, saleAllocations, salesReturns }} /></TabsContent>
         <TabsContent value="purchases"><TabPurchases {...{ purchaseHeaders, purchaseItems, purchaseReturns }} /></TabsContent>
         <TabsContent value="profitability"><TabProfitability {...{ sales, saleAllocations, stockLots, purchaseHeaders, purchaseItems }} /></TabsContent>
-        <TabsContent value="inventory"><TabInventory {...{ stock, stockLots, saleAllocations, stockAdjustments }} /></TabsContent>
+        <TabsContent value="inventory"><TabInventory {...{ stock, sales, stockLots, saleAllocations, stockAdjustments }} /></TabsContent>
         <TabsContent value="vendors"><TabVendors {...{ vendors, vendorTransactions, vendorPayments }} /></TabsContent>
         <TabsContent value="cashflow"><TabCashFlow {...{ sales, purchases, purchaseHeaders, vendorPayments, saleAllocations, stockLots }} /></TabsContent>
         <TabsContent value="stores"><TabStores {...{ stock, sales, purchaseHeaders, stockLots, saleAllocations, vendors, vendorTransactions }} /></TabsContent>
@@ -867,7 +867,7 @@ function TabProfitability({ sales, saleAllocations, stockLots, purchaseHeaders, 
 
 // ─── TAB 5: INVENTORY INTELLIGENCE ────────────────────────────────────────────
 
-function TabInventory({ stock, stockLots, saleAllocations, stockAdjustments }: any) {
+function TabInventory({ stock, sales, stockLots, saleAllocations, stockAdjustments }: any) {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -1266,7 +1266,7 @@ function TabCashFlow({ sales, purchases, purchaseHeaders, vendorPayments, saleAl
         <ChartCard title="Monthly Cash Inflow vs Outflow">
           {a.monthlyFlow.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={a.monthlyFlow}>
+              <ComposedChart data={a.monthlyFlow}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
@@ -1275,7 +1275,7 @@ function TabCashFlow({ sales, purchases, purchaseHeaders, vendorPayments, saleAl
                 <Bar dataKey="inflow" fill="#16a34a" name="Inflow (Sales)" />
                 <Bar dataKey="outflow" fill="#e11d48" name="Outflow (Purchases)" />
                 <Line type="monotone" dataKey="net" stroke="#2563eb" strokeWidth={2} name="Net" />
-              </BarChart>
+              </ComposedChart>
             </ResponsiveContainer>
           ) : <NoData />}
         </ChartCard>
