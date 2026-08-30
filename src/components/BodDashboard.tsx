@@ -314,19 +314,24 @@ function TabOverview({ stock, sales, stockLots, saleAllocations, purchaseHeaders
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>
-          <Card className="p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Store Summary</p>
-            <div className="space-y-2">
-              {o.storePerf.map((s: any) => (
-                <div key={s.name} className="flex items-center justify-between border-b border-border pb-2">
-                  <span className="text-xs font-medium">{s.name}</span>
-                  <div className="flex gap-4 text-xs">
-                    <span className="text-muted-foreground">Sales: <strong className="text-foreground">{money(s.sales)}</strong></span>
-                    <span className="text-muted-foreground">Margin: <strong className={s.margin >= 0 ? "text-green-600" : "text-destructive"}>{s.margin.toFixed(1)}%</strong></span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <Card className="p-3 sm:p-4">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs sm:mb-3">Store Summary</p>
+            <DataTable>
+              <thead className="sticky top-0 bg-secondary text-secondary-foreground">
+                <tr><Th>Store</Th><ThR>Sales</ThR><ThR>Purchases</ThR><ThR>Profit</ThR><ThR>Margin</ThR></tr>
+              </thead>
+              <tbody>
+                {o.storePerf.map((s: any) => (
+                  <tr key={s.name} className="border-t border-border">
+                    <Td className="font-medium">{s.name}</Td>
+                    <TdR>{money(s.sales)}</TdR>
+                    <TdR>{money(s.purchases)}</TdR>
+                    <TdR className={s.profit >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{money(s.profit)}</TdR>
+                    <TdR className={s.margin >= 0 ? "text-green-600" : "text-destructive"}>{s.margin.toFixed(1)}%</TdR>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
           </Card>
         </div>
       )}
@@ -1083,7 +1088,7 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
               <tr key={s.code} className="border-t border-border">
                 <Td className="font-mono">{s.code}</Td><Td className="font-medium">{s.name}</Td><Td>{s.category}</Td><Td>{s.brand}</Td>
                 <TdR className={`font-bold ${s.qty <= 1 ? "text-destructive" : "text-orange-600"}`}>{s.qty}</TdR>
-                <TdR>{money(s.qty * s.sellingPrice)}</TdR>
+                <TdR>{money(s.qty * s.purchasePrice)}</TdR>
               </tr>
             ))}
           </tbody>
@@ -1099,7 +1104,7 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
               <tr key={s.code} className="border-t border-border">
                 <Td className="font-mono">{s.code}</Td><Td className="font-medium">{s.name}</Td><Td>{s.category}</Td><Td>{s.brand}</Td>
                 <TdR className={`font-semibold ${s.qty === 0 ? "text-destructive" : ""}`}>{s.qty}</TdR>
-                <TdR>{money(s.purchasePrice)}</TdR><TdR>{money(s.sellingPrice)}</TdR><TdR>{money(s.qty * s.sellingPrice)}</TdR>
+                <TdR>{money(s.purchasePrice)}</TdR><TdR>{money(s.sellingPrice)}</TdR><TdR>{money(s.qty * s.purchasePrice)}</TdR>
                 <TdR>{s.daysInStock}</TdR><TdR>{s.turnover}</TdR>
               </tr>
             ))}
