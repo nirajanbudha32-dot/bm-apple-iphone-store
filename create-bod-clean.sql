@@ -3,7 +3,7 @@
 -- 1. Create auth user
 INSERT INTO auth.users (
   instance_id, id, aud, role, email, encrypted_password,
-  email_confirmed_at, confirmation_token, confirmation_sent_at,
+  email_confirmed_at, confirmation_sent_at,
   created_at, updated_at, raw_app_meta_data, raw_user_meta_data
 )
 VALUES (
@@ -13,7 +13,7 @@ VALUES (
   'authenticated',
   'bod@bmstore.com',
   crypt('bod123', gen_salt('bf')),
-  now(), '', '', now(), now(),
+  now(), now(), now(), now(),
   '{"provider":"email","providers":["email"]}',
   '{}'
 );
