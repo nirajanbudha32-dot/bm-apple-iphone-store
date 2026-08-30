@@ -32,18 +32,24 @@ const shortMonth = (d: string) => {
   return m[dt.getMonth()] + " " + dt.getDate();
 };
 
+const BORDER_COLORS: Record<string, string> = {
+  blue: "border-l-blue-500", green: "border-l-green-500", orange: "border-l-orange-500",
+  purple: "border-l-purple-500", red: "border-l-red-500", cyan: "border-l-cyan-500",
+};
+
 function Kpi({ label, value, sub, icon: Icon, trend, color }: {
   label: string; value: string; sub?: string; icon?: any; trend?: "up" | "down"; color?: string;
 }) {
+  const borderClass = color ? BORDER_COLORS[color] || "border-l-primary" : "";
   return (
-    <Card className={`p-3 sm:p-4 ${color ? `border-l-4 border-l-${color}` : ""}`}>
-      <div className="flex items-start justify-between">
-        <div className="min-w-0">
+    <Card className={`p-2.5 sm:p-3 ${borderClass ? `border-l-4 ${borderClass}` : ""}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">{label}</p>
-          <p className="mt-1 text-lg font-bold sm:text-xl">{value}</p>
-          {sub && <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs">{sub}</p>}
+          <p className="mt-0.5 text-base font-bold sm:text-lg md:text-xl">{value}</p>
+          {sub && <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs truncate">{sub}</p>}
         </div>
-        {Icon && <div className="rounded-md bg-muted p-1.5"><Icon className="size-4 text-muted-foreground" /></div>}
+        {Icon && <div className="rounded-md bg-muted p-1 sm:p-1.5 shrink-0"><Icon className="size-3.5 sm:size-4 text-muted-foreground" /></div>}
       </div>
     </Card>
   );
@@ -51,8 +57,8 @@ function Kpi({ label, value, sub, icon: Icon, trend, color }: {
 
 function ChartCard({ title, children, className = "" }: { title: string; children: any; className?: string }) {
   return (
-    <Card className={`p-4 ${className}`}>
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">{title}</p>
+    <Card className={`p-3 sm:p-4 ${className}`}>
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs sm:mb-3">{title}</p>
       {children}
     </Card>
   );
@@ -86,23 +92,23 @@ const NoData = ({ msg }: { msg?: string }) => (
 
 const DataTable = ({ children, className = "" }: { children: any; className?: string }) => (
   <Card className={`overflow-hidden p-0 ${className}`}>
-    <div className="max-h-[60vh] overflow-auto">
-      <table className="w-full min-w-[800px] text-xs">{children}</table>
+    <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto bod-table-scroll">
+      <table className="w-full min-w-[600px] sm:min-w-[800px] text-[11px] sm:text-xs">{children}</table>
     </div>
   </Card>
 );
 
 const Th = ({ children, className = "" }: { children: any; className?: string }) => (
-  <th className={`p-2.5 ${className}`}>{children}</th>
+  <th className={`p-2 sm:p-2.5 ${className}`}>{children}</th>
 );
 const ThR = ({ children, className = "" }: { children: any; className?: string }) => (
-  <th className={`p-2.5 text-right ${className}`}>{children}</th>
+  <th className={`p-2 sm:p-2.5 text-right ${className}`}>{children}</th>
 );
 const Td = ({ children, className = "" }: { children: any; className?: string }) => (
-  <td className={`p-2.5 ${className}`}>{children}</td>
+  <td className={`p-2 sm:p-2.5 ${className}`}>{children}</td>
 );
 const TdR = ({ children, className = "" }: { children: any; className?: string }) => (
-  <td className={`p-2.5 text-right ${className}`}>{children}</td>
+  <td className={`p-2 sm:p-2.5 text-right ${className}`}>{children}</td>
 );
 
 export function BodDashboard() {
@@ -135,14 +141,14 @@ export function BodDashboard() {
   const fPurchaseReturns = useMemo(() => activeFilter ? purchaseReturns.filter((r: any) => r.storeId === activeFilter) : purchaseReturns, [purchaseReturns, activeFilter]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-3 sm:space-y-3 sm:space-y-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Store className="size-3.5" />
-          <span className="font-medium">Store:</span>
+          <span className="font-medium hidden sm:inline">Store:</span>
         </div>
         <Select value={filterStoreId} onValueChange={setFilterStoreId}>
-          <SelectTrigger className="h-8 w-[200px] text-xs sm:h-9">
+          <SelectTrigger className="h-8 w-full sm:w-[200px] text-xs sm:h-9 sm:min-w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -152,18 +158,20 @@ export function BodDashboard() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">Showing: <strong className="text-foreground">{filterLabel}</strong></span>
+        <span className="text-[10px] sm:text-xs text-muted-foreground">
+          <strong className="text-foreground">{filterLabel}</strong>
+        </span>
       </div>
       <Tabs value={subTab} onValueChange={setSubTab}>
-        <TabsList className="mb-4 flex h-10 w-full overflow-x-auto overflow-y-hidden p-1 sm:w-auto sm:flex-nowrap">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm"><LayoutDashboard className="mr-1 size-3.5" /> Overview</TabsTrigger>
-          <TabsTrigger value="sales" className="text-xs sm:text-sm"><ShoppingBag className="mr-1 size-3.5" /> Sales</TabsTrigger>
-          <TabsTrigger value="purchases" className="text-xs sm:text-sm"><PackagePlus className="mr-1 size-3.5" /> Purchases</TabsTrigger>
-          <TabsTrigger value="profitability" className="text-xs sm:text-sm"><TrendingUp className="mr-1 size-3.5" /> Profitability</TabsTrigger>
-          <TabsTrigger value="inventory" className="text-xs sm:text-sm"><Boxes className="mr-1 size-3.5" /> Inventory</TabsTrigger>
-          <TabsTrigger value="vendors" className="text-xs sm:text-sm"><Users className="mr-1 size-3.5" /> Vendors</TabsTrigger>
-          <TabsTrigger value="cashflow" className="text-xs sm:text-sm"><Wallet className="mr-1 size-3.5" /> Cash Flow</TabsTrigger>
-          <TabsTrigger value="stores" className="text-xs sm:text-sm"><Building2 className="mr-1 size-3.5" /> Stores</TabsTrigger>
+        <TabsList className="mb-3 sm:mb-4 flex h-9 sm:h-10 w-full overflow-x-auto overflow-y-hidden p-0.5 sm:p-1 sm:w-auto sm:flex-nowrap bod-tabs-scroll">
+          <TabsTrigger value="overview" className="text-[11px] sm:text-sm px-2 sm:px-3"><LayoutDashboard className="mr-1 size-3 sm:size-3.5" /> Overview</TabsTrigger>
+          <TabsTrigger value="sales" className="text-[11px] sm:text-sm px-2 sm:px-3"><ShoppingBag className="mr-1 size-3 sm:size-3.5" /> Sales</TabsTrigger>
+          <TabsTrigger value="purchases" className="text-[11px] sm:text-sm px-2 sm:px-3"><PackagePlus className="mr-1 size-3 sm:size-3.5" /> Purchases</TabsTrigger>
+          <TabsTrigger value="profitability" className="text-[11px] sm:text-sm px-2 sm:px-3"><TrendingUp className="mr-1 size-3 sm:size-3.5" /> Profitability</TabsTrigger>
+          <TabsTrigger value="inventory" className="text-[11px] sm:text-sm px-2 sm:px-3"><Boxes className="mr-1 size-3 sm:size-3.5" /> Inventory</TabsTrigger>
+          <TabsTrigger value="vendors" className="text-[11px] sm:text-sm px-2 sm:px-3"><Users className="mr-1 size-3 sm:size-3.5" /> Vendors</TabsTrigger>
+          <TabsTrigger value="cashflow" className="text-[11px] sm:text-sm px-2 sm:px-3"><Wallet className="mr-1 size-3 sm:size-3.5" /> Cash Flow</TabsTrigger>
+          <TabsTrigger value="stores" className="text-[11px] sm:text-sm px-2 sm:px-3"><Building2 className="mr-1 size-3 sm:size-3.5" /> Stores</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview"><TabOverview stock={fStock} sales={fSales} purchases={fPurchases} stockLots={fStockLots} saleAllocations={fSaleAllocations} purchaseHeaders={fPurchaseHeaders} purchaseItems={fPurchaseItems} salesReturns={fSalesReturns} vendors={fVendors} vendorTransactions={fVendorTransactions} vendorPayments={fVendorPayments} storeLabel={filterLabel} /></TabsContent>
@@ -237,7 +245,7 @@ function TabOverview({ stock, sales, purchases, stockLots, saleAllocations, purc
   }, [stock, sales, purchases, stockLots, saleAllocations, purchaseHeaders, salesReturns, vendors, vendorTransactions]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground sm:text-sm">{storeLabel} — Executive Overview</p>
         <ExportBtn onExport={() => {
@@ -261,10 +269,10 @@ function TabOverview({ stock, sales, purchases, stockLots, saleAllocations, purc
         <Kpi label="Returns Refund" value={money(o.totalReturnRefund)} icon={RotateCcw} />
         <Kpi label="Avg Sale Value" value={money(o.avgSaleValue)} icon={Target} />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Monthly Sales vs Purchases">
           {o.monthlyTrend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={180}>
               <LineChart data={o.monthlyTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -280,7 +288,7 @@ function TabOverview({ stock, sales, purchases, stockLots, saleAllocations, purc
         </ChartCard>
         <ChartCard title="Store Performance">
           {o.storePerf.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={o.storePerf}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -296,9 +304,9 @@ function TabOverview({ stock, sales, purchases, stockLots, saleAllocations, purc
         </ChartCard>
       </div>
       {o.paymentBreakdown.length > 0 && (
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
           <ChartCard title="Sales by Payment Method">
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={160}>
               <PieChart>
                 <Pie data={o.paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {o.paymentBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -431,7 +439,7 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
   function today() { return new Date().toISOString().slice(0, 10); }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Card className="p-3 sm:p-4">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-5">
           <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
@@ -448,10 +456,10 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
         <Kpi label="Credit Sales" value={a.creditPct.toFixed(1) + "%"} icon={Banknote} />
         <Kpi label="Return Rate" value={a.returnRate.toFixed(1) + "%"} sub={money(a.totalReturns) + " refund"} icon={RotateCcw} />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Daily Sales Trend">
           {a.dailyTrend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={a.dailyTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
@@ -464,7 +472,7 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
         </ChartCard>
         <ChartCard title="Sales by Category">
           {a.categoryBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={a.categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {a.categoryBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -475,10 +483,10 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
           ) : <NoData />}
         </ChartCard>
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Sales by Payment Method">
           {a.paymentBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={150}>
               <PieChart>
                 <Pie data={a.paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {a.paymentBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -490,7 +498,7 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
         </ChartCard>
         <ChartCard title="Brand Performance">
           {a.brandPerformance.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={150}>
               <BarChart data={a.brandPerformance.slice(0, 8)} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -619,7 +627,7 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
   function today() { return new Date().toISOString().slice(0, 10); }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Card className="p-3 sm:p-4">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-5">
           <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
@@ -639,10 +647,10 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
         <Kpi label="Credit %" value={a.creditPct.toFixed(1) + "%"} icon={Banknote} />
         <Kpi label="Returns" value={money(a.totalReturns)} icon={RotateCcw} />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Purchase Trend">
           {a.dailyTrend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <LineChart data={a.dailyTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
@@ -655,7 +663,7 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
         </ChartCard>
         <ChartCard title="Purchases by Category">
           {a.categoryBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={a.categoryBreakdown} dataKey="amount" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {a.categoryBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -668,7 +676,7 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
       </div>
       {a.brandBreakdown.length > 0 && (
         <ChartCard title="Purchases by Brand">
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={150}>
             <BarChart data={a.brandBreakdown}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -775,7 +783,7 @@ function TabProfitability({ sales, saleAllocations, stockLots, purchaseHeaders, 
   function today() { return new Date().toISOString().slice(0, 10); }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Card className="p-3 sm:p-4">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-5">
           <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
@@ -794,10 +802,10 @@ function TabProfitability({ sales, saleAllocations, stockLots, purchaseHeaders, 
         <Kpi label="Net Profit" value={money(a.totalProfit)} icon={TrendingUp} color="green" />
         <Kpi label="Avg Margin" value={a.avgMargin.toFixed(1) + "%"} icon={Target} />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Profit Margin Trend">
           {a.trendData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <LineChart data={a.trendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
@@ -813,7 +821,7 @@ function TabProfitability({ sales, saleAllocations, stockLots, purchaseHeaders, 
         </ChartCard>
         <ChartCard title="Profit by Category">
           {a.categoryData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={a.categoryData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -828,10 +836,10 @@ function TabProfitability({ sales, saleAllocations, stockLots, purchaseHeaders, 
           ) : <NoData />}
         </ChartCard>
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Profit by Brand">
           {a.brandData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={a.brandData.slice(0, 10)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -844,7 +852,7 @@ function TabProfitability({ sales, saleAllocations, stockLots, purchaseHeaders, 
         </ChartCard>
         <ChartCard title="Profit by Store">
           {a.storeData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={a.storeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -976,7 +984,7 @@ function TabInventory({ stock, sales, stockLots, saleAllocations, stockAdjustmen
   function today() { return new Date().toISOString().slice(0, 10); }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Card className="p-3 sm:p-4">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
           <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Item name, code, brand..." className="h-9 text-xs" /></div>
@@ -1007,9 +1015,9 @@ function TabInventory({ stock, sales, stockLots, saleAllocations, stockAdjustmen
         <Kpi label="Low Stock" value={String(a.lowStock.length)} sub="≤3 units" icon={AlertTriangle} color="orange" />
         <Kpi label="Dead Stock" value={String(a.deadStock.length)} sub="No sales" icon={Clock} color="red" />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Stock Age Distribution">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart data={a.ageBuckets}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -1021,7 +1029,7 @@ function TabInventory({ stock, sales, stockLots, saleAllocations, stockAdjustmen
         </ChartCard>
         <ChartCard title="Stock by Category">
           {a.categoryBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={160}>
               <PieChart>
                 <Pie data={a.categoryBreakdown} dataKey="qty" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {a.categoryBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1151,7 +1159,7 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
   function today() { return new Date().toISOString().slice(0, 10); }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Card className="p-3 sm:p-4">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
           <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Vendor name, code, type..." className="h-9 text-xs" /></div>
@@ -1172,9 +1180,9 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
         <Kpi label="Overdue Vendors" value={String(a.overdueVendors.length)} sub={money(a.overdueAmount)} icon={AlertTriangle} color="red" />
         <Kpi label="Total Purchases" value={money(a.vendorData.reduce((a, v) => a + v.totalPurchases, 0))} icon={PackagePlus} />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Payment Aging (Outstanding by Days)">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart data={a.aging}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -1188,7 +1196,7 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
         </ChartCard>
         <ChartCard title="Vendors by Type">
           {a.typeBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={160}>
               <PieChart>
                 <Pie data={a.typeBreakdown} dataKey="totalPurchases" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {a.typeBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1201,7 +1209,7 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
       </div>
       {a.paymentBreakdown.length > 0 && (
         <ChartCard title="Vendor Payments by Method">
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={140}>
             <BarChart data={a.paymentBreakdown}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -1283,7 +1291,7 @@ function TabCashFlow({ sales, purchases, purchaseHeaders, vendorPayments, saleAl
   function today() { return new Date().toISOString().slice(0, 10); }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Card className="p-3 sm:p-4">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
           <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
@@ -1301,10 +1309,10 @@ function TabCashFlow({ sales, purchases, purchaseHeaders, vendorPayments, saleAl
         <Kpi label="Net Cash Flow" value={money(a.netCashFlow)} icon={Wallet} color={a.netCashFlow >= 0 ? "green" : "red"} />
         <Kpi label="Outstanding" value={money(a.receivables)} sub={`Payables: ${money(a.payables)}`} icon={CreditCard} />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Monthly Cash Inflow vs Outflow">
           {a.monthlyFlow.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={180}>
               <ComposedChart data={a.monthlyFlow}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
@@ -1320,7 +1328,7 @@ function TabCashFlow({ sales, purchases, purchaseHeaders, vendorPayments, saleAl
         </ChartCard>
         <ChartCard title="Sales Payment Methods">
           {a.paymentBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={a.paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {a.paymentBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1331,10 +1339,10 @@ function TabCashFlow({ sales, purchases, purchaseHeaders, vendorPayments, saleAl
           ) : <NoData />}
         </ChartCard>
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="p-4">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Receivables vs Payables</p>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div>
               <div className="flex justify-between text-xs mb-1"><span className="text-green-600 font-medium">Receivables (Credit Sales)</span><span className="font-semibold">{money(a.receivables)}</span></div>
               <div className="h-3 w-full rounded-full bg-muted">
@@ -1423,7 +1431,7 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
   function today() { return new Date().toISOString().slice(0, 10); }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div className="flex justify-end">
         <ExportBtn onExport={() => {
           exportRows([...stores.map(s => ({ Store: s.name, "Stock Items": s.stockItems, "Stock Qty": s.stockQty, "Stock Value": s.stockValue, Sales: s.sales, Purchases: s.purchases, Profit: s.profit, VAT: s.vat, "Avg Sale": s.avgSaleValue, Vendors: s.vendorCount })),
@@ -1431,9 +1439,9 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
           ], "Store Comparison", `BOD_StoreComparison_${today()}.xlsx`);
         }} />
       </div>
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Sales by Store">
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={180}>
             <BarChart data={stores}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -1447,7 +1455,7 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
           </ResponsiveContainer>
         </ChartCard>
         <ChartCard title="Stock Value Distribution">
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={stores} dataKey="stockValue" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                 {stores.map((_: any, i: number) => <Cell key={i} fill={STORE_COLORS[i % STORE_COLORS.length]} />)}

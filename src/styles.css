@@ -140,5 +140,62 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    overflow-x: hidden;
   }
+}
+
+/* BOD Dashboard mobile improvements */
+.bod-scroll-fade {
+  position: relative;
+}
+.bod-scroll-fade::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 32px;
+  background: linear-gradient(to right, transparent, var(--color-background));
+  pointer-events: none;
+  z-index: 2;
+}
+@media (min-width: 640px) {
+  .bod-scroll-fade::after {
+    display: none;
+  }
+}
+
+/* Tab scroll indicator */
+.bod-tabs-scroll {
+  position: relative;
+  -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  mask-image: linear-gradient(to right, black 85%, transparent 100%);
+}
+@media (min-width: 640px) {
+  .bod-tabs-scroll {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+/* Table horizontal scroll indicator */
+.bod-table-scroll {
+  position: relative;
+}
+.bod-table-scroll::after {
+  content: "";
+  position: sticky;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--color-card));
+  pointer-events: none;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+/* Smooth chart container */
+.bod-chart-card canvas {
+  max-width: 100%;
 }
