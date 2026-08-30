@@ -1061,38 +1061,72 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
         </ChartCard>
       </div>
       {a.deadStock.length > 0 && (
-        <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th colSpan={7}><span className="text-destructive font-semibold">Dead Stock — No Sales ({a.deadStock.length} items)</span></Th></tr>
-            <tr><Th>Code</Th><Th>Name</Th><Th>Category</Th><Th>Brand</Th><ThR>Qty</ThR><ThR>Value</ThR><ThR>Days in Stock</ThR></tr>
-          </thead>
-          <tbody>
-            {a.deadStock.map((s: any) => (
-              <tr key={s.code} className="border-t border-border">
-                <Td className="font-mono">{s.code}</Td><Td className="font-medium">{s.name}</Td><Td>{s.category}</Td><Td>{s.brand}</Td>
-                <TdR className="font-semibold">{s.qty}</TdR><TdR>{money(s.qty * s.purchasePrice)}</TdR>
-                <TdR className={s.daysInStock > 60 ? "text-destructive font-semibold" : ""}>{s.daysInStock} days</TdR>
-              </tr>
-            ))}
-          </tbody>
-        </DataTable>
+        <Card className="overflow-hidden p-0">
+          <div className="px-3 py-2 sm:px-4 sm:py-2.5 border-b border-border bg-destructive/5">
+            <p className="text-xs font-semibold text-destructive">Dead Stock — No Sales ({a.deadStock.length} items)</p>
+          </div>
+          <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto bod-table-scroll">
+            <table className="w-full text-[11px] sm:text-xs">
+              <thead className="sticky top-0 bg-secondary text-secondary-foreground">
+                <tr>
+                  <Th>Code</Th>
+                  <Th>Name</Th>
+                  <Th>Category</Th>
+                  <Th>Brand</Th>
+                  <ThR>Qty</ThR>
+                  <ThR>Value</ThR>
+                  <ThR>Days in Stock</ThR>
+                </tr>
+              </thead>
+              <tbody>
+                {a.deadStock.map((s: any) => (
+                  <tr key={s.code} className="border-t border-border">
+                    <Td className="font-mono">{s.code}</Td>
+                    <Td className="font-medium">{s.name}</Td>
+                    <Td>{s.category}</Td>
+                    <Td>{s.brand}</Td>
+                    <TdR className="font-semibold">{s.qty}</TdR>
+                    <TdR>{money(s.qty * s.purchasePrice)}</TdR>
+                    <TdR className={s.daysInStock > 60 ? "text-destructive font-semibold" : ""}>{s.daysInStock} days</TdR>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
       {a.lowStock.length > 0 && (
-        <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th colSpan={6}><span className="text-orange-600 font-semibold">Low Stock Alert ({a.lowStock.length} items)</span></Th></tr>
-            <tr><Th>Code</Th><Th>Name</Th><Th>Category</Th><Th>Brand</Th><ThR>Qty</ThR><ThR>Value</ThR></tr>
-          </thead>
-          <tbody>
-            {a.lowStock.map((s: any) => (
-              <tr key={s.code} className="border-t border-border">
-                <Td className="font-mono">{s.code}</Td><Td className="font-medium">{s.name}</Td><Td>{s.category}</Td><Td>{s.brand}</Td>
-                <TdR className={`font-bold ${s.qty <= 1 ? "text-destructive" : "text-orange-600"}`}>{s.qty}</TdR>
-                <TdR>{money(s.qty * s.purchasePrice)}</TdR>
-              </tr>
-            ))}
-          </tbody>
-        </DataTable>
+        <Card className="overflow-hidden p-0">
+          <div className="px-3 py-2 sm:px-4 sm:py-2.5 border-b border-border bg-orange-500/5">
+            <p className="text-xs font-semibold text-orange-600">Low Stock Alert ({a.lowStock.length} items)</p>
+          </div>
+          <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto bod-table-scroll">
+            <table className="w-full text-[11px] sm:text-xs">
+              <thead className="sticky top-0 bg-secondary text-secondary-foreground">
+                <tr>
+                  <Th>Code</Th>
+                  <Th>Name</Th>
+                  <Th>Category</Th>
+                  <Th>Brand</Th>
+                  <ThR>Qty</ThR>
+                  <ThR>Value</ThR>
+                </tr>
+              </thead>
+              <tbody>
+                {a.lowStock.map((s: any) => (
+                  <tr key={s.code} className="border-t border-border">
+                    <Td className="font-mono">{s.code}</Td>
+                    <Td className="font-medium">{s.name}</Td>
+                    <Td>{s.category}</Td>
+                    <Td>{s.brand}</Td>
+                    <TdR className={`font-bold ${s.qty <= 1 ? "text-destructive" : "text-orange-600"}`}>{s.qty}</TdR>
+                    <TdR>{money(s.qty * s.purchasePrice)}</TdR>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
       {a.filteredStock.length > 0 && (
         <DataTable>
