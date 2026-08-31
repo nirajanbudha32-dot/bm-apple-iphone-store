@@ -44,8 +44,6 @@ for (const row of rows) {
 }
 
 sql += `\n-- 3. Insert stock lots (one lot per item for FIFO sales)\n`;
-sql += `-- Reset lot sequence first\n`;
-sql += `SELECT setval('public.lot_no_seq', (SELECT COALESCE(MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)), 0) FROM public.stock_lots));\n\n`;
 
 for (const row of rows) {
   const code = String(row[1]);

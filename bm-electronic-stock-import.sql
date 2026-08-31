@@ -404,9 +404,6 @@ INSERT INTO public.stock (code, name, category, sub_category, brand, sub_brand, 
 INSERT INTO public.stock (code, name, category, sub_category, brand, sub_brand, model, unit, qty, purchase_price, selling_price, store_id, updated_at) VALUES ('391', 'Camera Lens Samsung S23 ultra', 'ASSERICESS', 'Camera Lens', 'Camera Lens', 'Camera Lens', 'Samsung S23 ultra', 'Pcs', 1, 0, 0, 'a0000000-0000-0000-0000-000000000003', now()) ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, category=EXCLUDED.category, sub_category=EXCLUDED.sub_category, brand=EXCLUDED.brand, sub_brand=EXCLUDED.sub_brand, model=EXCLUDED.model, unit=EXCLUDED.unit, qty=EXCLUDED.qty, purchase_price=EXCLUDED.purchase_price, selling_price=EXCLUDED.selling_price, store_id=EXCLUDED.store_id, updated_at=EXCLUDED.updated_at;
 
 -- 3. Insert stock lots (one lot per item for FIFO sales)
--- Reset lot sequence first
-SELECT setval('public.lot_no_seq', (SELECT COALESCE(MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)), 0) FROM public.stock_lots));
-
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('ELC-1', NULL, '1', 'Fashion Case Cover Iphone 11', '2026-08-31', 'IMPORT', 28, 0, 'a0000000-0000-0000-0000-000000000003');
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('ELC-2', NULL, '2', 'Silicon Cover Iphone 11', '2026-08-31', 'IMPORT', 51, 0, 'a0000000-0000-0000-0000-000000000003');
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('ELC-3', NULL, '3', 'Metal Cover Iphone 11', '2026-08-31', 'IMPORT', 5, 0, 'a0000000-0000-0000-0000-000000000003');
