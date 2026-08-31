@@ -517,7 +517,3 @@ INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, 
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('AIS-1250', NULL, '1250', 'Wiwu Lighting Cable', '2026-08-31', 'IMPORT', 7, 0, 'a0000000-0000-0000-0000-000000000001');
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('AIS-1251', NULL, '1251', 'USB C to C Cable', '2026-08-31', 'IMPORT', 6, 0, 'a0000000-0000-0000-0000-000000000001');
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('AIS-1252', NULL, '1252', 'CMS Cable', '2026-08-31', 'IMPORT', 42, 0, 'a0000000-0000-0000-0000-000000000001');
-
--- 4. Reset sequences (global — set to max across ALL stores)
-SELECT setval('public.stock_code_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(code AS integer)), 0) FROM public.stock)));
-SELECT setval('public.lot_no_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)), 0) FROM public.stock_lots)));

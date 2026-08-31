@@ -798,7 +798,3 @@ INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, 
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('ELC-389', NULL, '389', 'Camera Lens Iphone 15 Pro/15 Pro Max', '2026-08-31', 'IMPORT', 9, 0, 'a0000000-0000-0000-0000-000000000003');
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('ELC-390', NULL, '390', 'Camera Lens Iphone 13/13 Min', '2026-08-31', 'IMPORT', 4, 0, 'a0000000-0000-0000-0000-000000000003');
 INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('ELC-391', NULL, '391', 'Camera Lens Samsung S23 ultra', '2026-08-31', 'IMPORT', 1, 0, 'a0000000-0000-0000-0000-000000000003');
-
--- 4. Reset sequences (global — set to max across ALL stores)
-SELECT setval('public.stock_code_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(code AS integer)), 0) FROM public.stock)));
-SELECT setval('public.lot_no_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)), 0) FROM public.stock_lots)));

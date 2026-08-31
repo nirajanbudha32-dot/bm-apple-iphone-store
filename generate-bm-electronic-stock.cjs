@@ -56,9 +56,5 @@ for (const row of rows) {
   sql += `INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('${LOT_PREFIX}-${code}', NULL, '${code}', '${name}', '${today}', 'IMPORT', ${qty}, 0, '${STORE_ID}');\n`;
 }
 
-sql += `\n-- 4. Reset sequences (global — set to max across ALL stores)\n`;
-sql += `SELECT setval('public.stock_code_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(code AS integer)), 0) FROM public.stock)));\n`;
-sql += `SELECT setval('public.lot_no_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)), 0) FROM public.stock_lots)));\n`;
-
 fs.writeFileSync('bm-electronic-stock-import.sql', sql);
 console.log(`Generated bm-electronic-stock-import.sql with ${rows.length} items + lots`);
