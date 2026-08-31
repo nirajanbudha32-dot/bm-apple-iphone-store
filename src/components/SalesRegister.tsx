@@ -31,10 +31,11 @@ import { money, numberToWords } from "@/lib/utils";
 import { useStoreContext } from "@/lib/store-context";
 
 const DEFAULT_COMPANY = {
-  name: "BM Apple iPhone Store",
-  address: "Pokhara, Nepal",
+  name: "B.M. Electronics",
+  address: "Birendranagar, Surkhet, Nepal",
   pan: "123456789",
-  vatNo: "123456789",
+  vatNo: "303678416",
+  phone: "9767510622",
 };
 
 function esc(s: string) {
@@ -55,6 +56,7 @@ export function SalesRegister() {
     address: currentStore?.address || DEFAULT_COMPANY.address,
     pan: currentStore?.pan || DEFAULT_COMPANY.pan,
     vatNo: currentStore?.vatNumber || DEFAULT_COMPANY.vatNo,
+    phone: currentStore?.phone || DEFAULT_COMPANY.phone,
   };
 
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -295,183 +297,135 @@ export function SalesRegister() {
     const w = window.open("", "_blank", "width=800,height=600");
     if (!w) { toast.error("Pop-up blocked. Allow pop-ups to print."); return; }
 
-    const storePhone = currentStore?.phone || "";
-    const storeEmail = currentStore?.email || "";
-    const contactLine = [storePhone, storeEmail].filter(Boolean).join(" | ");
+    const now = new Date();
+    const printedAt = now.toISOString().slice(0, 10) + " " + now.toTimeString().slice(0, 8);
 
     function renderImeiRow(idx: number): string {
       const pd = printData;
       if (!pd) return "";
       const imeis = pd.itemImeis[idx];
       if (!imeis || imeis.length === 0) return "";
-      return `<tr class="imei-row"><td></td><td colspan="10" style="font-size:10px;color:#6b7280;padding:2px 8px 6px;font-family:monospace">IMEI: ${imeis.map(esc).join(", ")}</td></tr>`;
+      return `<tr><td style="padding:2px 10px;font-size:10px;color:#666;font-family:monospace">IMEI: ${imeis.map(esc).join(", ")}</td></tr>`;
     }
 
     w.document.write(`<!DOCTYPE html>
-<html><head><title>Invoice ${esc(printData.invoiceNo)}</title>
+<html><head><title>Tax Invoice - ${esc(COMPANY.name)}</title>
 <style>
-  @page { margin: 15mm 20mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 11.5px; color: #1f2937; padding: 30px 40px; line-height: 1.5; }
-
-  .header { text-align: center; margin-bottom: 24px; }
-  .company-name { font-size: 22px; font-weight: 700; color: #16a34a; letter-spacing: 0.5px; }
-  .company-address { font-size: 10px; color: #6b7280; margin-top: 3px; letter-spacing: 0.2px; }
-  .company-contact { font-size: 10px; color: #6b7280; margin-top: 2px; letter-spacing: 0.2px; }
-  .company-tagline { font-size: 11px; color: #6b7280; margin-top: 2px; letter-spacing: 0.3px; }
-  .header-bar { width: 60px; height: 3px; background: #16a34a; margin: 10px auto 0; border-radius: 2px; }
-
-  .info-grid { display: flex; gap: 20px; margin-bottom: 20px; }
-  .info-card { flex: 1; border: 1px solid #e5e7eb; border-left: 3px solid #16a34a; border-radius: 6px; padding: 12px 14px; background: #fafafa; }
-  .info-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #16a34a; margin-bottom: 6px; }
-  .info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
-  .info-row .lbl { color: #6b7280; }
-  .info-row .val { font-weight: 600; color: #111827; }
-
-  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border-radius: 6px; overflow: hidden; border: 1px solid #e5e7eb; }
-  thead th { background: #16a34a; color: #ffffff; font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 8px; text-align: left; border: none; }
-  tbody td { padding: 7px 8px; font-size: 11px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-  tbody tr:nth-child(even) { background: #f8faf9; }
-  tbody tr:last-child td { border-bottom: 1px solid #e5e7eb; }
-  .imei-row td { background: #f9fafb !important; border-bottom: 1px solid #f0f0f0 !important; }
-  .text-right { text-align: right; }
-  .text-center { text-align: center; }
-  .row-num { color: #9ca3af; font-weight: 500; }
-
-  .summary-section { display: flex; justify-content: flex-end; gap: 30px; margin-bottom: 16px; }
-  .totals-box { width: 280px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
-  .totals-header { background: #f0fdf4; padding: 8px 14px; font-weight: 700; font-size: 11px; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb; }
-  .totals-body { padding: 4px 0; }
-  .totals-row { display: flex; justify-content: space-between; padding: 5px 14px; font-size: 11px; }
-  .totals-row .t-label { color: #6b7280; }
-  .totals-row .t-value { font-weight: 600; }
-  .totals-divider { border-top: 1px solid #e5e7eb; margin: 0; }
-  .grand-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #16a34a; color: #ffffff; font-size: 13px; font-weight: 700; }
-  .payment-row { display: flex; justify-content: space-between; padding: 5px 14px; font-size: 11px; border-top: 1px solid #f0f0f0; }
-  .badge-paid { display: inline-block; background: #dcfce7; color: #15803d; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
-  .badge-remaining { display: inline-block; background: #fee2e2; color: #dc2626; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
-  .badge-status { display: inline-block; background: #dbeafe; color: #1d4ed8; font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
-
-  .amount-words { margin-bottom: 16px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 11px; }
-  .amount-words .aw-label { font-weight: 700; color: #15803d; }
-
-  .remarks-section { margin-bottom: 16px; padding: 10px 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 11px; }
-  .remarks-section .r-label { font-weight: 700; color: #374151; }
-  .remarks-section .r-value { color: #6b7280; margin-left: 4px; }
-
-  .signatures { display: flex; justify-content: space-between; margin-top: 30px; padding-top: 20px; }
-  .sig-box { width: 200px; text-align: center; }
-  .sig-line { border-top: 1px solid #374151; margin-top: 50px; padding-top: 6px; font-size: 11px; font-weight: 600; color: #374151; }
-  .sig-sub { font-size: 9.5px; color: #6b7280; font-weight: 400; }
-
-  .footer { text-align: center; padding-top: 16px; border-top: 2px solid #e5e7eb; margin-top: 20px; }
-  .footer-thanks { font-size: 13px; font-weight: 600; color: #16a34a; margin-bottom: 3px; }
-  .footer-note { font-size: 9.5px; color: #9ca3af; font-style: italic; }
-
-  @media print {
-    body { padding: 0; }
-    .info-card { break-inside: avoid; }
-    table { break-inside: auto; }
-    tr { break-inside: avoid; }
-    .footer { margin-top: 20px; }
-  }
+  * { box-sizing: border-box; }
+  body { font-family: "Times New Roman", Georgia, serif; background: #eceeef; margin: 0; padding: 24px; color: #111; }
+  .sheet { max-width: 850px; margin: 0 auto; background: #fff; padding: 40px 55px; }
+  .company-header { display: flex; align-items: center; gap: 18px; justify-content: center; text-align: center; }
+  .company-header .logo { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #999; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+  .company-header .logo img { width: 100%; height: 100%; object-fit: cover; }
+  .company-header .company-text h1 { margin: 0; font-size: 26px; text-decoration: underline; font-weight: bold; }
+  .company-header .company-text p { margin: 4px 0 0; font-size: 13px; }
+  .doc-title { text-align: center; font-size: 17px; font-weight: bold; margin: 22px 0 18px; }
+  .meta { display: flex; justify-content: space-between; font-size: 13.5px; gap: 30px; }
+  .meta table { border-collapse: collapse; }
+  .meta td { padding: 1.5px 6px 1.5px 0; vertical-align: top; }
+  .meta td.label { font-weight: normal; white-space: nowrap; }
+  .meta td.colon { padding: 0 6px; }
+  .meta td.value { font-weight: bold; }
+  table.items { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 26px; }
+  table.items th, table.items td { border: 1px solid #333; padding: 7px 10px; }
+  table.items th { text-align: left; font-weight: bold; }
+  table.items th.num, table.items td.num { text-align: right; }
+  table.items td.center, table.items th.center { text-align: center; }
+  .summary-wrap { display: flex; justify-content: flex-end; margin-top: 2px; }
+  .summary-wrap table { border-collapse: collapse; font-size: 14px; min-width: 300px; }
+  .summary-wrap td { padding: 5px 12px; border: 1px solid #333; border-top: none; }
+  .summary-wrap td.label { text-align: left; }
+  .summary-wrap td.val { text-align: right; }
+  .summary-wrap tr.grand td { font-weight: bold; font-size: 16px; }
+  .words-line { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 22px; font-size: 13.5px; border-top: 1px solid #333; padding-top: 10px; }
+  .words-line .words-text { max-width: 60%; }
+  .sign-row { display: flex; justify-content: space-between; margin-top: 60px; font-size: 13.5px; }
+  .sign-row .field { width: 300px; }
+  .sign-row .field .line { border-bottom: 1px solid #333; display: inline-block; min-width: 180px; }
+  .footnote { margin-top: 30px; font-size: 12.5px; font-style: italic; }
+  @media print { body { background: #fff; padding: 0; } .sheet { max-width: 100%; padding: 0; } }
 </style></head><body>
 
-<div class="header">
-  <div class="company-name">${esc(COMPANY.name)}</div>
-  <div class="company-address">${esc(COMPANY.address)} | PAN: ${esc(COMPANY.pan)} | VAT: ${esc(COMPANY.vatNo)}</div>
-  ${contactLine ? `<div class="company-contact">${esc(contactLine)}</div>` : ""}
-  <div class="company-tagline">Stock Management &amp; Sales</div>
-  <div class="header-bar"></div>
-</div>
+<div class="sheet">
 
-<div class="info-grid">
-  <div class="info-card">
-    <div class="info-label">Invoice To</div>
-    <div class="info-row"><span class="lbl">Customer</span><span class="val">${esc(printData.customer)}</span></div>
-    ${printData.hasVatPan ? `<div class="info-row"><span class="lbl">PAN Number</span><span class="val">${esc(printData.customerPan)}</span></div>` : ""}
-    ${printData.customerContact ? `<div class="info-row"><span class="lbl">Contact</span><span class="val">${esc(printData.customerContact)}</span></div>` : ""}
-    ${printData.customerLocation ? `<div class="info-row"><span class="lbl">Address</span><span class="val">${esc(printData.customerLocation)}</span></div>` : ""}
-  </div>
-  <div class="info-card">
-    <div class="info-label">Invoice Details</div>
-    <div class="info-row"><span class="lbl">Invoice No</span><span class="val">${esc(printData.invoiceNo)}</span></div>
-    <div class="info-row"><span class="lbl">Date</span><span class="val">${esc(printData.date)}</span></div>
-    <div class="info-row"><span class="lbl">Payment</span><span class="val">${esc(printData.paymentMethod)} (${esc(printData.saleType)})</span></div>
-    <div class="info-row"><span class="lbl">Status</span><span class="val"><span class="badge-status">${esc(printData.status || "CONFIRMED")}</span></span></div>
-  </div>
-</div>
-
-<table>
-  <thead><tr>
-    <th class="text-center" style="width:30px">#</th>
-    <th>Item Description</th>
-    <th class="text-center" style="width:68px">HS Code</th>
-    <th class="text-right" style="width:38px">Qty</th>
-    <th class="text-right" style="width:68px">Rate</th>
-    <th class="text-right" style="width:58px">Disc</th>
-    <th class="text-right" style="width:74px">Amount</th>
-    <th class="text-right" style="width:64px">VAT 13%</th>
-    <th class="text-right" style="width:78px">Total</th>
-  </tr></thead>
-  <tbody>
-  ${printData.items.map((it, i) => `<tr>
-    <td class="text-center row-num">${i + 1}</td>
-    <td>
-      <div style="font-weight:500">${esc(it.itemName)}</div>
-      <div style="font-size:10px;color:#6b7280">${esc(it.subCategory)} | ${esc(it.brand)} | ${esc(it.model)}</div>
-    </td>
-    <td class="text-center" style="font-family:monospace;font-size:10.5px">${esc(it.hsCode || "")}</td>
-    <td class="text-right">${it.qty}</td>
-    <td class="text-right">${money(it.rate)}</td>
-    <td class="text-right">${it.discount > 0 ? money(it.discount) : "-"}</td>
-    <td class="text-right">${money(it.amount)}</td>
-    <td class="text-right">${money(it.vat)}</td>
-    <td class="text-right" style="font-weight:600">${money(it.total)}</td>
-  </tr>${renderImeiRow(i)}`).join("")}
-  </tbody>
-</table>
-
-<div class="summary-section">
-  <div class="totals-box">
-    <div class="totals-header">Summary</div>
-    <div class="totals-body">
-      <div class="totals-row"><span class="t-label">Subtotal</span><span class="t-value">${money(printData.subtotal)}</span></div>
-      ${printData.headerDiscount > 0 ? `<div class="totals-row"><span class="t-label">Discount</span><span class="t-value" style="color:#dc2626">-${money(printData.headerDiscount)}</span></div>` : ""}
-      ${printData.otherCharges > 0 ? `<div class="totals-row"><span class="t-label">Other Charges</span><span class="t-value">${money(printData.otherCharges)}</span></div>` : ""}
-      <div class="totals-row"><span class="t-label">VAT (13%)</span><span class="t-value">${money(printData.vat)}</span></div>
-    </div>
-    <div class="totals-divider"></div>
-    <div class="grand-row"><span>GRAND TOTAL</span><span>${money(printData.total)}</span></div>
-    <div class="payment-row"><span style="color:#6b7280">Paid Amount</span><span style="font-weight:600">${money(printData.paidAmount)}</span></div>
-    ${printData.remaining > 0 ? `<div class="payment-row"><span style="color:#6b7280">Remaining</span><span class="badge-remaining">${money(printData.remaining)}</span></div>` : `<div class="payment-row"><span style="color:#6b7280">Status</span><span class="badge-paid">PAID IN FULL</span></div>`}
-  </div>
-</div>
-
-<div class="amount-words">
-  <span class="aw-label">Amount in Words: </span>${esc(numberToWords(printData.total))}
-</div>
-
-${printData.remarks ? `<div class="remarks-section"><span class="r-label">Remarks:</span><span class="r-value">${esc(printData.remarks)}</span></div>` : ""}
-
-<div class="signatures">
-  <div class="sig-box">
-    <div class="sig-line">
-      Seller's Signature
-      <div class="sig-sub">${esc(COMPANY.name)}</div>
+  <div class="company-header">
+    <div class="logo"><img src="/bm-logo.jpeg" alt="BM Logo" /></div>
+    <div class="company-text">
+      <h1>${esc(COMPANY.name)}</h1>
+      <p>${esc(COMPANY.address)}</p>
+      <p>Ph. No.: ${esc(COMPANY.phone)} &nbsp;|&nbsp; Email: ${esc(currentStore?.email || "")}</p>
+      <p>VAT No.: ${esc(COMPANY.vatNo)}</p>
     </div>
   </div>
-  <div class="sig-box">
-    <div class="sig-line">
-      Buyer's Signature
-      <div class="sig-sub">${esc(printData.customer)}</div>
+
+  <div class="doc-title">Tax Invoice</div>
+
+  <div class="meta">
+    <div class="meta-col">
+      <table>
+        <tr><td class="label">Customer Name</td><td class="colon">:</td><td class="value">${esc(printData.customer)}</td></tr>
+        <tr><td class="label">Company</td><td class="colon">:</td><td class="value">&nbsp;</td></tr>
+        <tr><td class="label">Address</td><td class="colon">:</td><td class="value">${esc(printData.customerLocation || "")}</td></tr>
+        ${printData.hasVatPan ? `<tr><td class="label">Buyer's PAN</td><td class="colon">:</td><td class="value">${esc(printData.customerPan)}</td></tr>` : ""}
+        <tr><td class="label">Payment Mode</td><td class="colon">:</td><td class="value">${esc(printData.paymentMethod)}</td></tr>
+      </table>
+    </div>
+    <div class="meta-col">
+      <table>
+        <tr><td class="label">Printed</td><td class="colon">:</td><td class="value">${esc(printedAt)}</td></tr>
+        <tr><td class="label">Invoice Date</td><td class="colon">:</td><td class="value">${esc(printData.date)}</td></tr>
+        <tr><td class="label">Invoice No.</td><td class="colon">:</td><td class="value">${esc(printData.invoiceNo)}</td></tr>
+        <tr><td class="label">Status</td><td class="colon">:</td><td class="value">${esc(printData.status || "CONFIRMED")}</td></tr>
+      </table>
     </div>
   </div>
-</div>
 
-<div class="footer">
-  <div class="footer-thanks">Thank you for your purchase!</div>
-  <div class="footer-note">This is a computer-generated invoice. ${esc(COMPANY.name)}</div>
+  <table class="items">
+    <thead>
+      <tr>
+        <th class="center" style="width:6%">Sn</th>
+        <th style="width:12%">H.S Code</th>
+        <th>Item</th>
+        <th class="center num" style="width:10%">Quantity</th>
+        <th class="num" style="width:15%">Rate</th>
+        <th class="num" style="width:16%">Price</th>
+      </tr>
+    </thead>
+    <tbody>
+    ${printData.items.map((it, i) => `<tr>
+      <td class="center">${i + 1}</td>
+      <td class="center" style="font-family:monospace">${esc(it.hsCode || "")}</td>
+      <td>${esc(it.itemName)}<br/><span style="font-size:10px;color:#666">${esc(it.subCategory)} | ${esc(it.brand)} | ${esc(it.model)}</span></td>
+      <td class="center num">${it.qty}</td>
+      <td class="num">${money(it.rate)}</td>
+      <td class="num">${money(it.total)}</td>
+    </tr>${renderImeiRow(i)}`).join("")}
+    </tbody>
+  </table>
+
+  <div class="summary-wrap">
+    <table>
+      <tr><td class="label">Sub Total</td><td class="val">${money(printData.subtotal)}</td></tr>
+      ${printData.headerDiscount > 0 ? `<tr><td class="label">Discount</td><td class="val">-${money(printData.headerDiscount)}</td></tr>` : ""}
+      ${printData.otherCharges > 0 ? `<tr><td class="label">Other Charges</td><td class="val">${money(printData.otherCharges)}</td></tr>` : ""}
+      <tr><td class="label">VAT / TAX 13%</td><td class="val">${money(printData.vat)}</td></tr>
+      <tr class="grand"><td class="label">Grand Total</td><td class="val">${money(printData.total)}</td></tr>
+    </table>
+  </div>
+
+  <div class="words-line">
+    <div class="words-text"><strong>In words</strong> : ${esc(numberToWords(printData.total))}</div>
+  </div>
+
+  ${printData.remarks ? `<div style="margin-top:16px;font-size:13.5px"><strong>Remarks:</strong> ${esc(printData.remarks)}</div>` : ""}
+
+  <div class="sign-row">
+    <div class="field">Customer Signature: <span class="line">&nbsp;</span></div>
+    <div class="field" style="text-align:right">Authorized Signature: <span class="line">&nbsp;</span></div>
+  </div>
+
+  <p class="footnote">This is a computer-generated invoice. So, it does not require a signature.</p>
+
 </div>
 
 <script>window.onload=function(){window.print();}</script>

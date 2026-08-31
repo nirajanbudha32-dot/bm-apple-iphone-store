@@ -23,10 +23,11 @@ import { exportRows } from "@/lib/excel";
 import { useStoreContext } from "@/lib/store-context";
 
 const DEFAULT_COMPANY = {
-  name: "BM Apple iPhone Store",
-  address: "Pokhara, Nepal",
+  name: "B.M. Electronics",
+  address: "Birendranagar, Surkhet, Nepal",
   pan: "123456789",
-  vatNo: "123456789",
+  vatNo: "303678416",
+  phone: "9767510622",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -52,6 +53,7 @@ export function VendorLedger() {
     address: currentStore?.address || DEFAULT_COMPANY.address,
     pan: currentStore?.pan || DEFAULT_COMPANY.pan,
     vatNo: currentStore?.vatNumber || DEFAULT_COMPANY.vatNo,
+    phone: currentStore?.phone || DEFAULT_COMPANY.phone,
   };
 
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
@@ -112,55 +114,80 @@ export function VendorLedger() {
     if (ledgerRows.length === 0) return;
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Vendor Ledger</title>
+    w.document.write(`<!DOCTYPE html><html><head><title>Vendor Ledger - ${esc(COMPANY.name)}</title>
 <style>
-  body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#333}
-  .header{text-align:center;margin-bottom:16px}
-  .header h2{margin:0 0 4px;font-size:16px}
-  .header p{margin:2px 0;font-size:11px;color:#666}
-  .info{display:flex;justify-content:space-between;margin-bottom:12px;font-size:11px}
-  table{width:100%;border-collapse:collapse;margin-top:8px}
-  th,td{border:1px solid #ccc;padding:5px 8px;text-align:left;font-size:11px}
-  th{background:#f5f5f5;font-weight:600}
-  td.num{text-align:right}
-  .footer{margin-top:12px;font-size:11px}
-  .footer-row{display:flex;justify-content:flex-end;gap:32px;padding:3px 0}
-  .footer-row span{font-weight:600}
-  @media print{body{margin:10px}}
+  * { box-sizing: border-box; }
+  body { font-family: "Times New Roman", Georgia, serif; background: #eceeef; margin: 0; padding: 24px; color: #111; }
+  .sheet { max-width: 850px; margin: 0 auto; background: #fff; padding: 40px 55px; }
+  .company-header { display: flex; align-items: center; gap: 18px; justify-content: center; text-align: center; }
+  .company-header .logo { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #999; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+  .company-header .logo img { width: 100%; height: 100%; object-fit: cover; }
+  .company-header .company-text h1 { margin: 0; font-size: 26px; text-decoration: underline; font-weight: bold; }
+  .company-header .company-text p { margin: 4px 0 0; font-size: 13px; }
+  .doc-title { text-align: center; font-size: 17px; font-weight: bold; margin: 22px 0 18px; }
+  .meta { display: flex; justify-content: space-between; font-size: 13.5px; gap: 30px; margin-bottom: 16px; }
+  .meta table { border-collapse: collapse; }
+  .meta td { padding: 1.5px 6px 1.5px 0; vertical-align: top; }
+  .meta td.label { font-weight: normal; white-space: nowrap; }
+  .meta td.colon { padding: 0 6px; }
+  .meta td.value { font-weight: bold; }
+  table.items { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+  table.items th, table.items td { border: 1px solid #333; padding: 7px 10px; }
+  table.items th { text-align: left; font-weight: bold; background: #f5f5f5; }
+  table.items td.num { text-align: right; }
+  .summary { margin-top: 12px; font-size: 13.5px; }
+  .summary-row { display: flex; justify-content: flex-end; gap: 32px; padding: 3px 0; }
+  .summary-row span { font-weight: 600; }
+  .footnote { margin-top: 30px; font-size: 12.5px; font-style: italic; }
+  @media print { body { background: #fff; padding: 0; } .sheet { max-width: 100%; padding: 0; } }
 </style></head><body>
-<div class="header">
-  <h2>${esc(COMPANY.name)}</h2>
-  <p>${esc(COMPANY.address)}</p>
-  <p>PAN: ${esc(COMPANY.pan)} | VAT: ${esc(COMPANY.vatNo)}</p>
-  <h3 style="margin-top:10px">Vendor Ledger Statement</h3>
-</div>
-<div class="info">
-  <div><strong>Vendor:</strong> ${esc(selectedVendor?.vendorName ?? "")} (${esc(selectedVendor?.vendorCode ?? "")})</div>
-  <div><strong>Address:</strong> ${esc(selectedVendor?.address ?? "")}</div>
-  <div><strong>Phone:</strong> ${esc(selectedVendor?.phone ?? "")}</div>
-  <div><strong>Date Range:</strong> ${fromDate || "All"} to ${toDate || "All"}</div>
-</div>
-<table>
-  <thead><tr>
-    <th>Date</th><th>Type</th><th>Reference No</th><th>Remarks</th>
-    <th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th>
-  </tr></thead>
-  <tbody>
-    ${ledgerRows.map((r) => `<tr>
-      <td>${esc(r.transactionDate)}</td>
-      <td>${esc(TYPE_LABELS[r.transactionType] || r.transactionType)}</td>
-      <td>${esc(r.referenceNo)}</td>
-      <td>${esc(r.remarks)}</td>
-      <td class="num">${r.debit > 0 ? money(r.debit) : "-"}</td>
-      <td class="num">${r.credit > 0 ? money(r.credit) : "-"}</td>
-      <td class="num">${money(r.runningBalance)}</td>
-    </tr>`).join("")}
-  </tbody>
-</table>
-<div class="footer">
-  <div class="footer-row"><span>Total Debit:</span> <span>${money(totalDebit)}</span></div>
-  <div class="footer-row"><span>Total Credit:</span> <span>${money(totalCredit)}</span></div>
-  <div class="footer-row"><span>Closing Balance:</span> <span>${money(closingBalance)}</span></div>
+<div class="sheet">
+  <div class="company-header">
+    <div class="logo"><img src="/bm-logo.jpeg" alt="BM Logo" /></div>
+    <div class="company-text">
+      <h1>${esc(COMPANY.name)}</h1>
+      <p>${esc(COMPANY.address)}</p>
+      <p>Ph. No.: ${esc(COMPANY.phone)} | PAN: ${esc(COMPANY.pan)} | VAT: ${esc(COMPANY.vatNo)}</p>
+    </div>
+  </div>
+  <div class="doc-title">Vendor Ledger Statement</div>
+  <div class="meta">
+    <div class="meta-col">
+      <table>
+        <tr><td class="label">Vendor</td><td class="colon">:</td><td class="value">${esc(selectedVendor?.vendorName ?? "")} (${esc(selectedVendor?.vendorCode ?? "")})</td></tr>
+        <tr><td class="label">Address</td><td class="colon">:</td><td class="value">${esc(selectedVendor?.address ?? "")}</td></tr>
+        <tr><td class="label">Phone</td><td class="colon">:</td><td class="value">${esc(selectedVendor?.phone ?? "")}</td></tr>
+      </table>
+    </div>
+    <div class="meta-col">
+      <table>
+        <tr><td class="label">Date Range</td><td class="colon">:</td><td class="value">${fromDate || "All"} to ${toDate || "All"}</td></tr>
+      </table>
+    </div>
+  </div>
+  <table class="items">
+    <thead><tr>
+      <th>Date</th><th>Type</th><th>Reference No</th><th>Remarks</th>
+      <th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th>
+    </tr></thead>
+    <tbody>
+      ${ledgerRows.map((r) => `<tr>
+        <td>${esc(r.transactionDate)}</td>
+        <td>${esc(TYPE_LABELS[r.transactionType] || r.transactionType)}</td>
+        <td>${esc(r.referenceNo)}</td>
+        <td>${esc(r.remarks)}</td>
+        <td class="num">${r.debit > 0 ? money(r.debit) : "-"}</td>
+        <td class="num">${r.credit > 0 ? money(r.credit) : "-"}</td>
+        <td class="num">${money(r.runningBalance)}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table>
+  <div class="summary">
+    <div class="summary-row"><span>Total Debit:</span> <span>${money(totalDebit)}</span></div>
+    <div class="summary-row"><span>Total Credit:</span> <span>${money(totalCredit)}</span></div>
+    <div class="summary-row"><span>Closing Balance:</span> <span>${money(closingBalance)}</span></div>
+  </div>
+  <p class="footnote">This is a computer-generated ledger statement.</p>
 </div>
 <script>window.onload=function(){window.print();}</script>
 </body></html>`);

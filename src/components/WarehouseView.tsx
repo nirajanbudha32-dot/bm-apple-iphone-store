@@ -370,78 +370,86 @@ function WarehouseTransferSection() {
     w.document.write(`<!DOCTYPE html>
 <html><head><title>Transfer ${esc(transfer.transferNo)}</title>
 <style>
-  @page { margin: 15mm 20mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11.5px; color: #1f2937; padding: 30px 40px; line-height: 1.5; }
-  .header { text-align: center; margin-bottom: 24px; }
-  .title { font-size: 20px; font-weight: 700; color: #16a34a; }
-  .subtitle { font-size: 12px; color: #6b7280; margin-top: 4px; }
-  .bar { width: 60px; height: 3px; background: #16a34a; margin: 10px auto 0; border-radius: 2px; }
-  .info-grid { display: flex; gap: 20px; margin-bottom: 20px; }
-  .info-card { flex: 1; border: 1px solid #e5e7eb; border-left: 3px solid #16a34a; border-radius: 6px; padding: 12px 14px; background: #fafafa; }
-  .info-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #16a34a; margin-bottom: 6px; }
-  .info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
-  .info-row .lbl { color: #6b7280; }
-  .info-row .val { font-weight: 600; color: #111827; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
-  thead th { background: #16a34a; color: #fff; font-weight: 600; font-size: 10.5px; text-transform: uppercase; padding: 9px 8px; text-align: left; }
-  tbody td { padding: 7px 8px; font-size: 11px; border-bottom: 1px solid #f0f0f0; }
-  .text-right { text-align: right; }
-  .text-center { text-align: center; }
-  .signatures { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }
-  .sig-box { width: 200px; text-align: center; }
-  .sig-line { border-top: 1px solid #374151; margin-top: 50px; padding-top: 6px; font-size: 11px; font-weight: 600; }
-  .sig-sub { font-size: 9.5px; color: #6b7280; font-weight: 400; }
-  .footer { text-align: center; padding-top: 16px; border-top: 2px solid #e5e7eb; margin-top: 20px; }
-  .footer-note { font-size: 9.5px; color: #9ca3af; font-style: italic; }
-  @media print { body { padding: 0; } }
+  * { box-sizing: border-box; }
+  body { font-family: "Times New Roman", Georgia, serif; background: #eceeef; margin: 0; padding: 24px; color: #111; }
+  .sheet { max-width: 850px; margin: 0 auto; background: #fff; padding: 40px 55px; }
+  .company-header { display: flex; align-items: center; gap: 18px; justify-content: center; text-align: center; }
+  .company-header .logo { width: 64px; height: 64px; border-radius: 50%; border: 1px solid #999; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+  .company-header .logo img { width: 100%; height: 100%; object-fit: cover; }
+  .company-header .company-text h1 { margin: 0; font-size: 26px; text-decoration: underline; font-weight: bold; }
+  .company-header .company-text p { margin: 4px 0 0; font-size: 13px; }
+  .doc-title { text-align: center; font-size: 17px; font-weight: bold; margin: 22px 0 18px; }
+  .meta { display: flex; justify-content: space-between; font-size: 13.5px; gap: 30px; }
+  .meta table { border-collapse: collapse; }
+  .meta td { padding: 1.5px 6px 1.5px 0; vertical-align: top; }
+  .meta td.label { font-weight: normal; white-space: nowrap; }
+  .meta td.colon { padding: 0 6px; }
+  .meta td.value { font-weight: bold; }
+  table.items { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 26px; }
+  table.items th, table.items td { border: 1px solid #333; padding: 7px 10px; }
+  table.items th { text-align: left; font-weight: bold; }
+  table.items th.num, table.items td.num { text-align: right; }
+  table.items td.center, table.items th.center { text-align: center; }
+  .sign-row { display: flex; justify-content: space-between; margin-top: 60px; font-size: 13.5px; }
+  .sign-row .field { width: 300px; }
+  .sign-row .field .line { border-bottom: 1px solid #333; display: inline-block; min-width: 180px; }
+  .footnote { margin-top: 30px; font-size: 12.5px; font-style: italic; }
+  @media print { body { background: #fff; padding: 0; } .sheet { max-width: 100%; padding: 0; } }
 </style></head><body>
-<div class="header">
-  <div class="title">STOCK TRANSFER NOTE</div>
-  <div class="subtitle">${esc(transfer.transferNo)}</div>
-  <div class="bar"></div>
-</div>
-<div class="info-grid">
-  <div class="info-card">
-    <div class="info-label">Transfer Details</div>
-    <div class="info-row"><span class="lbl">Transfer No</span><span class="val">${esc(transfer.transferNo)}</span></div>
-    <div class="info-row"><span class="lbl">Date</span><span class="val">${esc(transfer.date)}</span></div>
-    <div class="info-row"><span class="lbl">Status</span><span class="val">${esc(transfer.status)}</span></div>
+<div class="sheet">
+  <div class="company-header">
+    <div class="logo"><img src="/bm-logo.jpeg" alt="BM Logo" /></div>
+    <div class="company-text">
+      <h1>B.M. Electronics</h1>
+      <p>Birendranagar, Surkhet, Nepal</p>
+      <p>Ph. No.: 9767510622</p>
+    </div>
   </div>
-  <div class="info-card">
-    <div class="info-label">Locations</div>
-    <div class="info-row"><span class="lbl">From</span><span class="val">${esc(fromName)}</span></div>
-    <div class="info-row"><span class="lbl">To</span><span class="val">${esc(toName)}</span></div>
-    ${transfer.remarks ? `<div class="info-row"><span class="lbl">Remarks</span><span class="val">${esc(transfer.remarks)}</span></div>` : ""}
+  <div class="doc-title">STOCK TRANSFER NOTE</div>
+  <div class="meta">
+    <div class="meta-col">
+      <table>
+        <tr><td class="label">Transfer No</td><td class="colon">:</td><td class="value">${esc(transfer.transferNo)}</td></tr>
+        <tr><td class="label">Date</td><td class="colon">:</td><td class="value">${esc(transfer.date)}</td></tr>
+        <tr><td class="label">Status</td><td class="colon">:</td><td class="value">${esc(transfer.status)}</td></tr>
+      </table>
+    </div>
+    <div class="meta-col">
+      <table>
+        <tr><td class="label">From</td><td class="colon">:</td><td class="value">${esc(fromName)}</td></tr>
+        <tr><td class="label">To</td><td class="colon">:</td><td class="value">${esc(toName)}</td></tr>
+        ${transfer.remarks ? `<tr><td class="label">Remarks</td><td class="colon">:</td><td class="value">${esc(transfer.remarks)}</td></tr>` : ""}
+      </table>
+    </div>
   </div>
+  <table class="items">
+    <thead><tr>
+      <th class="center" style="width:6%">Sn</th>
+      <th>Item</th>
+      <th>Source Code</th>
+      <th>Dest Code</th>
+      <th class="num" style="width:10%">Qty</th>
+      <th class="num" style="width:15%">Rate</th>
+      <th class="num" style="width:18%">IMEI</th>
+    </tr></thead>
+    <tbody>
+    ${items.map((it, i) => `<tr>
+      <td class="center">${i + 1}</td>
+      <td>${esc(it.destItemName || it.itemName)}</td>
+      <td>${esc(it.itemCode)}</td>
+      <td>${esc(it.destItemCode || it.itemCode)}</td>
+      <td class="num">${it.qty}</td>
+      <td class="num">${money(it.purchasePrice)}</td>
+      <td class="num" style="font-family:monospace;font-size:11px">${esc(it.imei || "-")}</td>
+    </tr>`).join("")}
+    </tbody>
+  </table>
+  <div class="sign-row">
+    <div class="field">Dispatched By: <span class="line">&nbsp;</span></div>
+    <div class="field" style="text-align:right">Received By: <span class="line">&nbsp;</span></div>
+  </div>
+  <p class="footnote">Internal Transfer Note — Warehouse Dispatch. This is a computer-generated document.</p>
 </div>
-<table>
-  <thead><tr>
-    <th class="text-center" style="width:32px">#</th>
-    <th>Item</th>
-    <th>Source Code</th>
-    <th>Dest Code</th>
-    <th class="text-right" style="width:60px">Qty</th>
-    <th class="text-right" style="width:80px">Rate</th>
-    <th class="text-right" style="width:90px">IMEI</th>
-  </tr></thead>
-  <tbody>
-  ${items.map((it, i) => `<tr>
-    <td class="text-center">${i + 1}</td>
-    <td>${esc(it.destItemName || it.itemName)}</td>
-    <td>${esc(it.itemCode)}</td>
-    <td>${esc(it.destItemCode || it.itemCode)}</td>
-    <td class="text-right">${it.qty}</td>
-    <td class="text-right">${money(it.purchasePrice)}</td>
-    <td class="text-right" style="font-family:monospace;font-size:10px">${esc(it.imei || "-")}</td>
-  </tr>`).join("")}
-  </tbody>
-</table>
-<div class="signatures">
-  <div class="sig-box"><div class="sig-line">Dispatched By<div class="sig-sub">Warehouse</div></div></div>
-  <div class="sig-box"><div class="sig-line">Received By<div class="sig-sub">${esc(toName)}</div></div></div>
-</div>
-<div class="footer"><div class="footer-note">Internal Transfer Note — Warehouse Dispatch</div></div>
 <script>window.onload=function(){window.print();}</script>
 </body></html>`);
     w.document.close();
