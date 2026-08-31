@@ -49,7 +49,9 @@ export function SalesRegister() {
   const [invoiceNo, setInvoiceNo] = useState("BM-AIS-0001");
 
   useEffect(() => {
-    peekInvoiceNo().then(setInvoiceNo);
+    peekInvoiceNo()
+      .then(setInvoiceNo)
+      .catch(() => {});
   }, [sales.length]);
 
   const COMPANY = {
