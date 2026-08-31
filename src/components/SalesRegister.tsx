@@ -18,6 +18,7 @@ import {
   addBill,
   deleteInvoice,
   nextInvoiceNo,
+  peekInvoiceNo,
   useStore,
   VAT_RATE,
   PAYMENT_METHODS,
@@ -48,7 +49,7 @@ export function SalesRegister() {
   const [invoiceNo, setInvoiceNo] = useState("BM-AIS-0001");
 
   useEffect(() => {
-    nextInvoiceNo().then(setInvoiceNo);
+    peekInvoiceNo().then(setInvoiceNo);
   }, [sales.length]);
 
   const COMPANY = {
@@ -252,6 +253,7 @@ export function SalesRegister() {
       toast.error(`Save failed: ${msg}`);
       return;
     }
+    await nextInvoiceNo();
     setPrintData({
       invoiceNo,
       date,

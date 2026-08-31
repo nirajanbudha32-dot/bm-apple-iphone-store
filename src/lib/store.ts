@@ -780,6 +780,12 @@ export async function nextInvoiceNo(): Promise<string> {
   return data as string;
 }
 
+export async function peekInvoiceNo(): Promise<string> {
+  const { data, error } = await supabase.rpc("peek_invoice_no");
+  if (error) throw new Error(`Failed to peek invoice number: ${error.message}`);
+  return data as string;
+}
+
 export async function addBill(
   invoiceNo: string,
   date: string,
