@@ -246,7 +246,8 @@ export function SalesRegister() {
     );
     setSaving(false);
     if (error) {
-      toast.error(`Save failed: ${error.message}`);
+      const msg = typeof error === "string" ? error : (error as any)?.message || "Unknown error";
+      toast.error(`Save failed: ${msg}`);
       return;
     }
     setPrintData({

@@ -26,6 +26,7 @@ import { exportRows } from "@/lib/excel";
 const STORE_COLORS = ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#e11d48"];
 const PIE_COLORS = ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#e11d48", "#ca8a04", "#6366f1"];
 const fmt = (d: string) => d?.slice(0, 10) || "";
+const today = () => new Date().toISOString().slice(0, 10);
 const shortMonth = (d: string) => {
   const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const dt = new Date(d);
@@ -104,8 +105,8 @@ const Th = ({ children, className = "" }: { children: any; className?: string })
 const ThR = ({ children, className = "" }: { children: any; className?: string }) => (
   <th className={`p-2 sm:p-2.5 text-right ${className}`}>{children}</th>
 );
-const Td = ({ children, className = "" }: { children: any; className?: string }) => (
-  <td className={`p-2 sm:p-2.5 ${className}`}>{children}</td>
+const Td = ({ children, className = "", colSpan }: { children: any; className?: string; colSpan?: number }) => (
+  <td className={`p-2 sm:p-2.5 ${className}`} colSpan={colSpan}>{children}</td>
 );
 const TdR = ({ children, className = "" }: { children: any; className?: string }) => (
   <td className={`p-2 sm:p-2.5 text-right ${className}`}>{children}</td>
@@ -374,7 +375,7 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
   const a = useMemo(() => {
     const totalGrand = grouped.reduce((a, r) => a + r.grandTotal, 0);
     const totalPaid = grouped.reduce((a, r) => a + r.paidAmount, 0);
-    const totalVat = filtered.reduce((a, s) => a + s.vat, 0);
+    const totalVat = filtered.reduce((a: number, s: any) => a + s.vat, 0);
     const creditSales = grouped.filter(r => r.saleType === "Credit").reduce((a, r) => a + r.grandTotal, 0);
     const creditPct = totalGrand > 0 ? (creditSales / totalGrand * 100) : 0;
     const totalReturns = salesReturns.filter((r: any) => {
@@ -981,8 +982,8 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
     for (const s of stockAge) {
       const d = s.daysInStock;
       const bucket = d <= 7 ? 0 : d <= 30 ? 1 : d <= 60 ? 2 : d <= 90 ? 3 : 4;
-      ageBuckets[bucket].count += s.qty;
-      ageBuckets[bucket].value += s.qty * s.purchasePrice;
+      ageBuckets[bucket]!.count += s.qty;
+      ageBuckets[bucket]!.value += s.qty * s.purchasePrice;
     }
 
     let filteredStock = stockAge;
@@ -1170,11 +1171,11 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
       const lastTxn = txns.length > 0 ? txns[txns.length - 1].transactionDate : v.openingBalanceDate;
       const daysSinceLastTxn = lastTxn ? Math.floor((Date.now() - new Date(lastTxn).getTime()) / 86400000) : 999;
       return { ...v, totalPurchases, totalPayments, totalReturns, outstanding, daysSinceLastTxn };
-    }).sort((a, b) => b.totalPurchases - a.totalPurchases);
+    }).sort((a: any, b: any) => b.totalPurchases - a.totalPurchases);
 
-    const totalOutstanding = vendorData.reduce((a, v) => a + v.outstanding, 0);
-    const overdueVendors = vendorData.filter(v => v.outstanding > 0 && v.daysSinceLastTxn > 30);
-    const overdueAmount = overdueVendors.reduce((a, v) => a + v.outstanding, 0);
+    const totalOutstanding = vendorData.reduce((a: number, v: any) => a + v.outstanding, 0);
+    const overdueVendors = vendorData.filter((v: any) => v.outstanding > 0 && v.daysSinceLastTxn > 30);
+    const overdueAmount = overdueVendors.reduce((a: number, v: any) => a + v.outstanding, 0);
 
     const aging = [
       { label: "0-30 days", amount: 0, count: 0 },
@@ -1186,8 +1187,8 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
       if (v.outstanding <= 0) continue;
       const d = v.daysSinceLastTxn;
       const bucket = d <= 30 ? 0 : d <= 60 ? 1 : d <= 90 ? 2 : 3;
-      aging[bucket].amount += v.outstanding;
-      aging[bucket].count++;
+      aging[bucket]!.amount += v.outstanding;
+      aging[bucket]!.count++;
     }
 
     const typeMap = new Map<string, { count: number; totalPurchases: number; outstanding: number }>();
@@ -1219,7 +1220,7 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
           <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Vendor name, code, type..." className="h-9 text-xs" /></div>
           <div className="flex items-end">
             <ExportBtn onExport={() => {
-              exportRows(a.vendorData.map(v => ({
+              exportRows(a.vendorData.map((v: any) => ({
                 Code: v.vendorCode, Name: v.vendorName, Type: v.vendorType, PAN: v.pan,
                 "Total Purchases": v.totalPurchases, "Total Payments": v.totalPayments,
                 Returns: v.totalReturns, Outstanding: v.outstanding, "Days Since Activity": v.daysSinceLastTxn,
@@ -1232,7 +1233,7 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
         <Kpi label="Total Vendors" value={String(a.vendorData.length)} icon={Users} />
         <Kpi label="Total Outstanding" value={money(a.totalOutstanding)} icon={DollarSign} color={a.totalOutstanding > 0 ? "red" : "green"} />
         <Kpi label="Overdue Vendors" value={String(a.overdueVendors.length)} sub={money(a.overdueAmount)} icon={AlertTriangle} color="red" />
-        <Kpi label="Total Purchases" value={money(a.vendorData.reduce((a, v) => a + v.totalPurchases, 0))} icon={PackagePlus} />
+        <Kpi label="Total Purchases" value={money(a.vendorData.reduce((a: number, v: any) => a + v.totalPurchases, 0))} icon={PackagePlus} />
       </div>
       <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Payment Aging (Outstanding by Days)">
@@ -1546,22 +1547,22 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
         <Card className="p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Best Performing Store</p>
           {stores.length > 0 && (() => {
-            const best = [...stores].sort((a, b) => b.sales - a.sales)[0];
-            return <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Sales: {money(best.sales)} | Profit: {money(best.profit)} | Margin: {best.sales > 0 ? (best.profit / best.sales * 100).toFixed(1) : 0}%</p></div>;
+            const best = [...stores].sort((a: any, b: any) => b.sales - a.sales)[0];
+            return best ? <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Sales: {money(best.sales)} | Profit: {money(best.profit)} | Margin: {best.sales > 0 ? (best.profit / best.sales * 100).toFixed(1) : 0}%</p></div> : null;
           })()}
         </Card>
         <Card className="p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most Profitable Store</p>
           {stores.length > 0 && (() => {
-            const best = [...stores].sort((a, b) => b.profit - a.profit)[0];
-            return <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Profit: {money(best.profit)} | Margin: {best.sales > 0 ? (best.profit / best.sales * 100).toFixed(1) : 0}%</p></div>;
+            const best = [...stores].sort((a: any, b: any) => b.profit - a.profit)[0];
+            return best ? <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Profit: {money(best.profit)} | Margin: {best.sales > 0 ? (best.profit / best.sales * 100).toFixed(1) : 0}%</p></div> : null;
           })()}
         </Card>
         <Card className="p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Highest Avg Sale</p>
           {stores.length > 0 && (() => {
-            const best = [...stores].sort((a, b) => b.avgSaleValue - a.avgSaleValue)[0];
-            return <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Avg: {money(best.avgSaleValue)} | Invoices: {best.salesCount}</p></div>;
+            const best = [...stores].sort((a: any, b: any) => b.avgSaleValue - a.avgSaleValue)[0];
+            return best ? <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Avg: {money(best.avgSaleValue)} | Invoices: {best.salesCount}</p></div> : null;
           })()}
         </Card>
       </div>

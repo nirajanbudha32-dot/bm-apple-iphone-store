@@ -27,6 +27,13 @@ import { money } from "@/lib/utils";
 
 export function SalesReturns() {
   const { sales, salesReturns, saleAllocations, stockLots, saleImeis } = useStore();
+  const [page, setPage] = useState(0);
+  const PER_PAGE = 50;
+
+  const pagedReturns = useMemo(() => {
+    return salesReturns.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+  }, [salesReturns, page]);
+  const totalPages = Math.ceil(salesReturns.length / PER_PAGE);
 
   const groupedSales = useMemo(() => {
     const groups = new Map<string, { header: Sale; items: Sale[] }>();
@@ -355,7 +362,7 @@ export function SalesReturns() {
               </tr>
             </thead>
             <tbody>
-              {salesReturns.map((r) => (
+              {pagedReturns.map((r) => (
                 <tr key={r.id} className="border-t border-border">
                   <td className="p-2.5 font-mono font-medium">{r.returnNo}</td>
                   <td className="p-2.5 whitespace-nowrap">{r.returnDate}</td>
@@ -383,6 +390,16 @@ export function SalesReturns() {
           </table>
         </div>
       </Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+          <span>Showing {page * PER_PAGE + 1}-{Math.min((page + 1) * PER_PAGE, salesReturns.length)} of {salesReturns.length}</span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <span className="px-2 py-1">{page + 1} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

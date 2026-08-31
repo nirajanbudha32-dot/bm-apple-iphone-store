@@ -39,6 +39,13 @@ export function PurchaseReturns() {
   const [selectedLotId, setSelectedLotId] = useState("");
   const [selectedImei, setSelectedImei] = useState("");
   const [returnQty, setReturnQty] = useState(1);
+  const [page, setPage] = useState(0);
+  const PER_PAGE = 50;
+
+  const pagedReturns = useMemo(() => {
+    return purchaseReturns.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+  }, [purchaseReturns, page]);
+  const totalPages = Math.ceil(purchaseReturns.length / PER_PAGE);
   const [returnDate, setReturnDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
@@ -455,7 +462,7 @@ export function PurchaseReturns() {
               </tr>
             </thead>
             <tbody>
-              {purchaseReturns.map((r) => {
+              {pagedReturns.map((r) => {
                 const vendor = vendors.find((v) => v.id === r.vendorId);
                 const lot = stockLots.find((l) => l.id === r.lotId);
                 return (
@@ -509,6 +516,16 @@ export function PurchaseReturns() {
           </table>
         </div>
       </Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+          <span>Showing {page * PER_PAGE + 1}-{Math.min((page + 1) * PER_PAGE, purchaseReturns.length)} of {purchaseReturns.length}</span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <span className="px-2 py-1">{page + 1} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -36,6 +36,8 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<StockItem>(empty);
   const [editingCode, setEditingCode] = useState<string | undefined>();
+  const [page, setPage] = useState(0);
+  const PER_PAGE = 50;
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -47,6 +49,9 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
         .includes(t),
     );
   }, [stock, q]);
+
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const paged = filtered.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
 
   const totalQty = filtered.reduce((s, i) => s + i.qty, 0);
 
@@ -210,7 +215,7 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
               </tr>
             </thead>
             <tbody>
-              {filtered.map((i) => (
+              {paged.map((i) => (
                 <tr key={i.code + i.name} className="border-t border-border">
                   <td className="p-2.5 font-mono">{i.code}</td>
                   <td className="p-2.5 font-medium">{i.name}</td>
@@ -258,6 +263,16 @@ export function StockManager({ role = "admin" }: { role?: "admin" | "salesman" }
           </table>
         </div>
       </Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+          <span>Showing {page * PER_PAGE + 1}-{Math.min((page + 1) * PER_PAGE, filtered.length)} of {filtered.length}</span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <span className="px-2 py-1">{page + 1} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
