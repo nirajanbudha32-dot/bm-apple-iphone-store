@@ -13,8 +13,8 @@ BEGIN
   SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_no FROM 9) AS int)), 0)
     INTO max_num FROM sales;
 
-  -- Set the sequence to that value so nextval() returns max_num + 1
-  PERFORM setval('public.invoice_no_seq', max_num, true);
+  -- Set the sequence to that value (is_called = true by default)
+  PERFORM setval('public.invoice_no_seq', max_num);
 
   RAISE NOTICE 'invoice_no_seq reset to % — next sale will be BM-AIS-%',
     max_num, LPAD((max_num + 1)::text, 4, '0');

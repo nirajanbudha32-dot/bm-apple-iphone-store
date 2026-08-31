@@ -1,17 +1,17 @@
 -- ============================================
 -- peek_invoice_no: Read next invoice number without advancing sequence
--- Uses pg_sequences (system catalog) instead of currval() which is session-dependent
+-- Reads actual max from sales table (works in all Supabase PostgreSQL versions)
 -- Run in Supabase SQL Editor
 -- ============================================
 
 CREATE OR REPLACE FUNCTION public.peek_invoice_no()
 RETURNS text AS $$
   SELECT 'BM-AIS-' || LPAD(
-    CASE WHEN is_called THEN (last_value + 1)::text ELSE '1' END,
-    4, '0'
-  )
-  FROM pg_sequences
-  WHERE schemaname = 'public' AND sequencename = 'invoice_no_seq';
+    (COALESCE(
+      (SELECT MAX(CAST(SUBSTRING(invoice_no FROM 9) AS int)) FROM sales),
+      0
+    ) + 1)::text, 4, '0'
+  );
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.peek_invoice_no() TO authenticated;
