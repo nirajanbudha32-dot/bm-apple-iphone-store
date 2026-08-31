@@ -6,6 +6,39 @@ let _currentStoreId: string | null = null;
 export function setCurrentStoreIdForStore(id: string | null) { _currentStoreId = id; }
 export function getCurrentStoreId(): string | null { return _currentStoreId; }
 
+// Double-submit prevention guard
+const inFlightOps = new Set<string>();
+function acquireOp(key: string): boolean {
+  if (inFlightOps.has(key)) return false;
+  inFlightOps.add(key);
+  return true;
+}
+function releaseOp(key: string) { inFlightOps.delete(key); }
+
+// Audit trail logger
+async function logAudit(action: string, tableName: string, recordId?: string, oldData?: unknown, newData?: unknown) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("audit_log").insert({
+      user_id: user?.id,
+      action,
+      table_name: tableName,
+      record_id: recordId,
+      old_data: oldData ? JSON.stringify(oldData) : null,
+      new_data: newData ? JSON.stringify(newData) : null,
+    });
+  } catch (err) {
+    console.error("[store] audit log failed:", err);
+  }
+}
+
+// File upload size validation (10MB max)
+const MAX_FILE_BASE64_LENGTH = 13_981_016;
+function validateFileSize(fileData: string): string | null {
+  if (fileData.length > MAX_FILE_BASE64_LENGTH) return "File too large. Maximum size is 10MB.";
+  return null;
+}
+
 export type StockItem = {
   code: string;
   name: string;
@@ -742,27 +775,9 @@ export function useStore() {
 }
 
 export async function nextInvoiceNo(): Promise<string> {
-  try {
-    const { data, error } = await supabase.rpc("next_invoice_no");
-    if (!error && data) return data as string;
-  } catch (_) {}
-  // Fallback: query MAX directly from sales table
-  const { data: rows } = await supabase.from("sales").select("invoice_no").order("invoice_no", { ascending: false }).limit(1);
-  let max = 0;
-  if (rows && rows.length > 0) {
-    const n = Number(String((rows[0] as any).invoice_no ?? "").replace(/\D/g, ""));
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  let candidate = max + 1;
-  let noStr = `BM-AIS-${String(candidate).padStart(4, "0")}`;
-  const { data: existing } = await supabase.from("sales").select("invoice_no").eq("invoice_no", noStr);
-  while (existing && existing.length > 0) {
-    candidate++;
-    noStr = `BM-AIS-${String(candidate).padStart(4, "0")}`;
-    const { data: check } = await supabase.from("sales").select("invoice_no").eq("invoice_no", noStr);
-    if (!check || check.length === 0) break;
-  }
-  return noStr;
+  const { data, error } = await supabase.rpc("next_invoice_no");
+  if (error) throw new Error(`Failed to generate invoice number: ${error.message}`);
+  return data as string;
 }
 
 export async function addBill(
@@ -784,94 +799,97 @@ export async function addBill(
   customerLocation: string = "",
   imeisByItem: Record<number, string[]> = {},
 ) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const opKey = `addBill:${invoiceNo}`;
+  if (!acquireOp(opKey)) return { error: "Operation already in progress" };
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const rows = items.map((item) => ({
-    invoice_no: invoiceNo,
-    date,
-    customer,
-    customer_pan: customerPan,
-    has_vat_pan: hasVatPan,
-    customer_type: customerType,
-    customer_contact: customerContact,
-    customer_location: customerLocation,
-    item_name: item.itemName,
-    item_code: item.itemCode,
-    category: item.category,
-    sub_category: item.subCategory,
-    brand: item.brand,
-    model: item.model,
-    qty: item.qty,
-    rate: item.rate,
-    discount: item.discount,
-    amount: item.amount,
-    vat: item.vat,
-    total: item.total,
-    payment_method: paymentMethod,
-    other_charges: otherCharges,
-    paid_amount: paidAmount,
-    remaining: 0,
-    remarks,
-    sale_type: saleType,
-    status,
-    created_by: user?.id ?? null,
-    store_id: _currentStoreId,
-  }));
+    const rows = items.map((item) => ({
+      invoice_no: invoiceNo,
+      date,
+      customer,
+      customer_pan: customerPan,
+      has_vat_pan: hasVatPan,
+      customer_type: customerType,
+      customer_contact: customerContact,
+      customer_location: customerLocation,
+      item_name: item.itemName,
+      item_code: item.itemCode,
+      category: item.category,
+      sub_category: item.subCategory,
+      brand: item.brand,
+      model: item.model,
+      qty: item.qty,
+      rate: item.rate,
+      discount: item.discount,
+      amount: item.amount,
+      vat: item.vat,
+      total: item.total,
+      payment_method: paymentMethod,
+      other_charges: otherCharges,
+      paid_amount: paidAmount,
+      remaining: 0,
+      remarks,
+      sale_type: saleType,
+      status,
+      created_by: user?.id ?? null,
+      store_id: _currentStoreId,
+    }));
 
-  // Calculate remaining from first item (set only on first row — other rows keep 0)
-  const grossTotal = items.reduce((a, i) => a + i.total, 0);
-  const remaining = Math.max(0, grossTotal - headerDiscount + otherCharges - paidAmount);
-  if (rows[0]) {
-    rows[0].remaining = remaining;
-  }
-
-  const { data: insertedSales, error: salesError } = await supabase.from("sales").insert(rows).select("id, item_name, qty");
-
-  if (!salesError && insertedSales) {
-    const affectedItems = new Set<string>();
-    for (let idx = 0; idx < insertedSales.length; idx++) {
-      const inserted = insertedSales[idx]!;
-
-      // FIFO deduct first — only insert IMEIs after stock is confirmed deducted
-      const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
-        p_item_name: inserted.item_name,
-        p_qty: inserted.qty,
-        p_sale_id: inserted.id,
-      });
-      if (fifoErr) {
-        await supabase.rpc("decrement_stock", { item_name: inserted.item_name, qty_sold: inserted.qty });
-      }
-
-      // Insert IMEIs for this sale row (after FIFO succeeds)
-      const imeis = imeisByItem[idx] || [];
-      if (imeis.length > 0) {
-        const imeiRows = imeis.map((imei) => ({
-          sale_id: inserted.id,
-          imei,
-          store_id: _currentStoreId,
-        }));
-        await supabase.from("sale_item_imeis").insert(imeiRows);
-      }
-
-      affectedItems.add(inserted.item_name);
+    const grossTotal = items.reduce((a, i) => a + i.total, 0);
+    const remaining = Math.max(0, grossTotal - headerDiscount + otherCharges - paidAmount);
+    if (rows[0]) {
+      rows[0].remaining = remaining;
     }
 
-    for (const itemName of affectedItems) {
-      try {
-        const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
-        if (lots && lots.length > 0) {
-          const totalLotQty = (lots as Record<string, unknown>[]).reduce((sum: number, l) => sum + (l['qty'] as number), 0);
-          await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
+    const { data: insertedSales, error: salesError } = await supabase.from("sales").insert(rows).select("id, item_name, qty");
+
+    if (!salesError && insertedSales) {
+      const affectedItems = new Set<string>();
+      for (let idx = 0; idx < insertedSales.length; idx++) {
+        const inserted = insertedSales[idx]!;
+
+        const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
+          p_item_name: inserted.item_name,
+          p_qty: inserted.qty,
+          p_sale_id: inserted.id,
+        });
+        if (fifoErr) {
+          console.error("[store] fifo_deduct failed:", fifoErr);
+          return { error: `Stock deduction failed for "${inserted.item_name}": ${fifoErr.message}` };
         }
-      } catch (_) {
-        await supabase.rpc("decrement_stock", { item_name: itemName, qty_sold: 0 });
+
+        const imeis = imeisByItem[idx] || [];
+        if (imeis.length > 0) {
+          const imeiRows = imeis.map((imei) => ({
+            sale_id: inserted.id,
+            imei,
+            store_id: _currentStoreId,
+          }));
+          const { error: imeiErr } = await supabase.from("sale_item_imeis").insert(imeiRows);
+          if (imeiErr) console.error("[store] sale IMEI insert failed:", imeiErr);
+        }
+
+        affectedItems.add(inserted.item_name);
       }
+
+      for (const itemName of affectedItems) {
+        try {
+          await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+        } catch (err) {
+          console.error("[store] reconcile_stock_from_lots failed:", err);
+        }
+      }
+
+      await logAudit("INSERT", "sales", undefined, null, { invoice_no: invoiceNo, items: items.length });
+      await reload();
     }
-    await reload();
+    return { error: salesError };
+  } finally {
+    releaseOp(opKey);
   }
-  return { error: salesError };
 }
 
 export async function deleteSale(id: string) {
@@ -889,21 +907,20 @@ export async function deleteSale(id: string) {
       for (const alloc of allocations) {
         const lotId = alloc['lot_id'] as string;
         const qtyTaken = alloc['qty_taken'] as number;
-        const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
-        if (freshLot) {
-          const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
-          await supabase.from("stock_lots").update({ qty: currentQty + qtyTaken }).eq("id", lotId);
-        }
+        await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: qtyTaken });
       }
       await supabase.from("sale_lot_allocations").delete().eq("sale_id", id);
       lotRestored = true;
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] deleteSale lot restore failed:", err);
+  }
 
-  // Delete sale IMEIs
   try {
     await supabase.from("sale_item_imeis").delete().eq("sale_id", id);
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] deleteSale IMEI delete failed:", err);
+  }
 
   await supabase.from("sales").delete().eq("id", id);
 
@@ -911,13 +928,13 @@ export async function deleteSale(id: string) {
     await supabase.rpc("increment_stock", { item_name: sale.itemName, qty_returned: sale.qty });
   }
 
-  // Reconcile stock qty from lot totals (always, to ensure consistency)
   try {
-    const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", sale.itemName);
-    const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
-    await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", sale.itemName);
-  } catch (_) {}
+    await supabase.rpc("reconcile_stock_from_lots", { p_item_name: sale.itemName, p_store_id: _currentStoreId });
+  } catch (err) {
+    console.error("[store] deleteSale reconcile failed:", err);
+  }
 
+  await logAudit("DELETE", "sales", id, { invoice_no: sale.invoiceNo, item_name: sale.itemName });
   await reload();
 }
 
@@ -937,25 +954,24 @@ export async function deleteInvoice(invoiceNo: string) {
         for (const alloc of allocations) {
           const lotId = alloc['lot_id'] as string;
           const qtyTaken = alloc['qty_taken'] as number;
-          const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
-          if (freshLot) {
-            const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
-            await supabase.from("stock_lots").update({ qty: currentQty + qtyTaken }).eq("id", lotId);
-          }
+          await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: qtyTaken });
         }
         await supabase.from("sale_lot_allocations").delete().eq("sale_id", sale.id);
         lotRestored = true;
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] deleteInvoice lot restore failed:", err);
+  }
 
-  // Delete all sale IMEIs for this invoice
   try {
     const saleIds = items.map((s) => s.id);
     for (const saleId of saleIds) {
       await supabase.from("sale_item_imeis").delete().eq("sale_id", saleId);
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] deleteInvoice IMEI delete failed:", err);
+  }
 
   await supabase.from("sales").delete().eq("invoice_no", invoiceNo);
 
@@ -967,69 +983,51 @@ export async function deleteInvoice(invoiceNo: string) {
     );
   }
 
-  // Reconcile stock qty from lot totals for all affected items
   const affectedItems = new Set(items.map((i) => i.itemName));
   for (const itemName of affectedItems) {
     try {
-      const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
-      const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
-      await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
-    } catch (_) {}
+      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+    } catch (err) {
+      console.error("[store] deleteInvoice reconcile failed:", err);
+    }
   }
 
+  await logAudit("DELETE", "sales", undefined, { invoice_no: invoiceNo, item_count: items.length });
   await reload();
 }
 
 export async function upsertStock(item: StockItem, originalCode?: string) {
-  const key = originalCode ?? item.code;
-  const { data: existing } = await supabase.from("stock").select("code").eq("code", key).single();
-
-  if (existing) {
-    await supabase
-      .from("stock")
-      .update({
-        code: item.code,
-        name: item.name,
-        category: item.category,
-        sub_category: item.subCategory,
-        brand: item.brand,
-        sub_brand: item.subBrand,
-        model: item.model,
-        unit: item.unit,
-        qty: item.qty,
-        purchase_price: item.purchasePrice,
-        selling_price: item.sellingPrice,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("code", key);
-  } else {
-    await supabase.from("stock").insert({
-      code: item.code,
-      name: item.name,
-      category: item.category,
-      sub_category: item.subCategory,
-      brand: item.brand,
-      sub_brand: item.subBrand,
-      model: item.model,
-      unit: item.unit,
-      qty: item.qty,
-      purchase_price: item.purchasePrice,
-      selling_price: item.sellingPrice,
-      store_id: _currentStoreId,
-    });
-  }
+  const { error } = await supabase.from("stock").upsert({
+    code: item.code,
+    name: item.name,
+    category: item.category,
+    sub_category: item.subCategory,
+    brand: item.brand,
+    sub_brand: item.subBrand,
+    model: item.model,
+    unit: item.unit,
+    qty: item.qty,
+    purchase_price: item.purchasePrice,
+    selling_price: item.sellingPrice,
+    updated_at: new Date().toISOString(),
+    store_id: _currentStoreId,
+  }, { onConflict: "code" });
+  if (error) return { error: error.message };
   await reload();
+  return {};
 }
 
 export async function deleteStock(code: string) {
-  // Delete orphan lots for this stock item
   try {
     const { data: stockItem } = await supabase.from("stock").select("name").eq("code", code).maybeSingle();
     if (stockItem) {
       await supabase.from("stock_lots").delete().eq("item_name", (stockItem as Record<string, unknown>)['name'] as string);
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] deleteStock lot cleanup failed:", err);
+  }
   await supabase.from("stock").delete().eq("code", code);
+  await logAudit("DELETE", "stock", undefined, { code });
   await reload();
 }
 
@@ -1040,7 +1038,9 @@ export async function calculateMaxStockCode(): Promise<number> {
       const parsed = Number(data);
       if (Number.isFinite(parsed) && parsed > 0) return parsed - 1;
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] calculateMaxStockCode RPC failed:", err);
+  }
 
   // Fallback: query max code from stock table directly
   const { data: allRows } = await supabase.from("stock").select("code").order("code", { ascending: false }).limit(1);
@@ -1072,7 +1072,9 @@ export async function calculateMaxLotNo(): Promise<number> {
       const n = Number(String(data).replace(/\D/g, ""));
       if (Number.isFinite(n) && n > 0) return n - 1;
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] calculateMaxLotNo RPC failed:", err);
+  }
 
   // Fallback: query from stock_lots table directly
   const { data: allLots } = await supabase.from("stock_lots").select("lot_no").order("lot_no", { ascending: false }).limit(1);
@@ -1136,7 +1138,9 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
       if (!lotErr && lotNoResult) {
         lotNo = lotNoResult as string;
       }
-    } catch (_) {}
+    } catch (err) {
+      console.error("[store] addPurchase next_lot_no failed:", err);
+    }
 
     if (!lotNo) {
       lotNo = await getNextLotNo();
@@ -1171,7 +1175,9 @@ export async function deletePurchase(id: string) {
     if (lot) {
       await supabase.from("stock_lots").delete().eq("id", lot.id);
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] deletePurchase lot cleanup failed:", err);
+  }
 
   await supabase.from("purchases").delete().eq("id", id);
   await applyStockDelta(p, -p.qty);
@@ -1179,26 +1185,9 @@ export async function deletePurchase(id: string) {
 }
 
 export async function nextPurchaseNo(): Promise<string> {
-  try {
-    const { data, error } = await supabase.rpc("next_purchase_no");
-    if (!error && data) return data as string;
-  } catch (_) {}
-  const { data: rows } = await supabase.from("purchase_headers").select("purchase_no").order("purchase_no", { ascending: false }).limit(1);
-  let max = 0;
-  if (rows && rows.length > 0) {
-    const n = Number(String((rows[0] as any).purchase_no ?? "").replace(/\D/g, ""));
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  let candidate = max + 1;
-  let noStr = `PUR-${String(candidate).padStart(4, "0")}`;
-  const { data: existing } = await supabase.from("purchase_headers").select("purchase_no").eq("purchase_no", noStr);
-  while (existing && existing.length > 0) {
-    candidate++;
-    noStr = `PUR-${String(candidate).padStart(4, "0")}`;
-    const { data: check } = await supabase.from("purchase_headers").select("purchase_no").eq("purchase_no", noStr);
-    if (!check || check.length === 0) break;
-  }
-  return noStr;
+  const { data, error } = await supabase.rpc("next_purchase_no");
+  if (error) throw new Error(`Failed to generate purchase number: ${error.message}`);
+  return data as string;
 }
 
 export async function addPurchaseHeader(
@@ -1207,234 +1196,226 @@ export async function addPurchaseHeader(
   imeisByItem: Record<number, string[]>,
   destinationStoreId?: string,
 ): Promise<{ error?: string; headerId?: string }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const targetStoreId = destinationStoreId || _currentStoreId;
-
-  // Generate purchase_no server-side to avoid duplicates
-  let purchaseNo = header.purchaseNo;
+  const opKey = `addPurchaseHeader:${header.purchaseNo}`;
+  if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: noResult, error: noErr } = await supabase.rpc("next_purchase_no");
-    if (!noErr && noResult) {
-      purchaseNo = noResult as string;
-    }
-  } catch (_) {}
+    const { data: { user } } = await supabase.auth.getUser();
+    const targetStoreId = destinationStoreId || _currentStoreId;
 
-  const { data: inserted, error } = await supabase.from("purchase_headers").insert({
-    purchase_no: purchaseNo,
-    supplier_invoice_no: header.supplierInvoiceNo,
-    date: header.date,
-    supplier_name: header.supplierName,
-    supplier_address: header.supplierAddress,
-    supplier_pan: header.supplierPan,
-    supplier_vat: header.supplierVat,
-    purchase_type: header.purchaseType,
-    due_date: header.dueDate,
-    remarks: header.remarks,
-    payment_method: header.paymentMethod,
-    gross_amount: header.grossAmount,
-    discount: header.discount,
-    taxable_amount: header.taxableAmount,
-    vat_rate: header.vatRate,
-    vat_amount: header.vatAmount,
-    other_charges: header.otherCharges,
-    grand_total: header.grandTotal,
-    paid_amount: header.paidAmount,
-    remaining_balance: header.grandTotal - header.paidAmount,
-    vendor_id: (header as Record<string, unknown>)['vendorId'] || null,
-    created_by: user?.id ?? null,
-    store_id: targetStoreId,
-  }).select("id").single();
-
-  if (error) return { error: error.message };
-  const headerId = inserted!.id as string;
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]!;
-
-    // Update stock first to ensure new stock item is created and itemCode is resolved
-    const stockResult = await applyStockDelta(
-      {
-        billNo: header.purchaseNo,
-        date: header.date,
-        supplier: header.supplierName,
-        itemCode: item.itemCode,
-        itemName: item.itemName,
-        category: item.category,
-        subCategory: item.subCategory,
-        brand: item.brand,
-        model: item.model,
-        qty: item.qty,
-        rate: item.rate,
-        amount: item.amount,
-        paymentMethod: header.paymentMethod,
-        note: "",
-      },
-      item.qty,
-    );
-    if (stockResult.error) return { error: stockResult.error };
-    const resolvedItemCode = stockResult.itemCode || item.itemCode;
-
-    // Create stock lot automatically
-    let lotNo = item.lotNo?.trim();
-    if (!lotNo) {
-      try {
-        const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
-        if (!lotErr && lotNoResult) {
-          lotNo = lotNoResult as string;
-        }
-      } catch (_) {}
-      if (!lotNo) {
-        lotNo = await getNextLotNo();
+    let purchaseNo = header.purchaseNo;
+    try {
+      const { data: noResult, error: noErr } = await supabase.rpc("next_purchase_no");
+      if (!noErr && noResult) {
+        purchaseNo = noResult as string;
       }
+    } catch (err) {
+      console.error("[store] next_purchase_no failed:", err);
     }
 
-    const { data: insertedItem, error: itemErr } = await supabase.from("purchase_items").insert({
-      purchase_header_id: headerId,
-      sn: item.sn,
-      item_code: resolvedItemCode,
-      item_name: item.itemName,
-      category: item.category,
-      sub_category: item.subCategory,
-      brand: item.brand,
-      model: item.model,
-      unit: item.unit,
-      qty: item.qty,
-      rate: item.rate,
-      discount: item.discount,
-      amount: item.amount,
-      taxable_amount: item.taxableAmount,
-      vat_rate: item.vatRate,
-      vat_amount: item.vatAmount,
-      total: item.total,
-      lot_no: lotNo,
+    const { data: inserted, error } = await supabase.from("purchase_headers").insert({
+      purchase_no: purchaseNo,
+      supplier_invoice_no: header.supplierInvoiceNo,
+      date: header.date,
+      supplier_name: header.supplierName,
+      supplier_address: header.supplierAddress,
+      supplier_pan: header.supplierPan,
+      supplier_vat: header.supplierVat,
+      purchase_type: header.purchaseType,
+      due_date: header.dueDate,
+      remarks: header.remarks,
+      payment_method: header.paymentMethod,
+      gross_amount: header.grossAmount,
+      discount: header.discount,
+      taxable_amount: header.taxableAmount,
+      vat_rate: header.vatRate,
+      vat_amount: header.vatAmount,
+      other_charges: header.otherCharges,
+      grand_total: header.grandTotal,
+      paid_amount: header.paidAmount,
+      remaining_balance: header.grandTotal - header.paidAmount,
+      vendor_id: (header as Record<string, unknown>)['vendorId'] || null,
+      created_by: user?.id ?? null,
       store_id: targetStoreId,
     }).select("id").single();
 
-    if (itemErr) return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
+    if (error) return { error: error.message };
+    const headerId = inserted!.id as string;
 
-    const itemId = (insertedItem as Record<string, unknown>)['id'] as string;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]!;
 
-    // Insert IMEIs if any
-    const imeis = imeisByItem[i] || [];
-    if (imeis.length > 0 && insertedItem) {
-      const imeiRows = imeis.map((imei) => ({
-        purchase_item_id: itemId,
-        imei,
-        store_id: targetStoreId,
-      }));
-      const { error: imeiErr } = await supabase.from("purchase_item_imeis").insert(imeiRows);
-      if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
-    }
+      const stockResult = await applyStockDelta(
+        {
+          billNo: header.purchaseNo,
+          date: header.date,
+          supplier: header.supplierName,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          category: item.category,
+          subCategory: item.subCategory,
+          brand: item.brand,
+          model: item.model,
+          qty: item.qty,
+          rate: item.rate,
+          amount: item.amount,
+          paymentMethod: header.paymentMethod,
+          note: "",
+        },
+        item.qty,
+      );
+      if (stockResult.error) return { error: stockResult.error };
+      const resolvedItemCode = stockResult.itemCode || item.itemCode;
 
-    const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
-      lot_no: lotNo,
-      purchase_id: itemId,
-      item_code: resolvedItemCode,
-      item_name: item.itemName,
-      date: header.date,
-      supplier: header.supplierName,
-      qty: item.qty,
-      purchase_price: item.rate,
-      store_id: targetStoreId,
-    });
+      let lotNo = item.lotNo?.trim();
+      if (!lotNo) {
+        try {
+          const { data: lotNoResult, error: lotErr } = await supabase.rpc("next_lot_no");
+          if (!lotErr && lotNoResult) {
+            lotNo = lotNoResult as string;
+          }
+        } catch (err) {
+          console.error("[store] next_lot_no failed:", err);
+        }
+        if (!lotNo) {
+          lotNo = await getNextLotNo();
+        }
+      }
 
-    if (lotInsertErr) {
-      console.warn("Stock lot insert warning for " + item.itemName, lotInsertErr.message);
-    }
-  }
-
-  // Create vendor ledger entry for this purchase (debit = increases what we owe)
-  const vendorIdForTxn = (header as Record<string, unknown>)['vendorId'] as string | undefined;
-  if (vendorIdForTxn && header.grandTotal > 0) {
-    const prevBalance = getVendorBalance(vendorIdForTxn);
-    const paidAmount = header.paidAmount ?? 0;
-    // Record the full purchase as debit
-    await supabase.from("vendor_transactions").insert({
-      vendor_id: vendorIdForTxn,
-      transaction_type: "PURCHASE",
-      reference_no: purchaseNo,
-      reference_id: headerId,
-      transaction_date: header.date,
-      debit: header.grandTotal,
-      credit: 0,
-      balance: prevBalance + header.grandTotal,
-      remarks: `Purchase ${purchaseNo}`,
-      store_id: targetStoreId,
-    });
-    // If paid at purchase time, record the payment as credit
-    if (paidAmount > 0) {
-      const balanceAfterPurchase = prevBalance + header.grandTotal;
-      // Create vendor_transactions PAYMENT entry (for ledger)
-      const purchasePaymentNo = await nextVendorPaymentNo();
-      const { data: paymentInserted } = await supabase.from("vendor_payments").insert({
-        payment_no: purchasePaymentNo,
-        vendor_id: vendorIdForTxn,
-        payment_date: header.date,
-        payment_method: header.paymentMethod,
-        amount: paidAmount,
-        bank_name: "",
-        reference_no: purchaseNo,
-        remarks: `Payment at purchase ${purchaseNo}`,
-        created_by: user?.id ?? null,
+      const { data: insertedItem, error: itemErr } = await supabase.from("purchase_items").insert({
+        purchase_header_id: headerId,
+        sn: item.sn,
+        item_code: resolvedItemCode,
+        item_name: item.itemName,
+        category: item.category,
+        sub_category: item.subCategory,
+        brand: item.brand,
+        model: item.model,
+        unit: item.unit,
+        qty: item.qty,
+        rate: item.rate,
+        discount: item.discount,
+        amount: item.amount,
+        taxable_amount: item.taxableAmount,
+        vat_rate: item.vatRate,
+        vat_amount: item.vatAmount,
+        total: item.total,
+        lot_no: lotNo,
         store_id: targetStoreId,
       }).select("id").single();
 
-      if (paymentInserted) {
-        // Create allocation linking payment to this purchase bill
-        await supabase.from("vendor_payment_allocations").insert({
-          payment_id: paymentInserted.id,
-          purchase_header_id: headerId,
-          amount: paidAmount,
-          allocation_type: "bill",
+      if (itemErr) return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
+
+      const itemId = (insertedItem as Record<string, unknown>)['id'] as string;
+
+      const imeis = imeisByItem[i] || [];
+      if (imeis.length > 0 && insertedItem) {
+        const imeiRows = imeis.map((imei) => ({
+          purchase_item_id: itemId,
+          imei,
           store_id: targetStoreId,
-        });
+        }));
+        const { error: imeiErr } = await supabase.from("purchase_item_imeis").insert(imeiRows);
+        if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
       }
 
-      await supabase.from("vendor_transactions").insert({
-        vendor_id: vendorIdForTxn,
-        transaction_type: "PAYMENT",
-        reference_no: purchasePaymentNo,
-        reference_id: paymentInserted?.id ?? headerId,
-        transaction_date: header.date,
-        debit: 0,
-        credit: paidAmount,
-        balance: balanceAfterPurchase - paidAmount,
-        remarks: `Payment at purchase ${purchaseNo}`,
-        store_id: _currentStoreId,
+      const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
+        lot_no: lotNo,
+        purchase_id: itemId,
+        item_code: resolvedItemCode,
+        item_name: item.itemName,
+        date: header.date,
+        supplier: header.supplierName,
+        qty: item.qty,
+        purchase_price: item.rate,
+        store_id: targetStoreId,
       });
-    }
-  }
 
-  await reload();
-  return { headerId };
+      if (lotInsertErr) {
+        console.warn("[store] Stock lot insert warning for " + item.itemName, lotInsertErr.message);
+      }
+    }
+
+    const vendorIdForTxn = (header as Record<string, unknown>)['vendorId'] as string | undefined;
+    if (vendorIdForTxn && header.grandTotal > 0) {
+      const paidAmt = header.paidAmount ?? 0;
+      await supabase.rpc("insert_vendor_txn", {
+        p_vendor_id: vendorIdForTxn,
+        p_txn_type: "PURCHASE",
+        p_ref_no: purchaseNo,
+        p_ref_id: headerId,
+        p_txn_date: header.date,
+        p_debit: header.grandTotal,
+        p_credit: 0,
+        p_remarks: `Purchase ${purchaseNo}`,
+        p_store_id: targetStoreId,
+      });
+
+      if (paidAmt > 0) {
+        const purchasePaymentNo = await nextVendorPaymentNo();
+        const { data: paymentInserted } = await supabase.from("vendor_payments").insert({
+          payment_no: purchasePaymentNo,
+          vendor_id: vendorIdForTxn,
+          payment_date: header.date,
+          payment_method: header.paymentMethod,
+          amount: paidAmt,
+          bank_name: "",
+          reference_no: purchaseNo,
+          remarks: `Payment at purchase ${purchaseNo}`,
+          created_by: user?.id ?? null,
+          store_id: targetStoreId,
+        }).select("id").single();
+
+        if (paymentInserted) {
+          await supabase.from("vendor_payment_allocations").insert({
+            payment_id: paymentInserted.id,
+            purchase_header_id: headerId,
+            amount: paidAmt,
+            allocation_type: "bill",
+            store_id: targetStoreId,
+          });
+        }
+
+        await supabase.rpc("insert_vendor_txn", {
+          p_vendor_id: vendorIdForTxn,
+          p_txn_type: "PAYMENT",
+          p_ref_no: purchasePaymentNo,
+          p_ref_id: paymentInserted?.id ?? headerId,
+          p_txn_date: header.date,
+          p_debit: 0,
+          p_credit: paidAmt,
+          p_remarks: `Payment at purchase ${purchaseNo}`,
+          p_store_id: targetStoreId,
+        });
+      }
+    }
+
+    await logAudit("INSERT", "purchase_headers", headerId, null, { purchase_no: purchaseNo, items: items.length });
+    await reload();
+    return { headerId };
+  } finally {
+    releaseOp(opKey);
+  }
 }
 
 export async function deletePurchaseHeader(id: string): Promise<{ error?: string }> {
   try {
-    // Clean up vendor financial records first
-    // 1. Delete vendor_payment_allocations linked to this purchase
     const { data: linkedPayments } = await supabase.from("vendor_payment_allocations").select("payment_id").eq("purchase_header_id", id);
     const linkedPaymentIds = [...new Set((linkedPayments ?? []).map((p) => p.payment_id as string))];
 
-    // Delete allocations for this purchase
     await supabase.from("vendor_payment_allocations").delete().eq("purchase_header_id", id);
 
-    // Delete vendor_payments that were auto-created for this purchase (reference_no matches purchase_no)
     const header = state.purchaseHeaders.find((h) => h.id === id);
     if (header) {
       const { data: autoPayments } = await supabase.from("vendor_payments").select("id").eq("reference_no", header.purchaseNo);
       if (autoPayments && autoPayments.length > 0) {
         for (const ap of autoPayments) {
-          // Delete allocations for this payment first
           await supabase.from("vendor_payment_allocations").delete().eq("payment_id", ap.id);
           await supabase.from("vendor_payments").delete().eq("id", ap.id);
         }
       }
     }
 
-    // Delete vendor_transactions referencing this purchase header
     await supabase.from("vendor_transactions").delete().eq("reference_id", id);
-    // Also delete vendor_transactions referencing auto-created payments
     if (header) {
       const { data: autoVtxns } = await supabase.from("vendor_transactions").select("id").eq("reference_no", header.purchaseNo);
       if (autoVtxns && autoVtxns.length > 0) {
@@ -1450,24 +1431,27 @@ export async function deletePurchaseHeader(id: string): Promise<{ error?: string
       for (const lot of lots) {
         try {
           await supabase.from("stock_lots").delete().eq("id", lot.id);
-        } catch (_) {}
+        } catch (err) {
+          console.error("[store] deletePurchaseHeader lot delete failed:", err);
+        }
       }
       try {
-        const { data } = await supabase.from("stock").select("qty").eq("code", item.itemCode).maybeSingle();
-        if (data) {
-          const current = Number((data as Record<string, unknown>)['qty'] ?? 0);
-          await supabase.from("stock").update({ qty: Math.max(0, current - item.qty), updated_at: new Date().toISOString() }).eq("code", item.itemCode);
-        }
-      } catch (_) {}
+        await supabase.rpc("adjust_stock_by_code", { p_code: item.itemCode, p_delta: -item.qty });
+      } catch (err) {
+        console.error("[store] deletePurchaseHeader stock adjust failed:", err);
+      }
       try {
         await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", item.id);
-      } catch (_) {}
+      } catch (err) {
+        console.error("[store] deletePurchaseHeader IMEI delete failed:", err);
+      }
     }
 
     await supabase.from("purchase_items").delete().eq("purchase_header_id", id);
     await supabase.from("purchase_attachments").delete().eq("purchase_header_id", id);
     await supabase.from("purchase_headers").delete().eq("id", id);
 
+    await logAudit("DELETE", "purchase_headers", id, { purchase_no: header?.purchaseNo });
     await reload();
     return {};
   } catch (e) {
@@ -1482,6 +1466,8 @@ export async function addPurchaseAttachment(
   fileSize: number,
   fileData: string,
 ): Promise<{ error?: string }> {
+  const sizeErr = validateFileSize(fileData);
+  if (sizeErr) return { error: sizeErr };
   const { error } = await supabase.from("purchase_attachments").insert({
     purchase_header_id: headerId,
     file_name: fileName,
@@ -1520,10 +1506,9 @@ export async function addStockAdjustment(
   });
   if (error) return { error: new Error(error.message) };
 
-  await supabase.from("stock_lots").update({ qty: lot.qty + qtyAdjusted }).eq("id", lotId);
-  const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", lot.itemName);
-  const totalLotQty = (lots ?? []).reduce((sum: number, l: Record<string, unknown>) => sum + (l['qty'] as number), 0);
-  await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", lot.itemName);
+  await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: qtyAdjusted });
+  await supabase.rpc("reconcile_stock_from_lots", { p_item_name: lot.itemName, p_store_id: _currentStoreId });
+  await logAudit("INSERT", "stock_adjustments", undefined, null, { lot_id: lotId, qty_adjusted: qtyAdjusted, reason });
   await reload();
   return {};
 }
@@ -1631,78 +1616,80 @@ export async function addSalesReturn(
   reason: string,
   refundAmount: number,
 ): Promise<{ error?: string }> {
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Generate return_no
-  let returnNo = "";
+  const opKey = `addSalesReturn:${saleId}:${lotId}`;
+  if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: noResult, error: noErr } = await supabase.rpc("next_return_no");
-    if (!noErr && noResult) returnNo = noResult as string;
-  } catch (_) {}
+    const { data: { user } } = await supabase.auth.getUser();
 
-  // Insert the return record
-  const { error } = await supabase.from("sales_returns").insert({
-    return_no: returnNo,
-    original_invoice_no: originalInvoiceNo,
-    sale_id: saleId,
-    sale_item_name: itemName,
-    sale_item_code: itemCode,
-    lot_id: lotId,
-    imei,
-    qty,
-    return_date: returnDate,
-    reason,
-    refund_amount: refundAmount,
-    status: "COMPLETED",
-    created_by: user?.id ?? null,
-    store_id: _currentStoreId,
-  });
-  if (error) return { error: error.message };
-
-  // Restore lot qty
-  if (lotId) {
-    const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
-    if (freshLot) {
-      const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
-      await supabase.from("stock_lots").update({ qty: currentQty + qty }).eq("id", lotId);
+    let returnNo = "";
+    try {
+      const { data: noResult, error: noErr } = await supabase.rpc("next_return_no");
+      if (!noErr && noResult) returnNo = noResult as string;
+    } catch (err) {
+      console.error("[store] next_return_no failed:", err);
     }
-  }
 
-  // Remove sale_lot_allocations for this sale item
-  if (saleId && lotId) {
-    try {
-      await supabase.from("sale_lot_allocations").delete().eq("sale_id", saleId).eq("lot_id", lotId);
-    } catch (_) {}
-  }
+    const { error } = await supabase.from("sales_returns").insert({
+      return_no: returnNo,
+      original_invoice_no: originalInvoiceNo,
+      sale_id: saleId,
+      sale_item_name: itemName,
+      sale_item_code: itemCode,
+      lot_id: lotId,
+      imei,
+      qty,
+      return_date: returnDate,
+      reason,
+      refund_amount: refundAmount,
+      status: "COMPLETED",
+      created_by: user?.id ?? null,
+      store_id: _currentStoreId,
+    });
+    if (error) return { error: error.message };
 
-  // Delete sale IMEI if present
-  if (imei && saleId) {
-    try {
-      await supabase.from("sale_item_imeis").delete().eq("sale_id", saleId).eq("imei", imei);
-    } catch (_) {}
-  }
-
-  // Reconcile stock qty from lot totals
-  try {
-    const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
-    if (lots && lots.length > 0) {
-      const totalLotQty = (lots as Record<string, unknown>[]).reduce((sum: number, l) => sum + (l['qty'] as number), 0);
-      await supabase.from("stock").update({ qty: totalLotQty, updated_at: new Date().toISOString() }).eq("name", itemName);
+    if (lotId) {
+      await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: qty });
     }
-  } catch (_) {}
 
-  // Update original sale status to reflect return
-  if (saleId) {
+    if (saleId && lotId) {
+      try {
+        await supabase.from("sale_lot_allocations").delete().eq("sale_id", saleId).eq("lot_id", lotId);
+      } catch (err) {
+        console.error("[store] addSalesReturn alloc delete failed:", err);
+      }
+    }
+
+    if (imei && saleId) {
+      try {
+        await supabase.from("sale_item_imeis").delete().eq("sale_id", saleId).eq("imei", imei);
+      } catch (err) {
+        console.error("[store] addSalesReturn IMEI delete failed:", err);
+      }
+    }
+
     try {
-      const { data: existingReturns } = await supabase.from("sales_returns").select("qty").eq("sale_id", saleId);
-      const totalReturned = (existingReturns ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + (r['qty'] as number), 0);
-      const newStatus = totalReturned >= qty ? "RETURNED" : "PARTIALLY_RETURNED";
-      await supabase.from("sales").update({ status: newStatus }).eq("id", saleId);
-    } catch (_) {}
-  }
+      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+    } catch (err) {
+      console.error("[store] addSalesReturn reconcile failed:", err);
+    }
 
-  await reload();
-  return {};
+    if (saleId) {
+      try {
+        const { data: existingReturns } = await supabase.from("sales_returns").select("qty").eq("sale_id", saleId);
+        const totalReturned = (existingReturns ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + (r['qty'] as number), 0);
+        const newStatus = totalReturned >= qty ? "RETURNED" : "PARTIALLY_RETURNED";
+        await supabase.from("sales").update({ status: newStatus }).eq("id", saleId);
+      } catch (err) {
+        console.error("[store] addSalesReturn status update failed:", err);
+      }
+    }
+
+    await logAudit("INSERT", "sales_returns", undefined, null, { return_no: returnNo, sale_id: saleId, qty });
+    await reload();
+    return {};
+  } finally {
+    releaseOp(opKey);
+  }
 }
 
 // Module-level counter for generating unique stock codes within a session
@@ -1815,26 +1802,9 @@ async function applyStockDelta(
 }
 
 export async function nextVendorCode(): Promise<string> {
-  try {
-    const { data, error } = await supabase.rpc("next_vendor_code");
-    if (!error && data) return data as string;
-  } catch (_) {}
-  const { data: rows } = await supabase.from("vendors").select("vendor_code").order("vendor_code", { ascending: false }).limit(1);
-  let max = 0;
-  if (rows && rows.length > 0) {
-    const n = Number(String((rows[0] as any).vendor_code ?? "").replace(/\D/g, ""));
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  let candidate = max + 1;
-  let code = `VEN-${String(candidate).padStart(4, "0")}`;
-  const { data: existing } = await supabase.from("vendors").select("vendor_code").eq("vendor_code", code);
-  while (existing && existing.length > 0) {
-    candidate++;
-    code = `VEN-${String(candidate).padStart(4, "0")}`;
-    const { data: check } = await supabase.from("vendors").select("vendor_code").eq("vendor_code", code);
-    if (!check || check.length === 0) break;
-  }
-  return code;
+  const { data, error } = await supabase.rpc("next_vendor_code");
+  if (error) throw new Error(`Failed to generate vendor code: ${error.message}`);
+  return data as string;
 }
 
 export async function addVendor(
@@ -1956,6 +1926,8 @@ export async function addVendorDocument(
   fileSize: number,
   fileData: string,
 ): Promise<{ error?: string }> {
+  const sizeErr = validateFileSize(fileData);
+  if (sizeErr) return { error: sizeErr };
   const { error } = await supabase.from("vendor_documents").insert({
     vendor_id: vendorId,
     file_name: fileName,
@@ -1977,26 +1949,9 @@ export async function deleteVendorDocument(id: string): Promise<{ error?: string
 }
 
 export async function nextVendorPaymentNo(): Promise<string> {
-  try {
-    const { data, error } = await supabase.rpc("next_vendor_payment_no");
-    if (!error && data) return data as string;
-  } catch (_) {}
-  const { data: rows } = await supabase.from("vendor_payments").select("payment_no").order("payment_no", { ascending: false }).limit(1);
-  let max = 0;
-  if (rows && rows.length > 0) {
-    const n = Number(String((rows[0] as any).payment_no ?? "").replace(/\D/g, ""));
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  let candidate = max + 1;
-  let noStr = `VP-${String(candidate).padStart(4, "0")}`;
-  const { data: existing } = await supabase.from("vendor_payments").select("payment_no").eq("payment_no", noStr);
-  while (existing && existing.length > 0) {
-    candidate++;
-    noStr = `VP-${String(candidate).padStart(4, "0")}`;
-    const { data: check } = await supabase.from("vendor_payments").select("payment_no").eq("payment_no", noStr);
-    if (!check || check.length === 0) break;
-  }
-  return noStr;
+  const { data, error } = await supabase.rpc("next_vendor_payment_no");
+  if (error) throw new Error(`Failed to generate payment number: ${error.message}`);
+  return data as string;
 }
 
 export async function addVendorPayment(
@@ -2009,92 +1964,72 @@ export async function addVendorPayment(
   remarks: string,
   allocations: { purchaseHeaderId: string; amount: number; allocationType: string }[],
 ): Promise<{ error?: string }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const paymentNo = await nextVendorPaymentNo();
+  const opKey = `addVendorPayment:${vendorId}:${paymentDate}`;
+  if (!acquireOp(opKey)) return { error: "Operation already in progress" };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const paymentNo = await nextVendorPaymentNo();
 
-  const { data: inserted, error } = await supabase.from("vendor_payments").insert({
-    payment_no: paymentNo,
-    vendor_id: vendorId,
-    payment_date: paymentDate,
-    payment_method: paymentMethod,
-    amount,
-    bank_name: bankName,
-    reference_no: referenceNo,
-    remarks,
-    created_by: user?.id ?? null,
-    store_id: _currentStoreId,
-  }).select("id").single();
+    const { data: inserted, error } = await supabase.from("vendor_payments").insert({
+      payment_no: paymentNo,
+      vendor_id: vendorId,
+      payment_date: paymentDate,
+      payment_method: paymentMethod,
+      amount,
+      bank_name: bankName,
+      reference_no: referenceNo,
+      remarks,
+      created_by: user?.id ?? null,
+      store_id: _currentStoreId,
+    }).select("id").single();
 
-  if (error) return { error: error.message };
-  const paymentId = inserted!.id as string;
+    if (error) return { error: error.message };
+    const paymentId = inserted!.id as string;
 
-  // Insert allocations
-  for (const alloc of allocations) {
-    if (alloc.amount > 0) {
-      const allocType = alloc.allocationType || "bill";
-      await supabase.from("vendor_payment_allocations").insert({
-        payment_id: paymentId,
-        purchase_header_id: allocType === "bill" ? alloc.purchaseHeaderId : null,
-        amount: alloc.amount,
-        allocation_type: allocType,
-        store_id: _currentStoreId,
-      });
-      // Update purchase_headers remaining_balance and paid_amount for bill allocations
-      if (allocType === "bill" && alloc.purchaseHeaderId) {
-        const { data: phRow } = await supabase.from("purchase_headers").select("remaining_balance, paid_amount").eq("id", alloc.purchaseHeaderId).maybeSingle();
-        if (phRow) {
-          const currentRemaining = (phRow as Record<string, unknown>)['remaining_balance'] as number;
-          const currentPaid = (phRow as Record<string, unknown>)['paid_amount'] as number;
-          const newRemaining = Math.max(0, currentRemaining - alloc.amount);
-          const newPaid = currentPaid + alloc.amount;
-          await supabase.from("purchase_headers").update({ remaining_balance: newRemaining, paid_amount: newPaid }).eq("id", alloc.purchaseHeaderId);
+    for (const alloc of allocations) {
+      if (alloc.amount > 0) {
+        const allocType = alloc.allocationType || "bill";
+        await supabase.from("vendor_payment_allocations").insert({
+          payment_id: paymentId,
+          purchase_header_id: allocType === "bill" ? alloc.purchaseHeaderId : null,
+          amount: alloc.amount,
+          allocation_type: allocType,
+          store_id: _currentStoreId,
+        });
+        if (allocType === "bill" && alloc.purchaseHeaderId) {
+          await supabase.rpc("adjust_purchase_balance", {
+            p_header_id: alloc.purchaseHeaderId,
+            p_paid_delta: alloc.amount,
+            p_remaining_delta: -alloc.amount,
+          });
         }
       }
     }
+
+    await supabase.rpc("insert_vendor_txn", {
+      p_vendor_id: vendorId,
+      p_txn_type: "PAYMENT",
+      p_ref_no: paymentNo,
+      p_ref_id: paymentId,
+      p_txn_date: paymentDate,
+      p_debit: 0,
+      p_credit: amount,
+      p_remarks: remarks || `Payment ${paymentNo}`,
+      p_store_id: _currentStoreId,
+    });
+
+    await logAudit("INSERT", "vendor_payments", paymentId, null, { payment_no: paymentNo, vendor_id: vendorId, amount });
+    await reload();
+    return {};
+  } finally {
+    releaseOp(opKey);
   }
-
-  // Create ledger entry (credit = reduces what you owe)
-  const vendor = state.vendors.find((v) => v.id === vendorId);
-  const prevBalance = vendor ? getVendorBalance(vendorId) : 0;
-  const newBalance = prevBalance - amount;
-  await supabase.from("vendor_transactions").insert({
-    vendor_id: vendorId,
-    transaction_type: "PAYMENT",
-    reference_no: paymentNo,
-    reference_id: paymentId,
-    transaction_date: paymentDate,
-    debit: 0,
-    credit: amount,
-    balance: newBalance,
-    remarks: remarks || `Payment ${paymentNo}`,
-    store_id: _currentStoreId,
-  });
-
-  await reload();
-  return {};
 }
 
 export async function nextPurchaseReturnNo(): Promise<string> {
-  try {
-    const { data, error } = await supabase.rpc("next_purchase_return_no");
-    if (!error && data) return data as string;
-  } catch (_) {}
-  const { data: rows } = await supabase.from("purchase_returns").select("return_no").order("return_no", { ascending: false }).limit(1);
-  let max = 0;
-  if (rows && rows.length > 0) {
-    const n = Number(String((rows[0] as any).return_no ?? "").replace(/\D/g, ""));
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  let candidate = max + 1;
-  let noStr = `PR-${String(candidate).padStart(4, "0")}`;
-  const { data: existing } = await supabase.from("purchase_returns").select("return_no").eq("return_no", noStr);
-  while (existing && existing.length > 0) {
-    candidate++;
-    noStr = `PR-${String(candidate).padStart(4, "0")}`;
-    const { data: check } = await supabase.from("purchase_returns").select("return_no").eq("return_no", noStr);
-    if (!check || check.length === 0) break;
-  }
-  return noStr;
+  const { data, error } = await supabase.rpc("next_purchase_return_no");
+  if (error) throw new Error(`Failed to generate purchase return number: ${error.message}`);
+  return data as string;
 }
 
 export async function addPurchaseReturn(
@@ -2110,84 +2045,80 @@ export async function addPurchaseReturn(
   reason: string,
   refundAmount: number,
 ): Promise<{ error?: string }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const returnNo = await nextPurchaseReturnNo();
-
-  const { error } = await supabase.from("purchase_returns").insert({
-    return_no: returnNo,
-    original_purchase_no: originalPurchaseNo,
-    purchase_header_id: purchaseHeaderId,
-    vendor_id: vendorId,
-    item_code: itemCode,
-    item_name: itemName,
-    lot_id: lotId,
-    imei,
-    qty,
-    return_date: returnDate,
-    reason,
-    refund_amount: refundAmount,
-    status: "COMPLETED",
-    created_by: user?.id ?? null,
-    store_id: _currentStoreId,
-  });
-  if (error) return { error: error.message };
-
-  // Restore lot qty (reduce it — we're returning stock)
-  if (lotId) {
-    const { data: freshLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
-    if (freshLot) {
-      const currentQty = (freshLot as Record<string, unknown>)['qty'] as number;
-      await supabase.from("stock_lots").update({ qty: Math.max(0, currentQty - qty) }).eq("id", lotId);
-    }
-  }
-
-  // Reconcile stock qty
+  const opKey = `addPurchaseReturn:${lotId}:${imei}`;
+  if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: lots } = await supabase.from("stock_lots").select("qty").eq("item_name", itemName);
-    if (lots && lots.length > 0) {
-      const totalLotQty = (lots as Record<string, unknown>[]).reduce((sum: number, l) => sum + (l['qty'] as number), 0);
-      await supabase.from("stock").update({ qty: Math.max(0, totalLotQty), updated_at: new Date().toISOString() }).eq("name", itemName);
-    }
-  } catch (_) {}
+    const { data: { user } } = await supabase.auth.getUser();
+    const returnNo = await nextPurchaseReturnNo();
 
-  // Create ledger entry (credit = reduces what you owe)
-  if (vendorId) {
-    const prevBalance = getVendorBalance(vendorId);
-    const newBalance = prevBalance - refundAmount;
-    await supabase.from("vendor_transactions").insert({
+    const { error } = await supabase.from("purchase_returns").insert({
+      return_no: returnNo,
+      original_purchase_no: originalPurchaseNo,
+      purchase_header_id: purchaseHeaderId,
       vendor_id: vendorId,
-      transaction_type: "PURCHASE_RETURN",
-      reference_no: returnNo,
-      transaction_date: returnDate,
-      debit: 0,
-      credit: refundAmount,
-      balance: newBalance,
-      remarks: reason || `Return ${returnNo}`,
+      item_code: itemCode,
+      item_name: itemName,
+      lot_id: lotId,
+      imei,
+      qty,
+      return_date: returnDate,
+      reason,
+      refund_amount: refundAmount,
+      status: "COMPLETED",
+      created_by: user?.id ?? null,
       store_id: _currentStoreId,
     });
-  }
+    if (error) return { error: error.message };
 
-  // Update purchase_headers.remaining_balance for this purchase
-  if (purchaseHeaderId) {
-    const ph = state.purchaseHeaders.find((h) => h.id === purchaseHeaderId);
-    if (ph) {
-      const newRemaining = Math.max(0, ph.remainingBalance - refundAmount);
-      await supabase.from("purchase_headers").update({ remaining_balance: newRemaining }).eq("id", purchaseHeaderId);
+    if (lotId) {
+      await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: -qty });
     }
-  }
 
-  // Clean up purchase_item_imeis for returned IMEI
-  if (imei) {
     try {
-      const { data: piRow } = await supabase.from("purchase_items").select("id").eq("item_code", itemCode).eq("purchase_header_id", purchaseHeaderId).maybeSingle();
-      if (piRow) {
-        await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", piRow.id).eq("imei", imei);
-      }
-    } catch (_) {}
-  }
+      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+    } catch (err) {
+      console.error("[store] addPurchaseReturn reconcile failed:", err);
+    }
 
-  await reload();
-  return {};
+    if (vendorId) {
+      await supabase.rpc("insert_vendor_txn", {
+        p_vendor_id: vendorId,
+        p_txn_type: "PURCHASE_RETURN",
+        p_ref_no: returnNo,
+        p_ref_id: null,
+        p_txn_date: returnDate,
+        p_debit: 0,
+        p_credit: refundAmount,
+        p_remarks: reason || `Return ${returnNo}`,
+        p_store_id: _currentStoreId,
+      });
+    }
+
+    if (purchaseHeaderId) {
+      await supabase.rpc("adjust_purchase_balance", {
+        p_header_id: purchaseHeaderId,
+        p_paid_delta: 0,
+        p_remaining_delta: -refundAmount,
+      });
+    }
+
+    if (imei) {
+      try {
+        const { data: piRow } = await supabase.from("purchase_items").select("id").eq("item_code", itemCode).eq("purchase_header_id", purchaseHeaderId).maybeSingle();
+        if (piRow) {
+          await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", piRow.id).eq("imei", imei);
+        }
+      } catch (err) {
+        console.error("[store] addPurchaseReturn IMEI cleanup failed:", err);
+      }
+    }
+
+    await logAudit("INSERT", "purchase_returns", undefined, null, { return_no: returnNo, vendor_id: vendorId, qty });
+    await reload();
+    return {};
+  } finally {
+    releaseOp(opKey);
+  }
 }
 
 export function getVendorBalance(vendorId: string): number {
@@ -2265,39 +2196,33 @@ export async function applyVendorAdvance(
     store_id: _currentStoreId,
   });
 
-  const { data: phRow } = await supabase.from("purchase_headers").select("remaining_balance, paid_amount").eq("id", purchaseHeaderId).maybeSingle();
-  if (phRow) {
-    const currentRemaining = (phRow as Record<string, unknown>)['remaining_balance'] as number;
-    const currentPaid = (phRow as Record<string, unknown>)['paid_amount'] as number;
-    const newRemaining = Math.max(0, currentRemaining - amount);
-    await supabase.from("purchase_headers").update({ remaining_balance: newRemaining, paid_amount: currentPaid + amount }).eq("id", purchaseHeaderId);
-  }
-
-  const vendor = state.vendors.find((v) => v.id === vendorId);
-  const prevBalance = vendor ? getVendorBalance(vendorId) : 0;
-  await supabase.from("vendor_transactions").insert({
-    vendor_id: vendorId,
-    transaction_type: "ADVANCE_APPLIED",
-    reference_no: paymentNo,
-    reference_id: paymentId,
-    transaction_date: paymentDate,
-    debit: 0,
-    credit: amount,
-    balance: prevBalance - amount,
-    remarks: `Advance applied to purchase`,
-    store_id: _currentStoreId,
+  await supabase.rpc("adjust_purchase_balance", {
+    p_header_id: purchaseHeaderId,
+    p_paid_delta: amount,
+    p_remaining_delta: -amount,
   });
 
+  await supabase.rpc("insert_vendor_txn", {
+    p_vendor_id: vendorId,
+    p_txn_type: "ADVANCE_APPLIED",
+    p_ref_no: paymentNo,
+    p_ref_id: paymentId,
+    p_txn_date: paymentDate,
+    p_debit: 0,
+    p_credit: amount,
+    p_remarks: `Advance applied to purchase`,
+    p_store_id: _currentStoreId,
+  });
+
+  await logAudit("INSERT", "vendor_payments", paymentId, null, { advance_applied: amount, purchase_header_id: purchaseHeaderId });
   await reload();
   return {};
 }
 
 export async function getNextTransferNo(): Promise<string> {
-  try {
-    const { data } = await supabase.rpc("next_transfer_no");
-    if (data) return data as string;
-  } catch (_) {}
-  return "TRF-0001";
+  const { data, error } = await supabase.rpc("next_transfer_no");
+  if (error) throw new Error(`Failed to generate transfer number: ${error.message}`);
+  return data as string;
 }
 
 export async function createTransfer(
@@ -2309,102 +2234,100 @@ export async function createTransfer(
   if (fromStoreId === toStoreId) return { error: "Source and destination cannot be the same" };
   if (items.length === 0) return { error: "Add at least one item to transfer" };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const transferNo = await getNextTransferNo();
+  const opKey = `createTransfer:${fromStoreId}:${toStoreId}:${Date.now()}`;
+  if (!acquireOp(opKey)) return { error: "Operation already in progress" };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const transferNo = await getNextTransferNo();
 
-  for (const item of items) {
-    const { data: lot } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
-    if (!lot) return { error: `Lot not found for "${item.itemName}"` };
-    const lotQty = (lot as Record<string, unknown>)['qty'] as number;
-    if (lotQty < item.qty) return { error: `Insufficient qty in lot for "${item.itemName}". Available: ${lotQty}, requested: ${item.qty}` };
-  }
+    for (const item of items) {
+      const { data: lot } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
+      if (!lot) return { error: `Lot not found for "${item.itemName}"` };
+      const lotQty = (lot as Record<string, unknown>)['qty'] as number;
+      if (lotQty < item.qty) return { error: `Insufficient qty in lot for "${item.itemName}". Available: ${lotQty}, requested: ${item.qty}` };
+    }
 
-  const { data: transferRow, error: tErr } = await supabase.from("stock_transfers").insert({
-    transfer_no: transferNo,
-    date: new Date().toISOString().slice(0, 10),
-    from_store_id: fromStoreId,
-    to_store_id: toStoreId,
-    status: "COMPLETED",
-    remarks,
-    created_by: user?.id ?? null,
-  }).select("id").single();
+    const { data: transferRow, error: tErr } = await supabase.from("stock_transfers").insert({
+      transfer_no: transferNo,
+      date: new Date().toISOString().slice(0, 10),
+      from_store_id: fromStoreId,
+      to_store_id: toStoreId,
+      status: "COMPLETED",
+      remarks,
+      created_by: user?.id ?? null,
+    }).select("id").single();
 
-  if (tErr) return { error: tErr.message };
-  const transferId = (transferRow as Record<string, unknown>)['id'] as string;
+    if (tErr) return { error: tErr.message };
+    const transferId = (transferRow as Record<string, unknown>)['id'] as string;
 
-  for (const item of items) {
-    const { data: srcLot } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
-    if (srcLot) {
-      const newSrcQty = ((srcLot as Record<string, unknown>)['qty'] as number) - item.qty;
-      if (newSrcQty > 0) {
-        await supabase.from("stock_lots").update({ qty: newSrcQty }).eq("id", item.lotId);
+    for (const item of items) {
+      await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: -item.qty });
+
+      let destLotId: string | null = null;
+      const destName = item.destItemName || item.itemName;
+      const destCode = item.destItemCode || item.itemCode;
+      const { data: existingDestLot } = await supabase.from("stock_lots")
+        .select("id, qty")
+        .eq("item_name", destName)
+        .eq("store_id", toStoreId)
+        .eq("purchase_price", item.purchasePrice)
+        .maybeSingle();
+
+      if (existingDestLot) {
+        destLotId = (existingDestLot as Record<string, unknown>)['id'] as string;
+        await supabase.rpc("adjust_lot_qty", { p_lot_id: destLotId, p_delta: item.qty });
       } else {
-        await supabase.from("stock_lots").delete().eq("id", item.lotId);
-      }
-    }
-
-    let destLotId: string | null = null;
-    const destName = item.destItemName || item.itemName;
-    const destCode = item.destItemCode || item.itemCode;
-    const { data: existingDestLot } = await supabase.from("stock_lots")
-      .select("id, qty")
-      .eq("item_name", destName)
-      .eq("store_id", toStoreId)
-      .eq("purchase_price", item.purchasePrice)
-      .maybeSingle();
-
-    if (existingDestLot) {
-      destLotId = (existingDestLot as Record<string, unknown>)['id'] as string;
-      const destLotQty = (existingDestLot as Record<string, unknown>)['qty'] as number;
-      await supabase.from("stock_lots").update({ qty: destLotQty + item.qty }).eq("id", destLotId);
-    } else {
-      const destLotNo = await getNextLotNo();
-      const { data: newDestLot } = await supabase.from("stock_lots").insert({
-        lot_no: destLotNo,
-        purchase_id: null,
-        item_code: destCode,
-        item_name: destName,
-        date: new Date().toISOString().slice(0, 10),
-        supplier: "Transfer",
-        qty: item.qty,
-        purchase_price: item.purchasePrice,
-        store_id: toStoreId,
-      }).select("id").maybeSingle();
-      destLotId = newDestLot ? (newDestLot as Record<string, unknown>)['id'] as string : null;
-    }
-
-    await supabase.from("stock_transfer_items").insert({
-      transfer_id: transferId,
-      item_code: item.itemCode,
-      item_name: item.itemName,
-      dest_item_code: destCode,
-      dest_item_name: destName,
-      lot_id: destLotId,
-      qty: item.qty,
-      imei: item.imei || null,
-      purchase_price: item.purchasePrice,
-    });
-
-    if (item.imei) {
-      await supabase.from("purchase_item_imeis").delete().eq("imei", item.imei);
-      const { data: newLot } = await supabase.from("stock_lots").select("id").eq("item_name", destName).eq("store_id", toStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      if (newLot) {
-        await supabase.from("purchase_item_imeis").insert({
-          imei: item.imei,
+        const destLotNo = await getNextLotNo();
+        const { data: newDestLot } = await supabase.from("stock_lots").insert({
+          lot_no: destLotNo,
+          purchase_id: null,
           item_code: destCode,
           item_name: destName,
-          lot_id: (newLot as Record<string, unknown>)['id'],
-          is_sold: false,
+          date: new Date().toISOString().slice(0, 10),
+          supplier: "Transfer",
+          qty: item.qty,
+          purchase_price: item.purchasePrice,
           store_id: toStoreId,
-        });
+        }).select("id").maybeSingle();
+        destLotId = newDestLot ? (newDestLot as Record<string, unknown>)['id'] as string : null;
+      }
+
+      await supabase.from("stock_transfer_items").insert({
+        transfer_id: transferId,
+        item_code: item.itemCode,
+        item_name: item.itemName,
+        dest_item_code: destCode,
+        dest_item_name: destName,
+        lot_id: destLotId,
+        qty: item.qty,
+        imei: item.imei || null,
+        purchase_price: item.purchasePrice,
+      });
+
+      if (item.imei) {
+        await supabase.from("purchase_item_imeis").delete().eq("imei", item.imei);
+        const { data: newLot } = await supabase.from("stock_lots").select("id").eq("item_name", destName).eq("store_id", toStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (newLot) {
+          await supabase.from("purchase_item_imeis").insert({
+            imei: item.imei,
+            item_code: destCode,
+            item_name: destName,
+            lot_id: (newLot as Record<string, unknown>)['id'],
+            is_sold: false,
+            store_id: toStoreId,
+          });
+        }
       }
     }
-  }
 
-  await reconcileStockQty(fromStoreId);
-  await reconcileStockQty(toStoreId);
-  await reload();
-  return { transferNo };
+    await reconcileStockQty(fromStoreId);
+    await reconcileStockQty(toStoreId);
+    await logAudit("INSERT", "stock_transfers", transferId, null, { transfer_no: transferNo, from: fromStoreId, to: toStoreId, items: items.length });
+    await reload();
+    return { transferNo };
+  } finally {
+    releaseOp(opKey);
+  }
 }
 
 async function reconcileStockQty(storeId: string) {
@@ -2466,16 +2389,7 @@ export async function deleteTransfer(transferId: string): Promise<{ error?: stri
     const purchasePrice = ti['purchase_price'] as number;
     const imei = ti['imei'] as string | null;
 
-    const { data: destLot } = await supabase.from("stock_lots").select("qty").eq("id", lotId).maybeSingle();
-    if (destLot) {
-      const destQty = (destLot as Record<string, unknown>)['qty'] as number;
-      const newDestQty = destQty - qty;
-      if (newDestQty > 0) {
-        await supabase.from("stock_lots").update({ qty: newDestQty }).eq("id", lotId);
-      } else {
-        await supabase.from("stock_lots").delete().eq("id", lotId);
-      }
-    }
+    await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: -qty });
 
     const { data: srcLots } = await supabase.from("stock_lots")
       .select("id, qty")
@@ -2487,8 +2401,7 @@ export async function deleteTransfer(transferId: string): Promise<{ error?: stri
       .maybeSingle();
 
     if (srcLots) {
-      const srcQty = (srcLots as Record<string, unknown>)['qty'] as number;
-      await supabase.from("stock_lots").update({ qty: srcQty + qty }).eq("id", (srcLots as Record<string, unknown>)['id']);
+      await supabase.rpc("adjust_lot_qty", { p_lot_id: (srcLots as Record<string, unknown>)['id'] as string, p_delta: qty });
     } else {
       const srcLotNo = await getNextLotNo();
       await supabase.from("stock_lots").insert({
@@ -2523,6 +2436,7 @@ export async function deleteTransfer(transferId: string): Promise<{ error?: stri
   await supabase.from("stock_transfers").delete().eq("id", transferId);
   await reconcileStockQty(fromStoreId);
   await reconcileStockQty(toStoreId);
+  await logAudit("DELETE", "stock_transfers", transferId);
   await reload();
   return {};
 }
@@ -2600,7 +2514,9 @@ async function reload() {
     lots = (lotsRes.data ?? []).map(mapStockLotRow);
     allocs = (allocRes.data ?? []).map(mapSaleAllocationRow);
     adjustments = (adjRes.data ?? []).map(mapStockAdjustmentRow);
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] reload: lots/allocs/adj fetch failed:", err);
+  }
 
   let ph: PurchaseHeader[] = [];
   let pi: PurchaseItem[] = [];
@@ -2629,7 +2545,9 @@ async function reload() {
     pi = (itemsRes.data ?? []).map(mapPurchaseItemRow);
     pImeis = (imeisRes.data ?? []).map(mapPurchaseImeiRow);
     pAttach = (attachRes.data ?? []).map(mapPurchaseAttachmentRow);
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] reload: purchase headers/items fetch failed:", err);
+  }
 
   let saleImeis: SaleItemImei[] = [];
   let salesReturns: SalesReturn[] = [];
@@ -2648,7 +2566,9 @@ async function reload() {
     ]);
     saleImeis = (saleImeiRes.data ?? []).map(mapSaleImeiRow);
     salesReturns = (returnsRes.data ?? []).map(mapSalesReturnRow);
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] reload: sale IMEIs/returns fetch failed:", err);
+  }
 
   let vendors: Vendor[] = [];
   let vendorTransactions: VendorTransaction[] = [];
@@ -2687,7 +2607,9 @@ async function reload() {
     vendorPaymentAllocs = (vpaRes.data ?? []).map(mapVendorPaymentAllocationRow);
     purchaseReturnsList = (prRes.data ?? []).map(mapPurchaseReturnRow);
     vendorDocs = (vdRes.data ?? []).map(mapVendorDocumentRow);
-  } catch (_) {}
+  } catch (err) {
+    console.error("[store] reload: vendors/transactions/payments fetch failed:", err);
+  }
 
   state = {
     stock: (stockRes.data ?? []).map(mapStockRow),
