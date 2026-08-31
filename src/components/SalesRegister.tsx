@@ -383,22 +383,31 @@ export function SalesRegister() {
   <table class="items">
     <thead>
       <tr>
-        <th class="center" style="width:6%">Sn</th>
-        <th style="width:12%">H.S Code</th>
-        <th>Item</th>
-        <th class="center num" style="width:10%">Quantity</th>
-        <th class="num" style="width:15%">Rate</th>
-        <th class="num" style="width:16%">Price</th>
+        <th class="center" style="width:4%">Sn</th>
+        <th>Item Description</th>
+        <th class="center" style="width:8%">HS Code</th>
+        <th class="num" style="width:7%">Qty</th>
+        <th class="num" style="width:12%">Rate</th>
+        <th class="num" style="width:10%">Disc</th>
+        <th class="num" style="width:12%">Amount</th>
+        <th class="num" style="width:10%">VAT 13%</th>
+        <th class="num" style="width:13%">Total</th>
       </tr>
     </thead>
     <tbody>
     ${printData.items.map((it, i) => `<tr>
       <td class="center">${i + 1}</td>
-      <td class="center" style="font-family:monospace">${esc(it.hsCode || "")}</td>
-      <td>${esc(it.itemName)}<br/><span style="font-size:10px;color:#666">${esc(it.subCategory)} | ${esc(it.brand)} | ${esc(it.model)}</span></td>
-      <td class="center num">${it.qty}</td>
+      <td>
+        <div style="font-weight:500">${esc(it.itemName)}</div>
+        <div style="font-size:10px;color:#666">${esc(it.subCategory)} | ${esc(it.brand)} | ${esc(it.model)}</div>
+      </td>
+      <td class="center" style="font-family:monospace;font-size:11px">${esc(it.hsCode || "")}</td>
+      <td class="num">${it.qty}</td>
       <td class="num">${money(it.rate)}</td>
-      <td class="num">${money(it.total)}</td>
+      <td class="num">${it.discount > 0 ? money(it.discount) : "-"}</td>
+      <td class="num">${money(it.amount)}</td>
+      <td class="num">${money(it.vat)}</td>
+      <td class="num" style="font-weight:600">${money(it.total)}</td>
     </tr>${renderImeiRow(i)}`).join("")}
     </tbody>
   </table>
