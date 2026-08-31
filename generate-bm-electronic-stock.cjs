@@ -2,6 +2,8 @@ const XLSX = require('xlsx');
 const fs = require('fs');
 
 const STORE_ID = 'a0000000-0000-0000-0000-000000000003'; // BM Electronic
+const STORE_NAME = 'BM Electronic';
+const LOT_PREFIX = 'ELC';
 const wb = XLSX.readFile('C:\\Users\\DELL\\Desktop\\stock\\BM Electronics Stock.xlsx');
 const ws = wb.Sheets['Sheet1'];
 const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
@@ -51,11 +53,12 @@ for (const row of rows) {
   const qty = parseInt(row[9]) || 0;
   const today = new Date().toISOString().slice(0, 10);
 
-  sql += `INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('IMP-${code}', NULL, '${code}', '${name}', '${today}', 'IMPORT', ${qty}, 0, '${STORE_ID}');\n`;
+  sql += `INSERT INTO public.stock_lots (lot_no, purchase_id, item_code, item_name, date, supplier, qty, purchase_price, store_id) VALUES ('${LOT_PREFIX}-${code}', NULL, '${code}', '${name}', '${today}', 'IMPORT', ${qty}, 0, '${STORE_ID}');\n`;
 }
 
-sql += `\n-- 4. Update stock_code_seq to max code\n`;
-sql += `SELECT setval('public.stock_code_seq', (SELECT COALESCE(MAX(CAST(code AS integer)), 0) FROM public.stock));\n`;
+sql += `\n-- 4. Reset sequences (global — set to max across ALL stores)\n`;
+sql += `SELECT setval('public.stock_code_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(code AS integer)), 0) FROM public.stock)));\n`;
+sql += `SELECT setval('public.lot_no_seq', GREATEST(1, (SELECT COALESCE(MAX(CAST(SUBSTRING(lot_no FROM 5) AS integer)), 0) FROM public.stock_lots)));\n`;
 
 fs.writeFileSync('bm-electronic-stock-import.sql', sql);
 console.log(`Generated bm-electronic-stock-import.sql with ${rows.length} items + lots`);
