@@ -49,11 +49,11 @@ export function VendorLedger() {
   const [toDate, setToDate] = useState("");
 
   const COMPANY = {
-    name: currentStore?.name || DEFAULT_COMPANY.name,
-    address: currentStore?.address || DEFAULT_COMPANY.address,
-    pan: currentStore?.pan || DEFAULT_COMPANY.pan,
-    vatNo: currentStore?.vatNumber || DEFAULT_COMPANY.vatNo,
-    phone: currentStore?.phone || DEFAULT_COMPANY.phone,
+    name: DEFAULT_COMPANY.name,
+    address: DEFAULT_COMPANY.address,
+    pan: DEFAULT_COMPANY.pan,
+    vatNo: DEFAULT_COMPANY.vatNo,
+    phone: DEFAULT_COMPANY.phone,
   };
 
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
