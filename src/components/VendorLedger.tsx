@@ -49,7 +49,7 @@ export function VendorLedger() {
   const [toDate, setToDate] = useState("");
 
   const COMPANY = {
-    name: DEFAULT_COMPANY.name,
+    name: currentStore?.name || DEFAULT_COMPANY.name,
     address: currentStore?.address || DEFAULT_COMPANY.address,
     pan: currentStore?.pan || DEFAULT_COMPANY.pan,
     vatNo: currentStore?.vatNumber || DEFAULT_COMPANY.vatNo,
