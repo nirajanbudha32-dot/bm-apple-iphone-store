@@ -49,7 +49,9 @@ export function StockOutSummary() {
   }, [currentStoreId]);
 
   const allRows = useMemo(() => {
-    const saleRows: OutRow[] = sales.map((s) => {
+    const saleRows: OutRow[] = sales
+      .filter((s) => s.saleType !== "Repair")
+      .map((s) => {
       const allocs = saleAllocations.filter((a) => a.saleId === s.id);
       const lotNos = allocs
         .map((a) => {

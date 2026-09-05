@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Trash2, Plus, Check, Printer, Smartphone } from "lucide-react";
+import { Download, Trash2, Plus, Check, Printer, Smartphone, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,14 +70,16 @@ export function SalesRegister() {
   const [customerContact, setCustomerContact] = useState("");
   const [customerLocation, setCustomerLocation] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
-  const [saleType, setSaleType] = useState<"Cash" | "Credit">("Cash");
+  const [saleType, setSaleType] = useState<"Cash" | "Credit" | "Warranty" | "Repair">("Cash");
   const [remarks, setRemarks] = useState("");
+  const [warrantyOriginalInvoice, setWarrantyOriginalInvoice] = useState("");
 
   const [itemName, setItemName] = useState("");
   const debouncedItemName = useDebounce(itemName, 150);
   const [itemQty, setItemQty] = useState(1);
   const [itemRate, setItemRate] = useState(0);
   const [itemDiscount, setItemDiscount] = useState(0);
+  const [isFreeItem, setIsFreeItem] = useState(false);
 
   const [imeiInput, setImeiInput] = useState("");
   const [showImeiInput, setShowImeiInput] = useState(false);
@@ -113,6 +115,7 @@ export function SalesRegister() {
     paidAmount: number;
     remaining: number;
     remarks: string;
+    warrantyOriginalInvoice: string;
   } | null>(null);
 
   const suggestions = useMemo(() => {
@@ -152,16 +155,20 @@ export function SalesRegister() {
       toast.error("Select an item");
       return;
     }
-    if (itemQty <= 0 || itemRate <= 0) {
+    if (itemQty <= 0) {
+      toast.error("Enter valid quantity");
+      return;
+    }
+    if (!isFreeItem && (itemQty <= 0 || itemRate <= 0)) {
       toast.error("Enter valid quantity and rate");
       return;
     }
-    if (matched && matched.qty < itemQty) {
+    if (!isFreeItem && matched && matched.qty < itemQty) {
       toast.error(`Insufficient stock. Available: ${matched.qty}`);
       return;
     }
-    const amount = itemQty * itemRate - itemDiscount;
-    const vat = amount * VAT_RATE;
+    const amount = isFreeItem ? 0 : itemQty * itemRate - itemDiscount;
+    const vat = isFreeItem ? 0 : amount * VAT_RATE;
     const newItem: BillItem = {
       itemCode: matched?.code ?? "",
       itemName: matched?.name ?? itemName.trim(),
@@ -171,11 +178,12 @@ export function SalesRegister() {
       model: matched?.model ?? "",
       hsCode: "",
       qty: itemQty,
-      rate: itemRate,
-      discount: itemDiscount,
+      rate: isFreeItem ? 0 : itemRate,
+      discount: isFreeItem ? 0 : itemDiscount,
       amount,
       vat,
       total: amount + vat,
+      isFree: isFreeItem,
     };
     setBillItems((prev) => {
       const newIndex = prev.length;
@@ -190,6 +198,7 @@ export function SalesRegister() {
     setItemQty(1);
     setItemRate(0);
     setItemDiscount(0);
+    setIsFreeItem(false);
     setDraftImeis([]);
     setImeiInput("");
     setAvailableImeis([]);
@@ -221,7 +230,12 @@ export function SalesRegister() {
       toast.error("Add at least one item to the bill");
       return;
     }
+    if (saleType === "Warranty" && !warrantyOriginalInvoice.trim()) {
+      toast.error("Enter original invoice number for warranty");
+      return;
+    }
     for (const item of billItems) {
+      if (item.isFree) continue;
       const inStock = stock.find((s) => s.code === item.itemCode || s.name === item.itemName);
       if (!inStock || inStock.qty < item.qty) {
         toast.error(`Insufficient stock for "${item.itemName}". Available: ${inStock?.qty ?? 0}, needed: ${item.qty}`);
@@ -248,6 +262,7 @@ export function SalesRegister() {
       customerContact.trim(),
       customerLocation.trim(),
       billItemImeis,
+      warrantyOriginalInvoice.trim(),
     );
     setSaving(false);
     if (error) {
@@ -277,6 +292,7 @@ export function SalesRegister() {
       paidAmount,
       remaining: billRemaining,
       remarks: remarks.trim(),
+      warrantyOriginalInvoice: warrantyOriginalInvoice.trim(),
     });
     setCustomer("");
     setCustomerPan("");
@@ -284,6 +300,7 @@ export function SalesRegister() {
     setCustomerType("Individual");
     setCustomerContact("");
     setCustomerLocation("");
+    setWarrantyOriginalInvoice("");
     setBillItems([]);
     setBillItemImeis({});
     setPaymentMethod("Cash");
@@ -362,7 +379,7 @@ export function SalesRegister() {
     </div>
   </div>
 
-  <div class="doc-title">Tax Invoice</div>
+  <div class="doc-title">${printData.saleType === "Repair" ? "Repair Receipt" : printData.saleType === "Warranty" ? "Warranty Invoice" : "Tax Invoice"}</div>
 
   <div class="meta">
     <div class="meta-col">
@@ -372,6 +389,8 @@ export function SalesRegister() {
         <tr><td class="label">Address</td><td class="colon">:</td><td class="value">${esc(printData.customerLocation || "")}</td></tr>
         ${printData.hasVatPan ? `<tr><td class="label">Buyer's PAN</td><td class="colon">:</td><td class="value">${esc(printData.customerPan)}</td></tr>` : ""}
         <tr><td class="label">Payment Mode</td><td class="colon">:</td><td class="value">${esc(printData.paymentMethod)}</td></tr>
+        <tr><td class="label">Sale Type</td><td class="colon">:</td><td class="value">${esc(printData.saleType || "Cash")}</td></tr>
+        ${printData.saleType === "Warranty" && printData.warrantyOriginalInvoice ? `<tr><td class="label">Original Invoice</td><td class="colon">:</td><td class="value">${esc(printData.warrantyOriginalInvoice)}</td></tr>` : ""}
       </table>
     </div>
     <div class="meta-col">
@@ -402,7 +421,7 @@ export function SalesRegister() {
     ${printData.items.map((it, i) => `<tr>
       <td class="center">${i + 1}</td>
       <td>
-        <div style="font-weight:500">${esc(it.itemName)}</div>
+        <div style="font-weight:500">${esc(it.itemName)}${it.isFree ? ' <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:bold;margin-left:4px">FREE</span>' : ''}</div>
         <div style="font-size:10px;color:#666">${esc(it.subCategory)} | ${esc(it.brand)} | ${esc(it.model)}</div>
       </td>
       <td class="center" style="font-family:monospace;font-size:11px">${esc(it.hsCode || "")}</td>
@@ -579,14 +598,27 @@ export function SalesRegister() {
           </div>
           <div>
             <Label className="text-xs sm:text-sm">Sale Type</Label>
-            <Select value={saleType} onValueChange={(v) => setSaleType(v as "Cash" | "Credit")}>
+            <Select value={saleType} onValueChange={(v) => setSaleType(v as "Cash" | "Credit" | "Warranty" | "Repair")}>
               <SelectTrigger className="h-9 text-xs sm:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Cash">Cash</SelectItem>
                 <SelectItem value="Credit">Credit</SelectItem>
+                <SelectItem value="Warranty">Warranty</SelectItem>
+                <SelectItem value="Repair">Repair</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {saleType === "Warranty" && (
+            <div className="sm:col-span-2">
+              <Label className="text-xs sm:text-sm">Original Invoice No. (for Warranty)</Label>
+              <Input
+                className="h-9 text-xs sm:text-sm"
+                placeholder="e.g. BM-AIS-0001"
+                value={warrantyOriginalInvoice}
+                onChange={(e) => setWarrantyOriginalInvoice(e.target.value)}
+              />
+            </div>
+          )}
           <div>
             <Label className="text-xs sm:text-sm">Payment Method</Label>
             <Select
@@ -695,6 +727,7 @@ export function SalesRegister() {
                     value={itemRate}
                     onChange={(e) => setItemRate(Number(e.target.value))}
                     className="h-9 text-xs sm:text-sm"
+                    disabled={isFreeItem}
                   />
                 </div>
                 <div>
@@ -707,10 +740,21 @@ export function SalesRegister() {
                     value={itemDiscount}
                     onChange={(e) => setItemDiscount(Number(e.target.value))}
                     className="h-9 text-xs sm:text-sm"
+                    disabled={isFreeItem}
                   />
                 </div>
               </div>
               <div className="mt-2 flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => { setIsFreeItem(!isFreeItem); if (!isFreeItem) { setItemRate(0); setItemDiscount(0); } }}
+                  className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors ${
+                    isFreeItem ? "border-green-500 bg-green-50 text-green-700" : "border-input bg-background text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  {isFreeItem ? "FREE" : "Free Item"}
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowImeiInput(!showImeiInput)}
@@ -783,6 +827,9 @@ export function SalesRegister() {
                       <td className="p-2">{idx + 1}</td>
                       <td className="p-2 font-medium">
                         {item.itemName}
+                        {item.isFree && (
+                          <span className="ml-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">FREE</span>
+                        )}
                         <span className="block text-[11px] text-muted-foreground font-normal">
                           {item.subCategory} · {item.brand} · {item.model}
                         </span>
@@ -963,6 +1010,7 @@ export function SalesRegister() {
                                 amount: s.amount,
                                 vat: s.vat,
                                 total: s.total,
+                                isFree: s.isFree ?? false,
                               })),
                               itemImeis: {},
                               subtotal: g.items.reduce((a, i) => a + i.amount, 0),
@@ -973,6 +1021,7 @@ export function SalesRegister() {
                               paidAmount: invPaid,
                               remaining: invRemaining,
                               remarks: g.header.remarks,
+                              warrantyOriginalInvoice: g.header.warrantyOriginalInvoice ?? "",
                             });
                             setTimeout(() => printInvoice(), 100);
                           }}

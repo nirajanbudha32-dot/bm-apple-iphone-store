@@ -32,10 +32,10 @@ async function logAudit(action: string, tableName: string, recordId?: string, ol
   }
 }
 
-// File upload size validation (10MB max)
-const MAX_FILE_BASE64_LENGTH = 13_981_016;
+// File upload size validation (5MB max)
+const MAX_FILE_BASE64_LENGTH = 6_990_508;
 function validateFileSize(fileData: string): string | null {
-  if (fileData.length > MAX_FILE_BASE64_LENGTH) return "File too large. Maximum size is 10MB.";
+  if (fileData.length > MAX_FILE_BASE64_LENGTH) return "File too large. Maximum size is 5MB.";
   return null;
 }
 
@@ -80,6 +80,7 @@ export type BillItem = {
   amount: number;
   vat: number;
   total: number;
+  isFree: boolean;
 };
 
 export type Sale = {
@@ -110,6 +111,8 @@ export type Sale = {
   remaining: number;
   remarks: string;
   saleType: string;
+  isFree: boolean;
+  warrantyOriginalInvoice: string;
   status: string;
   storeId?: string;
 };
@@ -477,6 +480,8 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     remaining: Number(r['remaining'] ?? 0),
     remarks: (r['remarks'] as string) ?? "",
     saleType: (r['sale_type'] as string) ?? "Cash",
+    isFree: (r['is_free'] as boolean) ?? false,
+    warrantyOriginalInvoice: (r['warranty_original_invoice'] as string) ?? "",
     status: (r['status'] as string) ?? "CONFIRMED",
     storeId: (r['store_id'] as string) ?? "",
   };
@@ -804,6 +809,7 @@ export async function addBill(
   customerContact: string = "",
   customerLocation: string = "",
   imeisByItem: Record<number, string[]> = {},
+  warrantyOriginalInvoice: string = "",
 ) {
   const opKey = `addBill:${invoiceNo}`;
   if (!acquireOp(opKey)) return { error: "Operation already in progress" };
@@ -811,6 +817,8 @@ export async function addBill(
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    const isRepair = saleType === "Repair";
 
     const rows = items.map((item) => ({
       invoice_no: invoiceNo,
@@ -839,6 +847,8 @@ export async function addBill(
       remaining: 0,
       remarks,
       sale_type: saleType,
+      is_free: item.isFree ?? false,
+      warranty_original_invoice: saleType === "Warranty" ? warrantyOriginalInvoice : "",
       status,
       created_by: user?.id ?? null,
       store_id: _currentStoreId,
@@ -854,17 +864,23 @@ export async function addBill(
 
     if (!salesError && insertedSales) {
       const affectedItems = new Set<string>();
+      let fifoFailed = false;
+      let fifoErrorMsg = "";
       for (let idx = 0; idx < insertedSales.length; idx++) {
         const inserted = insertedSales[idx]!;
 
-        const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
-          p_item_name: inserted.item_name,
-          p_qty: inserted.qty,
-          p_sale_id: inserted.id,
-        });
-        if (fifoErr) {
-          console.error("[store] fifo_deduct failed:", fifoErr);
-          return { error: `Stock deduction failed for "${inserted.item_name}": ${fifoErr.message}` };
+        if (!isRepair) {
+          const { error: fifoErr } = await supabase.rpc("fifo_deduct", {
+            p_item_name: inserted.item_name,
+            p_qty: inserted.qty,
+            p_sale_id: inserted.id,
+          });
+          if (fifoErr) {
+            console.error("[store] fifo_deduct failed:", fifoErr);
+            fifoFailed = true;
+            fifoErrorMsg = `Stock deduction failed for "${inserted.item_name}": ${fifoErr.message}`;
+            break;
+          }
         }
 
         const imeis = imeisByItem[idx] || [];
@@ -881,11 +897,20 @@ export async function addBill(
         affectedItems.add(inserted.item_name);
       }
 
-      for (const itemName of affectedItems) {
-        try {
-          await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
-        } catch (err) {
-          console.error("[store] reconcile_stock_from_lots failed:", err);
+      if (fifoFailed) {
+        const insertedIds = insertedSales.map((s) => s.id);
+        await supabase.from("sale_item_imeis").delete().in("sale_id", insertedIds);
+        await supabase.from("sales").delete().in("id", insertedIds);
+        return { error: fifoErrorMsg };
+      }
+
+      if (!isRepair) {
+        for (const itemName of affectedItems) {
+          try {
+            await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+          } catch (err) {
+            console.error("[store] reconcile_stock_from_lots failed:", err);
+          }
         }
       }
 
@@ -930,14 +955,16 @@ export async function deleteSale(id: string) {
 
   await supabase.from("sales").delete().eq("id", id);
 
-  if (!lotRestored) {
-    await supabase.rpc("increment_stock", { item_name: sale.itemName, qty_returned: sale.qty });
+  if (!lotRestored && sale.saleType !== "Repair") {
+    await supabase.rpc("adjust_stock_by_code", { p_code: sale.itemCode, p_delta: sale.qty });
   }
 
-  try {
-    await supabase.rpc("reconcile_stock_from_lots", { p_item_name: sale.itemName, p_store_id: _currentStoreId });
-  } catch (err) {
-    console.error("[store] deleteSale reconcile failed:", err);
+  if (sale.saleType !== "Repair") {
+    try {
+      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: sale.itemName, p_store_id: _currentStoreId });
+    } catch (err) {
+      console.error("[store] deleteSale reconcile failed:", err);
+    }
   }
 
   await logAudit("DELETE", "sales", id, { invoice_no: sale.invoiceNo, item_name: sale.itemName });
@@ -981,15 +1008,17 @@ export async function deleteInvoice(invoiceNo: string) {
 
   await supabase.from("sales").delete().eq("invoice_no", invoiceNo);
 
-  if (!lotRestored) {
+  const nonRepairItems = items.filter((item) => item.saleType !== "Repair");
+
+  if (!lotRestored && nonRepairItems.length > 0) {
     await Promise.all(
-      items.map((item) =>
-        supabase.rpc("increment_stock", { item_name: item.itemName, qty_returned: item.qty })
+      nonRepairItems.map((item) =>
+        supabase.rpc("adjust_stock_by_code", { p_code: item.itemCode, p_delta: item.qty })
       )
     );
   }
 
-  const affectedItems = new Set(items.map((i) => i.itemName));
+  const affectedItems = new Set(nonRepairItems.map((i) => i.itemName));
   for (const itemName of affectedItems) {
     try {
       await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
@@ -1196,6 +1225,28 @@ export async function nextPurchaseNo(): Promise<string> {
   return data as string;
 }
 
+async function rollbackPurchaseItems(
+  headerId: string,
+  processedItems: { itemId: string; itemCode: string; qty: number; itemName: string; lotNo: string }[],
+) {
+  console.warn("[store] Rolling back purchase header", headerId, "due to", processedItems.length, "processed items");
+  for (const pi of processedItems) {
+    try {
+      await supabase.from("stock_lots").delete().eq("purchase_id", pi.itemId);
+      await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", pi.itemId);
+      await supabase.from("purchase_items").delete().eq("id", pi.itemId);
+      await applyStockDelta({ billNo: "", date: "", supplier: "", itemCode: pi.itemCode, itemName: pi.itemName, category: "", subCategory: "", brand: "", model: "", qty: pi.qty, rate: 0, amount: 0, paymentMethod: "Cash", note: "" }, -pi.qty);
+    } catch (err) {
+      console.error("[store] rollbackPurchaseItems failed for item:", pi.itemName, err);
+    }
+  }
+  try {
+    await supabase.from("purchase_headers").delete().eq("id", headerId);
+  } catch (err) {
+    console.error("[store] rollbackPurchaseItems header delete failed:", err);
+  }
+}
+
 export async function addPurchaseHeader(
   header: Omit<PurchaseHeader, "id" | "createdAt">,
   items: Omit<PurchaseItem, "id" | "purchaseHeaderId">[],
@@ -1247,6 +1298,8 @@ export async function addPurchaseHeader(
     if (error) return { error: error.message };
     const headerId = inserted!.id as string;
 
+    const processedItems: { itemId: string; itemCode: string; qty: number; itemName: string; lotNo: string }[] = [];
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!;
 
@@ -1269,7 +1322,10 @@ export async function addPurchaseHeader(
         },
         item.qty,
       );
-      if (stockResult.error) return { error: stockResult.error };
+      if (stockResult.error) {
+        await rollbackPurchaseItems(headerId, processedItems);
+        return { error: stockResult.error };
+      }
       const resolvedItemCode = stockResult.itemCode || item.itemCode;
 
       let lotNo = item.lotNo?.trim();
@@ -1309,7 +1365,10 @@ export async function addPurchaseHeader(
         store_id: targetStoreId,
       }).select("id").single();
 
-      if (itemErr) return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
+      if (itemErr) {
+        await rollbackPurchaseItems(headerId, processedItems);
+        return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
+      }
 
       const itemId = (insertedItem as Record<string, unknown>)['id'] as string;
 
@@ -1321,7 +1380,10 @@ export async function addPurchaseHeader(
           store_id: targetStoreId,
         }));
         const { error: imeiErr } = await supabase.from("purchase_item_imeis").insert(imeiRows);
-        if (imeiErr) return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
+        if (imeiErr) {
+          await rollbackPurchaseItems(headerId, processedItems);
+          return { error: `Failed to save IMEIs for ${item.itemName}: ${imeiErr.message}` };
+        }
       }
 
       const { error: lotInsertErr } = await supabase.from("stock_lots").insert({
@@ -1339,6 +1401,8 @@ export async function addPurchaseHeader(
       if (lotInsertErr) {
         console.warn("[store] Stock lot insert warning for " + item.itemName, lotInsertErr.message);
       }
+
+      processedItems.push({ itemId, itemCode: resolvedItemCode, qty: item.qty, itemName: item.itemName, lotNo });
     }
 
     const vendorIdForTxn = (header as Record<string, unknown>)['vendorId'] as string | undefined;
@@ -1683,7 +1747,9 @@ export async function addSalesReturn(
       try {
         const { data: existingReturns } = await supabase.from("sales_returns").select("qty").eq("sale_id", saleId);
         const totalReturned = (existingReturns ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + (r['qty'] as number), 0);
-        const newStatus = totalReturned >= qty ? "RETURNED" : "PARTIALLY_RETURNED";
+        const originalSale = state.sales.find((s) => s.id === saleId);
+        const saleQty = originalSale?.qty ?? 0;
+        const newStatus = saleQty > 0 && totalReturned >= saleQty ? "RETURNED" : "PARTIALLY_RETURNED";
         await supabase.from("sales").update({ status: newStatus }).eq("id", saleId);
       } catch (err) {
         console.error("[store] addSalesReturn status update failed:", err);
