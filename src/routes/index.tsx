@@ -156,9 +156,11 @@ function IndexInner() {
             <TabsTrigger value="lothistory" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <History className="mr-1.5 size-3.5 sm:size-4" /> Lot History
             </TabsTrigger>
+            {isAdmin && (
             <TabsTrigger value="adjustments" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <ShieldAlert className="mr-1.5 size-3.5 sm:size-4" /> Adjustments
             </TabsTrigger>
+            )}
             <TabsTrigger value="profit" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <TrendingUp className="mr-1.5 size-3.5 sm:size-4" /> Profit
             </TabsTrigger>
@@ -204,9 +206,11 @@ function IndexInner() {
         <TabsContent value="lothistory">
           <LotHistory />
         </TabsContent>
+        {isAdmin && (
         <TabsContent value="adjustments">
           <StockAdjustments />
         </TabsContent>
+        )}
         <TabsContent value="profit">
           <ProfitReport />
         </TabsContent>

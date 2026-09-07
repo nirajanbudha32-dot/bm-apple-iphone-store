@@ -145,9 +145,11 @@ export function SalesRegister() {
   function pick(name: string) {
     const item = stock.find((i) => i.name === name);
     setItemName(name);
-    if (item?.sellingPrice) setItemRate(item.sellingPrice);
+    if (saleType !== "Repair" && item?.sellingPrice) setItemRate(item.sellingPrice);
     // Fetch available IMEIs for this item
-    getAvailableImeis(name).then((imeis) => setAvailableImeis(imeis));
+    if (saleType !== "Repair") {
+      getAvailableImeis(name).then((imeis) => setAvailableImeis(imeis));
+    }
   }
 
   function addToBill() {
@@ -163,7 +165,7 @@ export function SalesRegister() {
       toast.error("Enter valid quantity and rate");
       return;
     }
-    if (!isFreeItem && matched && matched.qty < itemQty) {
+    if (saleType !== "Repair" && !isFreeItem && matched && matched.qty < itemQty) {
       toast.error(`Insufficient stock. Available: ${matched.qty}`);
       return;
     }
@@ -235,7 +237,7 @@ export function SalesRegister() {
       return;
     }
     for (const item of billItems) {
-      if (item.isFree) continue;
+      if (item.isFree || saleType === "Repair") continue;
       const inStock = stock.find((s) => s.code === item.itemCode || s.name === item.itemName);
       if (!inStock || inStock.qty < item.qty) {
         toast.error(`Insufficient stock for "${item.itemName}". Available: ${inStock?.qty ?? 0}, needed: ${item.qty}`);
