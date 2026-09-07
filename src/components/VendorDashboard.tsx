@@ -106,12 +106,7 @@ export function VendorDashboard() {
 
   const openingBalance = selectedVendor?.openingBalance ?? 0;
 
-  const outstandingPayable = useMemo(
-    () => openingBalance + totalPurchases - totalPayments - totalReturns,
-    [openingBalance, totalPurchases, totalPayments, totalReturns]
-  );
-
-  const currentBalance = useMemo(() => {
+  const outstandingPayable = useMemo(() => {
     if (!selectedVendorId) return 0;
     return getVendorBalance(selectedVendorId);
   }, [selectedVendorId, vendorTransactions]);
@@ -127,15 +122,13 @@ export function VendorDashboard() {
       const totalP = purchases.reduce((s, p) => s + p.grandTotal, 0);
       const totalPay = payments.reduce((s, p) => s + p.amount, 0);
       const totalR = returns.reduce((s, r) => s + r.refundAmount, 0);
-      const outstanding =
-        v.openingBalance + totalP - totalPay - totalR;
       return {
         vendor: v,
         totalPurchases: totalP,
         totalPayments: totalPay,
         totalReturns: totalR,
         openingBalance: v.openingBalance,
-        outstanding,
+        outstanding: balance,
         balance,
       };
     });

@@ -2160,7 +2160,7 @@ export async function addPurchaseReturn(
         p_vendor_id: vendorId,
         p_txn_type: "PURCHASE_RETURN",
         p_ref_no: returnNo,
-        p_ref_id: null,
+        p_ref_id: purchaseHeaderId || null,
         p_txn_date: returnDate,
         p_debit: 0,
         p_credit: refundAmount,
@@ -2201,10 +2201,10 @@ export function getVendorBalance(vendorId: string): number {
     .filter((t) => t.vendorId === vendorId)
     .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
 
-  // Purchases and opening balance increase what we owe (debit)
-  // Payments, returns, and advance applications decrease what we owe (credit)
-  const totalDebit = txns.filter((t) => t.transactionType === "PURCHASE" || t.transactionType === "OPENING_BALANCE" || t.transactionType === "ADVANCE_APPLIED").reduce((a, t) => a + t.debit, 0);
-  const totalCredit = txns.filter((t) => t.transactionType !== "PURCHASE" && t.transactionType !== "OPENING_BALANCE" && t.transactionType !== "ADVANCE_APPLIED").reduce((a, t) => a + t.credit, 0);
+  // Balance = sum of all debits - sum of all credits
+  // Each transaction type correctly places amount in either debit or credit column
+  const totalDebit = txns.reduce((a, t) => a + t.debit, 0);
+  const totalCredit = txns.reduce((a, t) => a + t.credit, 0);
   return totalDebit - totalCredit;
 }
 

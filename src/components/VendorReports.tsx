@@ -39,14 +39,14 @@ function StatusBadge({ outstanding }: { outstanding: number }) {
   if (outstanding <= 0) {
     return (
       <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-        Paid
+        Paid in full
       </Badge>
     );
   }
-  if (outstanding <= 50000) {
+  if (outstanding > 0 && outstanding <= 50000) {
     return (
       <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 border-yellow-200">
-        Due
+        Has balance due
       </Badge>
     );
   }
@@ -99,7 +99,7 @@ export function VendorReports() {
         grandTotal: p.grandTotal,
         paid: p.paidAmount,
         remaining: p.remainingBalance,
-        daysOutstanding: daysDiff(p.date),
+        daysOutstanding: daysDiff(p.dueDate || p.date),
         daysText: p.dueDate ? daysDiff(p.dueDate) + " days overdue" : "",
       }))
       .sort((a, b) => a.date.localeCompare(b.date));

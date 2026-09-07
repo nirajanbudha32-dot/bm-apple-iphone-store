@@ -178,6 +178,10 @@ export function VendorMaster() {
       toast.error("Vendor name is required");
       return;
     }
+    if (draft.openingBalance !== 0 && !draft.openingBalanceDate) {
+      toast.error("Opening balance date is required when opening balance is non-zero");
+      return;
+    }
     setSaving(true);
 
     const payload = {

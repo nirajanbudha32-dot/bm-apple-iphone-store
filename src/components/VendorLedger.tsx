@@ -73,12 +73,18 @@ export function VendorLedger() {
 
   const ledgerRows = useMemo(() => {
     if (!selectedVendor) return [];
+    // Compute carry-forward from transactions excluded by date filter
     let runningBalance = 0;
+    if (fromDate) {
+      runningBalance = allTransactions
+        .filter((t) => t.transactionDate < fromDate)
+        .reduce((a, t) => a + t.debit - t.credit, 0);
+    }
     return filteredTransactions.map((t) => {
       runningBalance = runningBalance + t.debit - t.credit;
       return { ...t, runningBalance };
     });
-  }, [filteredTransactions, selectedVendor]);
+  }, [filteredTransactions, selectedVendor, allTransactions, fromDate]);
 
   const totalDebit = useMemo(
     () => ledgerRows.reduce((a, r) => a + r.debit, 0),
@@ -90,8 +96,13 @@ export function VendorLedger() {
   );
   const closingBalance = useMemo(() => {
     if (!selectedVendor) return 0;
+    if (fromDate || toDate) {
+      // When date-filtered, closing balance = last filtered row's running balance
+      const lastRow = ledgerRows[ledgerRows.length - 1];
+      return lastRow ? lastRow.runningBalance : 0;
+    }
     return getVendorBalance(selectedVendorId);
-  }, [selectedVendorId, selectedVendor]);
+  }, [selectedVendorId, selectedVendor, fromDate, toDate, ledgerRows]);
 
   function onExport() {
     if (ledgerRows.length === 0) return;

@@ -18,7 +18,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { useStore, LOCATION_LABELS, WAREHOUSE_ID } from "@/lib/store";
+import { useStore, LOCATION_LABELS, WAREHOUSE_ID, getVendorBalance } from "@/lib/store";
 import { useStoreContext } from "@/lib/store-context";
 import { money } from "@/lib/utils";
 import { exportRows } from "@/lib/excel";
@@ -200,10 +200,7 @@ function TabOverview({ stock, sales, stockLots, saleAllocations, purchaseHeaders
       return a + (s.total - cost);
     }, 0);
     const vendorPayable = vendors.reduce((a: number, v: any) => {
-      const txns = vendorTransactions.filter((t: any) => t.vendorId === v.id);
-      const totalDebit = txns.reduce((a: number, t: any) => a + t.debit, 0);
-      const totalCredit = txns.reduce((a: number, t: any) => a + t.credit, 0);
-      const outstanding = v.openingBalance + totalDebit - totalCredit;
+      const outstanding = getVendorBalance(v.id);
       return a + Math.max(0, outstanding);
     }, 0);
     const today = new Date().toISOString().slice(0, 10);
@@ -1167,7 +1164,7 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
       const totalPurchases = txns.filter((t: any) => t.transactionType === "PURCHASE").reduce((a: number, t: any) => a + t.debit, 0);
       const totalPayments = txns.filter((t: any) => t.transactionType === "PAYMENT").reduce((a: number, t: any) => a + t.credit, 0);
       const totalReturns = txns.filter((t: any) => t.transactionType === "PURCHASE_RETURN").reduce((a: number, t: any) => a + t.credit, 0);
-      const outstanding = v.openingBalance + totalPurchases - totalPayments - totalReturns;
+      const outstanding = getVendorBalance(v.id);
       const lastTxn = txns.length > 0 ? txns[txns.length - 1].transactionDate : v.openingBalanceDate;
       const daysSinceLastTxn = lastTxn ? Math.floor((Date.now() - new Date(lastTxn).getTime()) / 86400000) : 999;
       return { ...v, totalPurchases, totalPayments, totalReturns, outstanding, daysSinceLastTxn };
