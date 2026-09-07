@@ -65,6 +65,7 @@ export function VendorLedger() {
 
   const filteredTransactions = useMemo(() => {
     return allTransactions.filter((t) => {
+      if (t.transactionType === "OPENING_BALANCE") return false;
       if (fromDate && t.transactionDate < fromDate) return false;
       if (toDate && t.transactionDate > toDate) return false;
       return true;
@@ -73,11 +74,12 @@ export function VendorLedger() {
 
   const ledgerRows = useMemo(() => {
     if (!selectedVendor) return [];
-    // Compute carry-forward from transactions excluded by date filter
-    let runningBalance = 0;
+    // Start from opening balance
+    let runningBalance = selectedVendor.openingBalance ?? 0;
+    // Add carry-forward from transactions excluded by date filter (but not OPENING_BALANCE)
     if (fromDate) {
-      runningBalance = allTransactions
-        .filter((t) => t.transactionDate < fromDate)
+      runningBalance += allTransactions
+        .filter((t) => t.transactionType !== "OPENING_BALANCE" && t.transactionDate < fromDate)
         .reduce((a, t) => a + t.debit - t.credit, 0);
     }
     return filteredTransactions.map((t) => {
@@ -107,15 +109,26 @@ export function VendorLedger() {
   function onExport() {
     if (ledgerRows.length === 0) return;
     exportRows(
-      ledgerRows.map((r) => ({
-        Date: r.transactionDate,
-        Type: TYPE_LABELS[r.transactionType] || r.transactionType,
-        "Reference No": r.referenceNo,
-        Remarks: r.remarks,
-        Debit: r.debit,
-        Credit: r.credit,
-        Balance: r.runningBalance,
-      })),
+      [
+        {
+          Date: "",
+          Type: "Opening Balance",
+          "Reference No": "",
+          Remarks: "Carried forward",
+          Debit: 0,
+          Credit: 0,
+          Balance: selectedVendor?.openingBalance ?? 0,
+        },
+        ...ledgerRows.map((r) => ({
+          Date: r.transactionDate,
+          Type: TYPE_LABELS[r.transactionType] || r.transactionType,
+          "Reference No": r.referenceNo,
+          Remarks: r.remarks,
+          Debit: r.debit,
+          Credit: r.credit,
+          Balance: r.runningBalance,
+        })),
+      ],
       "Vendor Ledger",
       `Vendor_Ledger_${selectedVendor?.vendorName ?? "Report"}_${new Date().toISOString().slice(0, 10)}.xlsx`
     );
@@ -182,6 +195,12 @@ export function VendorLedger() {
       <th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th>
     </tr></thead>
     <tbody>
+      <tr style="background:#f0f7ff;font-weight:600">
+        <td colspan="4">Opening Balance (carried forward)</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">${money(selectedVendor?.openingBalance ?? 0)}</td>
+      </tr>
       ${ledgerRows.map((r) => `<tr>
         <td>${esc(r.transactionDate)}</td>
         <td>${esc(TYPE_LABELS[r.transactionType] || r.transactionType)}</td>
@@ -317,6 +336,12 @@ export function VendorLedger() {
                 </tr>
               </thead>
               <tbody>
+                <tr className="border-b border-border bg-blue-50/50">
+                  <td className="px-3 py-2 font-medium" colSpan={4}>Opening Balance (carried forward)</td>
+                  <td className="px-3 py-2 text-right text-red-600">-</td>
+                  <td className="px-3 py-2 text-right text-green-600">-</td>
+                  <td className="px-3 py-2 text-right font-semibold">{money(selectedVendor?.openingBalance ?? 0)}</td>
+                </tr>
                 {ledgerRows.map((r) => (
                   <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                     <td className="px-3 py-2">{r.transactionDate}</td>
