@@ -1913,16 +1913,16 @@ export async function addVendor(
   if (error) return { error: error.message };
   const vendorId = inserted!.id as string;
 
-  // Create opening balance ledger entry if balance > 0
-  if (vendor.openingBalance > 0 && vendor.openingBalanceDate) {
+  // Create opening balance ledger entry if balance != 0
+  if (vendor.openingBalance !== 0 && vendor.openingBalanceDate) {
     await supabase.from("vendor_transactions").insert({
       vendor_id: vendorId,
       transaction_type: "OPENING_BALANCE",
       reference_no: "Opening",
       reference_id: vendorId,
       transaction_date: vendor.openingBalanceDate,
-      debit: vendor.openingBalance,
-      credit: 0,
+      debit: vendor.openingBalance > 0 ? vendor.openingBalance : 0,
+      credit: vendor.openingBalance < 0 ? Math.abs(vendor.openingBalance) : 0,
       balance: vendor.openingBalance,
       remarks: "Opening balance",
       store_id: _currentStoreId,
@@ -1964,14 +1964,17 @@ export async function updateVendor(
   const { data: existingOb } = await supabase.from("vendor_transactions").select("id, debit, credit").eq("vendor_id", id).eq("transaction_type", "OPENING_BALANCE").maybeSingle();
   if (existingOb) {
     const oldDebit = (existingOb as Record<string, unknown>)['debit'] as number;
-    if (vendor.openingBalance !== oldDebit) {
+    const oldCredit = (existingOb as Record<string, unknown>)['credit'] as number;
+    const oldBalance = oldDebit - oldCredit;
+    if (vendor.openingBalance !== oldBalance) {
       await supabase.from("vendor_transactions").update({
-        debit: vendor.openingBalance,
-        credit: 0,
+        debit: vendor.openingBalance > 0 ? vendor.openingBalance : 0,
+        credit: vendor.openingBalance < 0 ? Math.abs(vendor.openingBalance) : 0,
+        balance: vendor.openingBalance,
         transaction_date: vendor.openingBalanceDate || new Date().toISOString().slice(0, 10),
       }).eq("id", (existingOb as Record<string, unknown>)['id'] as string);
     }
-  } else if (vendor.openingBalance > 0 && vendor.openingBalanceDate) {
+  } else if (vendor.openingBalance !== 0 && vendor.openingBalanceDate) {
     // Create opening balance entry if it doesn't exist
     await supabase.from("vendor_transactions").insert({
       vendor_id: id,
@@ -1979,8 +1982,8 @@ export async function updateVendor(
       reference_no: "Opening",
       reference_id: id,
       transaction_date: vendor.openingBalanceDate,
-      debit: vendor.openingBalance,
-      credit: 0,
+      debit: vendor.openingBalance > 0 ? vendor.openingBalance : 0,
+      credit: vendor.openingBalance < 0 ? Math.abs(vendor.openingBalance) : 0,
       balance: vendor.openingBalance,
       remarks: "Opening balance",
       store_id: _currentStoreId,

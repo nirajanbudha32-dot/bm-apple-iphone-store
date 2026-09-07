@@ -613,10 +613,9 @@ export function VendorMaster() {
               />
             </div>
             <div>
-              <Label className="text-xs">Opening Balance</Label>
+              <Label className="text-xs">Opening Balance (+ve = you owe vendor, -ve = vendor owes you)</Label>
               <Input
                 type="number"
-                min="0"
                 step="0.01"
                 value={draft.openingBalance}
                 onChange={(e) => updateDraft("openingBalance", Number(e.target.value))}
