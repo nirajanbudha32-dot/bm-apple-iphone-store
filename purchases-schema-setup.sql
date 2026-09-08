@@ -27,7 +27,7 @@
 
   -- 2. GRANT PERMISSIONS
   GRANT SELECT, INSERT, UPDATE, DELETE ON public.purchases TO authenticated;
-  GRANT SELECT, INSERT, UPDATE, DELETE ON public.purchases TO anon;X`
+  GRANT SELECT, INSERT, UPDATE, DELETE ON public.purchases TO anon;
   GRANT ALL ON public.purchases TO service_role;
 
   -- 3. ENABLE ROW LEVEL SECURITY
