@@ -1775,9 +1775,20 @@ async function getNextStockCode(): Promise<string> {
   }
 
   let candidate = nextStockCode;
-  const existingCodes = new Set(state.stock.map((s) => String(s.code).trim()));
-  while (existingCodes.has(String(candidate))) {
-    candidate++;
+  // Check against ALL stores in DB (not just local state) to avoid unique constraint violations
+  // The stock.code column has a global UNIQUE constraint, but state.stock only has current store's items
+  let exists = true;
+  while (exists) {
+    const { data: found } = await supabase
+      .from("stock")
+      .select("code")
+      .eq("code", String(candidate))
+      .maybeSingle();
+    if (found) {
+      candidate++;
+    } else {
+      exists = false;
+    }
   }
   nextStockCode = candidate + 1;
   return String(candidate);
@@ -1862,7 +1873,10 @@ async function applyStockDelta(
         });
       } else {
         lastErr = insertErr.message;
+        // Force fresh read from DB on next attempt
         nextStockCode = null;
+        // Backoff delay to reduce collision probability on concurrent inserts
+        await new Promise((r) => setTimeout(r, 100 * attempts));
       }
     }
     if (!inserted) {
