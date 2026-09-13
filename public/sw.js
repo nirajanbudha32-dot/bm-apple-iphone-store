@@ -1,8 +1,11 @@
-const CACHE_NAME = "bm-store-v1";
+const CACHE_NAME = "bm-store-v2";
 const STATIC_ASSETS = [
-  "/",
   "/manifest.json",
   "/favicon.ico",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/bm-logo.jpeg",
+  "/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -28,15 +31,30 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   if (request.url.includes("supabase")) return;
 
+  const url = new URL(request.url);
+
+  if (request.mode === "navigate" || url.pathname === "/") {
+    event.respondWith(
+      fetch(request).catch(() => caches.match("/"))
+    );
+    return;
+  }
+
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
+        if (response.ok && response.type === "basic") {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+      }).catch(() => {
+        if (request.destination === "script" || request.destination === "style") {
+          return new Response("Offline", { status: 503, statusText: "Offline" });
+        }
+        return caches.match("/");
+      });
+    })
   );
 });

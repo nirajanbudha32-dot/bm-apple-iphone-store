@@ -68,6 +68,10 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.error("[BM Store] getSession error:", err);
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+          console.error("[BM Store] Network unreachable during session check");
+        }
         if (mounted) setLoading(false);
       });
 
@@ -95,7 +99,11 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       return { error };
     } catch (err) {
       console.error("[BM Store] signIn exception:", err);
-      return { error: { message: err instanceof Error ? err.message : "Sign in failed" } as AuthError };
+      const msg = err instanceof Error ? err.message : "Sign in failed";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("ERR_NETWORK")) {
+        return { error: { message: "Cannot reach the server. Please check your internet connection and try again." } as AuthError };
+      }
+      return { error: { message: msg } as AuthError };
     }
   }
 

@@ -19,6 +19,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [networkError, setNetworkError] = useState(false);
 
   useEffect(() => {
     if (!loading && user) {
@@ -31,6 +32,7 @@ function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setNetworkError(false);
     setSubmitting(true);
     try {
       const { error } = await signIn(email, password);
@@ -38,6 +40,9 @@ function LoginPage() {
       if (error) {
         console.error("Login error:", error);
         setError(error.message);
+        if (error.message.includes("Cannot reach the server")) {
+          setNetworkError(true);
+        }
         toast.error(error.message);
       } else {
         toast.success("Logged in");
@@ -50,6 +55,11 @@ function LoginPage() {
       setError(msg);
       toast.error(msg);
     }
+  }
+
+  function handleRetry() {
+    setError("");
+    setNetworkError(false);
   }
 
   if (loading) {
@@ -78,7 +88,18 @@ function LoginPage() {
           )}
           {error && (
             <div className="mb-4 rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-              {error}
+              <p>{error}</p>
+              {networkError && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={handleRetry}
+                >
+                  Try again
+                </Button>
+              )}
             </div>
           )}
           <form onSubmit={handleLogin} className="space-y-4">

@@ -7,7 +7,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("[BM Store] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env");
 }
 
-export const supabase: SupabaseClient = createClient(supabaseUrl ?? "", supabaseAnonKey ?? "");
+export const supabase: SupabaseClient = createClient(supabaseUrl ?? "", supabaseAnonKey ?? "", {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  },
+});
 
 export type UserRole = "admin" | "salesman" | "bod";
 
