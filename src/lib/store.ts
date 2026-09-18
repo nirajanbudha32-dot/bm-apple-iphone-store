@@ -2330,7 +2330,8 @@ export async function createTransfer(
     const transferNo = await getNextTransferNo();
 
     for (const item of items) {
-      const { data: lot } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
+      const { data: lot, error: lotErr } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
+      if (lotErr) return { error: `Failed to verify lot for "${item.itemName}": ${lotErr.message}` };
       if (!lot) return { error: `Lot not found for "${item.itemName}"` };
       const lotQty = (lot as Record<string, unknown>)['qty'] as number;
       if (lotQty < item.qty) return { error: `Insufficient qty in lot for "${item.itemName}". Available: ${lotQty}, requested: ${item.qty}` };
@@ -2346,11 +2347,16 @@ export async function createTransfer(
       created_by: user?.id ?? null,
     }).select("id").single();
 
-    if (tErr) return { error: tErr.message };
+    if (tErr) return { error: `Failed to create transfer record: ${tErr.message}` };
     const transferId = (transferRow as Record<string, unknown>)['id'] as string;
 
     for (const item of items) {
-      await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: -item.qty });
+      const { error: srcErr } = await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: -item.qty });
+      if (srcErr) {
+        console.error("[store] createTransfer: source lot decrement failed:", srcErr);
+        await supabase.from("stock_transfers").delete().eq("id", transferId);
+        return { error: `Failed to reduce source stock for "${item.itemName}": ${srcErr.message}` };
+      }
 
       let destLotId: string | null = null;
       const destName = item.destItemName || item.itemName;
@@ -2364,10 +2370,16 @@ export async function createTransfer(
 
       if (existingDestLot) {
         destLotId = (existingDestLot as Record<string, unknown>)['id'] as string;
-        await supabase.rpc("adjust_lot_qty", { p_lot_id: destLotId, p_delta: item.qty });
+        const { error: destErr } = await supabase.rpc("adjust_lot_qty", { p_lot_id: destLotId, p_delta: item.qty });
+        if (destErr) {
+          console.error("[store] createTransfer: dest lot increment failed:", destErr);
+          await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: item.qty });
+          await supabase.from("stock_transfers").delete().eq("id", transferId);
+          return { error: `Failed to add stock to destination for "${item.itemName}": ${destErr.message}` };
+        }
       } else {
         const destLotNo = await getNextLotNo();
-        const { data: newDestLot } = await supabase.from("stock_lots").insert({
+        const { data: newDestLot, error: destInsertErr } = await supabase.from("stock_lots").insert({
           lot_no: destLotNo,
           purchase_id: null,
           item_code: destCode,
@@ -2378,10 +2390,16 @@ export async function createTransfer(
           purchase_price: item.purchasePrice,
           store_id: toStoreId,
         }).select("id").maybeSingle();
-        destLotId = newDestLot ? (newDestLot as Record<string, unknown>)['id'] as string : null;
+        if (destInsertErr || !newDestLot) {
+          console.error("[store] createTransfer: dest lot insert failed:", destInsertErr);
+          await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: item.qty });
+          await supabase.from("stock_transfers").delete().eq("id", transferId);
+          return { error: `Failed to create destination lot for "${item.itemName}": ${destInsertErr?.message ?? "unknown error"}` };
+        }
+        destLotId = (newDestLot as Record<string, unknown>)['id'] as string;
       }
 
-      await supabase.from("stock_transfer_items").insert({
+      const { error: itemInsertErr } = await supabase.from("stock_transfer_items").insert({
         transfer_id: transferId,
         item_code: item.itemCode,
         item_name: item.itemName,
@@ -2392,6 +2410,9 @@ export async function createTransfer(
         imei: item.imei || null,
         purchase_price: item.purchasePrice,
       });
+      if (itemInsertErr) {
+        console.error("[store] createTransfer: transfer item insert failed:", itemInsertErr);
+      }
 
       if (item.imei) {
         await supabase.from("purchase_item_imeis").delete().eq("imei", item.imei);
@@ -2409,8 +2430,8 @@ export async function createTransfer(
       }
     }
 
-    await reconcileStockQty(fromStoreId);
-    await reconcileStockQty(toStoreId);
+    try { await reconcileStockQty(fromStoreId); } catch (e) { console.error("[store] createTransfer: reconcile fromStore failed:", e); }
+    try { await reconcileStockQty(toStoreId); } catch (e) { console.error("[store] createTransfer: reconcile toStore failed:", e); }
     await logAudit("INSERT", "stock_transfers", transferId, null, { transfer_no: transferNo, from: fromStoreId, to: toStoreId, items: items.length });
     await reload();
     return { transferNo };
@@ -2420,7 +2441,11 @@ export async function createTransfer(
 }
 
 async function reconcileStockQty(storeId: string) {
-  const { data: lots } = await supabase.from("stock_lots").select("item_name, qty").eq("store_id", storeId);
+  const { data: lots, error: lotsErr } = await supabase.from("stock_lots").select("item_name, qty").eq("store_id", storeId);
+  if (lotsErr) {
+    console.error("[store] reconcileStockQty: failed to fetch lots for store:", storeId, lotsErr);
+    return;
+  }
   if (!lots) return;
   const qtyMap = new Map<string, number>();
   for (const l of lots) {
@@ -2428,20 +2453,25 @@ async function reconcileStockQty(storeId: string) {
     const qty = (l as Record<string, unknown>)['qty'] as number;
     qtyMap.set(name, (qtyMap.get(name) || 0) + qty);
   }
-  const { data: stockItems } = await supabase.from("stock").select("name, code").eq("store_id", storeId);
+  const { data: stockItems, error: stockErr } = await supabase.from("stock").select("name, code").eq("store_id", storeId);
+  if (stockErr) {
+    console.error("[store] reconcileStockQty: failed to fetch stock for store:", storeId, stockErr);
+    return;
+  }
   const existingNames = new Set<string>();
   if (stockItems) {
     for (const s of stockItems) {
       const name = (s as Record<string, unknown>)['name'] as string;
       existingNames.add(name);
       const totalQty = qtyMap.get(name) || 0;
-      await supabase.from("stock").update({ qty: totalQty }).eq("name", name).eq("store_id", storeId);
+      const { error: updErr } = await supabase.from("stock").update({ qty: totalQty }).eq("name", name).eq("store_id", storeId);
+      if (updErr) console.error("[store] reconcileStockQty: stock update failed for", name, updErr);
     }
   }
   for (const [itemName, totalQty] of qtyMap) {
     if (!existingNames.has(itemName) && totalQty > 0) {
       const newCode = await getNextStockCode();
-      await supabase.from("stock").insert({
+      const { error: insertErr } = await supabase.from("stock").insert({
         code: newCode,
         name: itemName,
         category: "General",
@@ -2455,6 +2485,7 @@ async function reconcileStockQty(storeId: string) {
         selling_price: 0,
         store_id: storeId,
       });
+      if (insertErr) console.error("[store] reconcileStockQty: new stock insert failed for", itemName, insertErr);
     }
   }
 }

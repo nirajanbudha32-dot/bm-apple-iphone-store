@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, Building2, Warehouse } from "lucide-react";
+import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, Building2, Warehouse, ArrowRightLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import { StoreSwitcher } from "@/components/StoreSwitcher";
 import { StoreManager } from "@/components/StoreManager";
 import { CrossStoreSummary } from "@/components/CrossStoreSummary";
 import { WarehouseView } from "@/components/WarehouseView";
+import { TransferHistory } from "@/components/TransferHistory";
 import { BodDashboard } from "@/components/BodDashboard";
 import { StoreProvider, useStoreContext } from "@/lib/store-context";
 import { setCurrentStoreIdForStore } from "@/lib/store";
@@ -173,6 +174,9 @@ function IndexInner() {
             <TabsTrigger value="vendors" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
             </TabsTrigger>
+            <TabsTrigger value="transfers" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <ArrowRightLeft className="mr-1.5 size-3.5 sm:size-4" /> Transfers
+            </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="warehouse" className="py-2 text-xs sm:py-1.5 sm:text-sm">
                 <Warehouse className="mr-1.5 size-3.5 sm:size-4" /> Warehouse
@@ -247,6 +251,9 @@ function IndexInner() {
           {vendorSubTab === "payments" && <VendorPayments />}
           {vendorSubTab === "returns" && <PurchaseReturns />}
           {vendorSubTab === "reports" && <VendorReports />}
+        </TabsContent>
+        <TabsContent value="transfers">
+          <TransferHistory />
         </TabsContent>
         {isAdmin && (
           <TabsContent value="warehouse">
