@@ -2361,12 +2361,17 @@ export async function createTransfer(
       let destLotId: string | null = null;
       const destName = item.destItemName || item.itemName;
       const destCode = item.destItemCode || item.itemCode;
-      const { data: existingDestLot } = await supabase.from("stock_lots")
+      let destLotQuery = supabase.from("stock_lots")
         .select("id, qty")
-        .eq("item_name", destName)
         .eq("store_id", toStoreId)
-        .eq("purchase_price", item.purchasePrice)
-        .maybeSingle();
+        .eq("purchase_price", item.purchasePrice);
+
+      if (item.destItemCode) {
+        destLotQuery = destLotQuery.eq("item_code", item.destItemCode);
+      } else {
+        destLotQuery = destLotQuery.eq("item_name", destName);
+      }
+      const { data: existingDestLot } = await destLotQuery.maybeSingle();
 
       if (existingDestLot) {
         destLotId = (existingDestLot as Record<string, unknown>)['id'] as string;
@@ -2379,24 +2384,21 @@ export async function createTransfer(
         }
       } else {
         const destLotNo = await getNextLotNo();
-        const { data: newDestLot, error: destInsertErr } = await supabase.from("stock_lots").insert({
-          lot_no: destLotNo,
-          purchase_id: null,
-          item_code: destCode,
-          item_name: destName,
-          date: new Date().toISOString().slice(0, 10),
-          supplier: "Transfer",
-          qty: item.qty,
-          purchase_price: item.purchasePrice,
-          store_id: toStoreId,
-        }).select("id").maybeSingle();
-        if (destInsertErr || !newDestLot) {
+        const { data: newDestLotId, error: destInsertErr } = await supabase.rpc("create_transfer_dest_lot", {
+          p_lot_no: destLotNo,
+          p_item_code: destCode,
+          p_item_name: destName,
+          p_qty: item.qty,
+          p_purchase_price: item.purchasePrice,
+          p_store_id: toStoreId,
+        });
+        if (destInsertErr || !newDestLotId) {
           console.error("[store] createTransfer: dest lot insert failed:", destInsertErr);
           await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: item.qty });
           await supabase.from("stock_transfers").delete().eq("id", transferId);
           return { error: `Failed to create destination lot for "${item.itemName}": ${destInsertErr?.message ?? "unknown error"}` };
         }
-        destLotId = (newDestLot as Record<string, unknown>)['id'] as string;
+        destLotId = newDestLotId as string;
       }
 
       const { error: itemInsertErr } = await supabase.from("stock_transfer_items").insert({
@@ -2430,8 +2432,8 @@ export async function createTransfer(
       }
     }
 
-    try { await reconcileStockQty(fromStoreId); } catch (e) { console.error("[store] createTransfer: reconcile fromStore failed:", e); }
-    try { await reconcileStockQty(toStoreId); } catch (e) { console.error("[store] createTransfer: reconcile toStore failed:", e); }
+    try { await supabase.rpc("reconcile_store_stock", { p_store_id: fromStoreId }); } catch (e) { console.error("[store] createTransfer: reconcile fromStore failed:", e); }
+    try { await supabase.rpc("reconcile_store_stock", { p_store_id: toStoreId }); } catch (e) { console.error("[store] createTransfer: reconcile toStore failed:", e); }
     await logAudit("INSERT", "stock_transfers", transferId, null, { transfer_no: transferNo, from: fromStoreId, to: toStoreId, items: items.length });
     await reload();
     return { transferNo };
@@ -2554,11 +2556,23 @@ export async function deleteTransfer(transferId: string): Promise<{ error?: stri
 
   await supabase.from("stock_transfer_items").delete().eq("transfer_id", transferId);
   await supabase.from("stock_transfers").delete().eq("id", transferId);
-  await reconcileStockQty(fromStoreId);
-  await reconcileStockQty(toStoreId);
+  try { await supabase.rpc("reconcile_store_stock", { p_store_id: fromStoreId }); } catch (e) { console.error("[store] deleteTransfer: reconcile fromStore failed:", e); }
+  try { await supabase.rpc("reconcile_store_stock", { p_store_id: toStoreId }); } catch (e) { console.error("[store] deleteTransfer: reconcile toStore failed:", e); }
   await logAudit("DELETE", "stock_transfers", transferId);
   await reload();
   return {};
+}
+
+export async function getStoreStock(storeId: string): Promise<{ code: string; name: string }[]> {
+  const { data, error } = await supabase.rpc("get_store_stock", { p_store_id: storeId });
+  if (error) {
+    console.error("[store] getStoreStock RPC error:", error);
+    return [];
+  }
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    code: r['code'] as string,
+    name: r['name'] as string,
+  }));
 }
 
 export async function getTransfers(): Promise<StockTransfer[]> {

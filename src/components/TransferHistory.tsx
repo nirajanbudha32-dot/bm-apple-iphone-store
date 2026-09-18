@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Printer, ArrowDownRight, ArrowUpRight, Plus, Trash2, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   deleteTransfer,
   getTransfers,
   getTransferItems,
+  getStoreStock,
   useStore,
   WAREHOUSE_ID,
   LOCATION_LABELS,
@@ -75,6 +76,7 @@ export function TransferHistory() {
   const [destItemSearch, setDestItemSearch] = useState("");
   const [selectedDestItemCode, setSelectedDestItemCode] = useState("");
   const [selectedDestItemName, setSelectedDestItemName] = useState("");
+  const [destOpen, setDestOpen] = useState(false);
 
   const myStoreId = currentStoreId || null;
   const canCreateTransfer = myStoreId !== null || isAdmin;
@@ -104,12 +106,20 @@ export function TransferHistory() {
 
   const selectedLot = useMemo(() => stockLots.find((l) => l.id === selectedLotId), [stockLots, selectedLotId]);
 
+  // Fetch destination store stock via RPC (bypasses RLS for salesmen)
+  const [destStoreItems, setDestStoreItems] = useState<{ code: string; name: string }[]>([]);
+  const loadDestStock = useCallback(async (storeId: string) => {
+    if (!storeId) return;
+    const items = await getStoreStock(storeId);
+    setDestStoreItems(items);
+  }, []);
+  useEffect(() => { loadDestStock(toStoreId); }, [toStoreId, loadDestStock]);
+
   const destItems = useMemo(() => {
-    const items = stock.filter((s) => s.storeId === toStoreId);
-    if (!destItemSearch.trim()) return items.slice(0, 30);
+    if (!destItemSearch.trim()) return destStoreItems.slice(0, 30);
     const t = destItemSearch.trim().toLowerCase();
-    return items.filter((s) => s.name.toLowerCase().includes(t) || s.code.toLowerCase().includes(t));
-  }, [stock, toStoreId, destItemSearch]);
+    return destStoreItems.filter((s) => s.name.toLowerCase().includes(t) || s.code.toLowerCase().includes(t));
+  }, [destStoreItems, destItemSearch]);
 
   async function loadTransfers() {
     setLoading(true);
@@ -304,14 +314,30 @@ ${items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.itemName)}</td><td>${e
                   </div>
                   <div className="relative sm:col-span-3">
                     <Label className="text-xs sm:text-sm">Dest. Item (optional)</Label>
-                    <Input value={destItemSearch} onChange={(e) => { setDestItemSearch(e.target.value); setSelectedDestItemCode(""); setSelectedDestItemName(""); }}
-                      placeholder="Map to dest item..." className="h-9 text-xs sm:text-sm" disabled={!selectedLotId} />
-                    {destItemSearch && !selectedDestItemCode && destItems.length > 0 && (
+                    <Input
+                      value={destItemSearch}
+                      onChange={(e) => { setDestItemSearch(e.target.value); setSelectedDestItemCode(""); setSelectedDestItemName(""); }}
+                      onFocus={() => setDestOpen(true)}
+                      onBlur={() => setTimeout(() => setDestOpen(false), 250)}
+                      placeholder="Map to dest item..."
+                      className="h-9 text-xs sm:text-sm"
+                      disabled={!selectedLotId}
+                    />
+                    {destOpen && !selectedDestItemCode && destItems.length > 0 && (
                       <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-popover shadow-lg">
                         {destItems.map((s) => (
                           <li key={s.code}>
-                            <button type="button" className="w-full px-3 py-2 text-left text-xs hover:bg-accent"
-                              onClick={() => { setSelectedDestItemCode(s.code); setSelectedDestItemName(s.name); setDestItemSearch(`${s.code} - ${s.name}`); }}>
+                            <button
+                              type="button"
+                              className="w-full px-3 py-2 text-left text-xs hover:bg-accent"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setSelectedDestItemCode(s.code);
+                                setSelectedDestItemName(s.name);
+                                setDestItemSearch(`${s.code} - ${s.name}`);
+                                setDestOpen(false);
+                              }}
+                            >
                               <span className="font-mono text-primary">{s.code}</span>
                               <span className="ml-1 font-medium">{s.name}</span>
                             </button>
