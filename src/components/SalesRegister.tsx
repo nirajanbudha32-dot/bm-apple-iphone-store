@@ -28,7 +28,7 @@ import {
 } from "@/lib/store";
 import { exportRows } from "@/lib/excel";
 import { useDebounce } from "@/lib/use-debounce";
-import { money, numberToWords } from "@/lib/utils";
+import { money, numberToWords, extractVat } from "@/lib/utils";
 import { useStoreContext } from "@/lib/store-context";
 
 const DEFAULT_COMPANY = {
@@ -80,6 +80,12 @@ export function SalesRegister() {
   const [itemRate, setItemRate] = useState(0);
   const [itemDiscount, setItemDiscount] = useState(0);
   const [isFreeItem, setIsFreeItem] = useState(false);
+
+  const liveTotal = useMemo(() => {
+    if (isFreeItem) return 0;
+    return Math.max(0, itemQty * itemRate - itemDiscount);
+  }, [isFreeItem, itemQty, itemRate, itemDiscount]);
+  const liveVat = useMemo(() => extractVat(liveTotal), [liveTotal]);
 
   const [imeiInput, setImeiInput] = useState("");
   const [showImeiInput, setShowImeiInput] = useState(false);
@@ -169,8 +175,8 @@ export function SalesRegister() {
       toast.error(`Insufficient stock. Available: ${matched.qty}`);
       return;
     }
-    const amount = isFreeItem ? 0 : itemQty * itemRate - itemDiscount;
-    const vat = isFreeItem ? 0 : amount * VAT_RATE;
+    const total = isFreeItem ? 0 : itemQty * itemRate - itemDiscount;
+    const { taxable: amount, vat } = isFreeItem ? { taxable: 0, vat: 0 } : extractVat(total);
     const newItem: BillItem = {
       itemCode: matched?.code ?? "",
       itemName: matched?.name ?? itemName.trim(),
@@ -184,7 +190,7 @@ export function SalesRegister() {
       discount: isFreeItem ? 0 : itemDiscount,
       amount,
       vat,
-      total: amount + vat,
+      total,
       isFree: isFreeItem,
     };
     setBillItems((prev) => {
@@ -414,8 +420,8 @@ export function SalesRegister() {
         <th class="num" style="width:7%">Qty</th>
         <th class="num" style="width:12%">Rate</th>
         <th class="num" style="width:10%">Disc</th>
-        <th class="num" style="width:12%">Amount</th>
-        <th class="num" style="width:10%">VAT 13%</th>
+        <th class="num" style="width:12%">Taxable Amt</th>
+        <th class="num" style="width:11%">VAT 13% (incl.)</th>
         <th class="num" style="width:13%">Total</th>
       </tr>
     </thead>
@@ -439,10 +445,10 @@ export function SalesRegister() {
 
   <div class="summary-wrap">
     <table>
-      <tr><td class="label">Sub Total</td><td class="val">${money(printData.subtotal)}</td></tr>
+      <tr><td class="label">Taxable Amount</td><td class="val">${money(printData.subtotal)}</td></tr>
       ${printData.headerDiscount > 0 ? `<tr><td class="label">Discount</td><td class="val">-${money(printData.headerDiscount)}</td></tr>` : ""}
       ${printData.otherCharges > 0 ? `<tr><td class="label">Other Charges</td><td class="val">${money(printData.otherCharges)}</td></tr>` : ""}
-      <tr><td class="label">VAT / TAX 13%</td><td class="val">${money(printData.vat)}</td></tr>
+      <tr><td class="label">VAT @ 13% (inclusive)</td><td class="val">${money(printData.vat)}</td></tr>
       <tr class="grand"><td class="label">Grand Total</td><td class="val">${money(printData.total)}</td></tr>
     </table>
   </div>
@@ -746,6 +752,15 @@ export function SalesRegister() {
                   />
                 </div>
               </div>
+              {!isFreeItem && itemRate > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2.5 rounded bg-muted/60 px-2.5 py-1.5 text-xs text-muted-foreground">
+                  <span>Taxable: <strong className="text-foreground font-semibold">Rs. {money(liveVat.taxable)}</strong></span>
+                  <span>•</span>
+                  <span>VAT (13%): <strong className="text-foreground font-semibold">Rs. {money(liveVat.vat)}</strong></span>
+                  <span>•</span>
+                  <span>Grand Total: <strong className="text-primary font-bold">Rs. {money(liveVat.total)}</strong></span>
+                </div>
+              )}
               <div className="mt-2 flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
@@ -817,8 +832,8 @@ export function SalesRegister() {
                     <th className="p-2 text-right">Qty</th>
                     <th className="p-2 text-right">Rate</th>
                     <th className="p-2 text-right">Disc</th>
-                    <th className="p-2 text-right">Amount</th>
-                    <th className="p-2 text-right">VAT</th>
+                    <th className="p-2 text-right">Taxable Amt</th>
+                    <th className="p-2 text-right">VAT (13%)</th>
                     <th className="p-2 text-right">Total</th>
                     <th className="p-2"></th>
                   </tr>
@@ -857,7 +872,7 @@ export function SalesRegister() {
             <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
               <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 text-xs sm:text-sm">
                 <div>
-                  <Label className="text-[11px] text-muted-foreground">Subtotal</Label>
+                  <Label className="text-[11px] text-muted-foreground">Subtotal / Taxable Amount</Label>
                   <div className="font-semibold">{money(billSubtotal)}</div>
                 </div>
                 <div>
@@ -869,7 +884,7 @@ export function SalesRegister() {
                   <Input type="number" min="0" step="0.01" value={otherCharges} onChange={(e) => setOtherCharges(Number(e.target.value))} className="h-8 text-xs mt-0.5" />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground">VAT 13%</Label>
+                  <Label className="text-[11px] text-muted-foreground">VAT 13% (incl.)</Label>
                   <div className="font-semibold">{money(billVat)}</div>
                 </div>
                 <div>
@@ -1016,7 +1031,7 @@ export function SalesRegister() {
                               })),
                               itemImeis: {},
                               subtotal: g.items.reduce((a, i) => a + i.amount, 0),
-                              headerDiscount: Math.max(0, g.items.reduce((a, i) => a + i.amount, 0) + (g.header.otherCharges ?? 0) - invPaid - invRemaining),
+                              headerDiscount: Math.max(0, invTotal + (g.header.otherCharges ?? 0) - invPaid - invRemaining),
                               otherCharges: g.header.otherCharges,
                               vat: g.items.reduce((a, i) => a + i.vat, 0),
                               total: invTotal,

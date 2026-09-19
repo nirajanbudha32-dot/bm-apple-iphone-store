@@ -190,21 +190,21 @@ export function BodDashboard() {
 
 function TabOverview({ stock, sales, stockLots, saleAllocations, purchaseHeaders, salesReturns, vendors, vendorTransactions, storeLabel }: any) {
   const o = useMemo(() => {
-    const totalSales = sales.reduce((a: number, s: any) => a + s.total, 0);
+    const totalSales = sales.reduce((a: number, s: any) => a + s.amount, 0);
     const totalPurchases = purchaseHeaders.reduce((a: number, p: any) => a + p.grandTotal, 0);
     const stockValue = stockLots.filter((l: any) => l.qty > 0).reduce((a: number, l: any) => a + l.qty * l.purchasePrice, 0);
     const stockQty = stockLots.filter((l: any) => l.qty > 0).reduce((a: number, l: any) => a + l.qty, 0);
     const totalProfit = sales.reduce((a: number, s: any) => {
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
       const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
-      return a + (s.total - cost);
+      return a + (s.amount - cost);
     }, 0);
     const vendorPayable = vendors.reduce((a: number, v: any) => {
       const outstanding = getVendorBalance(v.id);
       return a + Math.max(0, outstanding);
     }, 0);
     const today = new Date().toISOString().slice(0, 10);
-    const todaySalesTotal = sales.filter((s: any) => s.date === today).reduce((a: number, s: any) => a + s.total, 0);
+    const todaySalesTotal = sales.filter((s: any) => s.date === today).reduce((a: number, s: any) => a + s.amount, 0);
     const invoiceCount = new Set(sales.map((s: any) => s.invoiceNo)).size;
     const totalVat = sales.reduce((a: number, s: any) => a + s.vat, 0);
     const totalReturnRefund = salesReturns.reduce((a: number, r: any) => a + r.refundAmount, 0);
@@ -214,7 +214,7 @@ function TabOverview({ stock, sales, stockLots, saleAllocations, purchaseHeaders
     const monthMap = new Map<string, { sales: number; purchases: number }>();
     for (const s of sales) {
       const m = s.date?.slice(0, 7);
-      if (m) { const e = monthMap.get(m) || { sales: 0, purchases: 0 }; e.sales += s.total; monthMap.set(m, e); }
+      if (m) { const e = monthMap.get(m) || { sales: 0, purchases: 0 }; e.sales += s.amount; monthMap.set(m, e); }
     }
     for (const p of purchaseHeaders) {
       const m = p.date?.slice(0, 7);
@@ -227,7 +227,7 @@ function TabOverview({ stock, sales, stockLots, saleAllocations, purchaseHeaders
       if (id === WAREHOUSE_ID) continue;
       storeMap.set(id, { name, sales: 0, purchases: 0 });
     }
-    for (const s of sales) { const st = storeMap.get(s.storeId || ""); if (st) st.sales += s.total; }
+    for (const s of sales) { const st = storeMap.get(s.storeId || ""); if (st) st.sales += s.amount; }
     for (const p of purchaseHeaders) { const st = storeMap.get(p.storeId || ""); if (st) st.purchases += p.grandTotal; }
     const storePerf = Array.from(storeMap.values()).filter(s => s.sales > 0 || s.purchases > 0).map(s => ({ ...s, profit: s.sales - s.purchases, margin: s.sales > 0 ? ((s.sales - s.purchases) / s.sales * 100) : 0 }));
 
@@ -383,22 +383,22 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
     const returnRate = totalGrand > 0 ? (totalReturns / totalGrand * 100) : 0;
 
     const dailyMap = new Map<string, number>();
-    for (const s of filtered) { const d = s.date?.slice(0, 10); if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + s.total); }
+    for (const s of filtered) { const d = s.date?.slice(0, 10); if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + s.amount); }
     const dailyTrend = Array.from(dailyMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date: shortMonth(date), label: date, total }));
 
     const catMap = new Map<string, number>();
-    for (const s of filtered) { const c = s.category || "Uncategorized"; catMap.set(c, (catMap.get(c) || 0) + s.total); }
+    for (const s of filtered) { const c = s.category || "Uncategorized"; catMap.set(c, (catMap.get(c) || 0) + s.amount); }
     const categoryBreakdown = Array.from(catMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
     const brandMap = new Map<string, { sales: number; qty: number; profit: number }>();
     for (const s of filtered) {
       const b = s.brand || "Unknown";
       const e = brandMap.get(b) || { sales: 0, qty: 0, profit: 0 };
-      e.sales += s.total;
+      e.sales += s.amount;
       e.qty += s.qty;
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
       const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
-      e.profit += s.total - cost;
+      e.profit += s.amount - cost;
       brandMap.set(b, e);
     }
     const brandPerformance = Array.from(brandMap.entries()).map(([brand, v]) => ({
@@ -410,10 +410,10 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
       const key = s.itemCode;
       const e = itemMap.get(key) || { name: s.itemName, code: s.itemCode, qty: 0, revenue: 0, profit: 0 };
       e.qty += s.qty;
-      e.revenue += s.total;
+      e.revenue += s.amount;
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
       const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
-      e.profit += s.total - cost;
+      e.profit += s.amount - cost;
       itemMap.set(key, e);
     }
     const topItems = Array.from(itemMap.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 15);
@@ -735,20 +735,20 @@ function TabProfitability({ sales, saleAllocations, stockLots }: any) {
     for (const s of filtered) {
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
       const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
-      const profit = s.total - cost;
-      totalRevenue += s.total;
+      const profit = s.amount - cost;
+      totalRevenue += s.amount;
       totalCost += cost;
 
       const cat = s.category || "Uncategorized";
-      const ce = catMap.get(cat) || { revenue: 0, cost: 0 }; ce.revenue += s.total; ce.cost += cost; catMap.set(cat, ce);
+      const ce = catMap.get(cat) || { revenue: 0, cost: 0 }; ce.revenue += s.amount; ce.cost += cost; catMap.set(cat, ce);
       const br = s.brand || "Unknown";
-      const be = brandMap.get(br) || { revenue: 0, cost: 0 }; be.revenue += s.total; be.cost += cost; brandMap.set(br, be);
+      const be = brandMap.get(br) || { revenue: 0, cost: 0 }; be.revenue += s.amount; be.cost += cost; brandMap.set(br, be);
       const st = LOCATION_LABELS[s.storeId] || "Unknown";
-      const se = storeMap.get(st) || { revenue: 0, cost: 0 }; se.revenue += s.total; se.cost += cost; storeMap.set(st, se);
+      const se = storeMap.get(st) || { revenue: 0, cost: 0 }; se.revenue += s.amount; se.cost += cost; storeMap.set(st, se);
       const key = s.itemCode;
-      const ie = itemMap.get(key) || { name: s.itemName, code: s.itemCode, revenue: 0, cost: 0, qty: 0 }; ie.revenue += s.total; ie.cost += cost; ie.qty += s.qty; itemMap.set(key, ie);
+      const ie = itemMap.get(key) || { name: s.itemName, code: s.itemCode, revenue: 0, cost: 0, qty: 0 }; ie.revenue += s.amount; ie.cost += cost; ie.qty += s.qty; itemMap.set(key, ie);
       const day = s.date?.slice(0, 10);
-      if (day) { const de = dailyMap.get(day) || { revenue: 0, cost: 0 }; de.revenue += s.total; de.cost += cost; dailyMap.set(day, de); }
+      if (day) { const de = dailyMap.get(day) || { revenue: 0, cost: 0 }; de.revenue += s.amount; de.cost += cost; dailyMap.set(day, de); }
     }
 
     const totalProfit = totalRevenue - totalCost;
@@ -1454,7 +1454,7 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
     for (const l of stockLots) { const st = storeMap.get(l.storeId || ""); if (st && l.qty > 0) st.stockValue += l.qty * l.purchasePrice; }
     for (const s of sales) {
       const st = storeMap.get(s.storeId || "");
-      if (st) { st.sales += s.total; st.salesCount++; st.vat += s.vat; }
+      if (st) { st.sales += s.amount; st.salesCount++; st.vat += s.vat; }
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
       const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
       if (st) st.cogs += cost;

@@ -29,6 +29,22 @@ function threeDigits(n: number): string {
   return parts.join(" ");
 }
 
+/**
+ * Extract VAT-inclusive breakdown from a VAT-inclusive total.
+ * Use this for ALL sales VAT calculations.
+ * @param inclusiveTotal - the price the customer pays (VAT already inside)
+ * @param vatRate - e.g. 0.13 for 13%
+ */
+export function extractVat(inclusiveTotal: number, vatRate: number = 0.13) {
+  const taxable = Math.round((inclusiveTotal / (1 + vatRate)) * 100) / 100;
+  const vat = Math.round((inclusiveTotal - taxable) * 100) / 100;
+  return {
+    taxable,
+    vat,
+    total: inclusiveTotal,
+  };
+}
+
 export function numberToWords(n: number): string {
   if (n === 0) return "Rupees Zero Only";
   if (n < 0) return "Minus " + numberToWords(-n);

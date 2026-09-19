@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase, type Profile } from "@/lib/supabase";
 import { useStoreContext } from "@/lib/store-context";
+import { extractVat } from "@/lib/utils";
 
 let _currentStoreId: string | null = null;
 export function setCurrentStoreIdForStore(id: string | null) { _currentStoreId = id; }
@@ -820,39 +821,57 @@ export async function addBill(
 
     const isRepair = saleType === "Repair";
 
-    const rows = items.map((item) => ({
-      invoice_no: invoiceNo,
-      date,
-      customer,
-      customer_pan: customerPan,
-      has_vat_pan: hasVatPan,
-      customer_type: customerType,
-      customer_contact: customerContact,
-      customer_location: customerLocation,
-      item_name: item.itemName,
-      item_code: item.itemCode,
-      category: item.category,
-      sub_category: item.subCategory,
-      brand: item.brand,
-      model: item.model,
-      qty: item.qty,
-      rate: item.rate,
-      discount: item.discount,
-      amount: item.amount,
-      vat: item.vat,
-      total: item.total,
-      payment_method: paymentMethod,
-      other_charges: otherCharges,
-      paid_amount: paidAmount,
-      remaining: 0,
-      remarks,
-      sale_type: saleType,
-      is_free: item.isFree ?? false,
-      warranty_original_invoice: saleType === "Warranty" ? warrantyOriginalInvoice : "",
-      status,
-      created_by: user?.id ?? null,
-      store_id: _currentStoreId,
-    }));
+    const rows = items.map((item) => {
+      let itemAmount = item.amount;
+      let itemVat = item.vat;
+      const itemTotal = item.isFree ? 0 : item.total;
+
+      if (item.isFree) {
+        itemAmount = 0;
+        itemVat = 0;
+      } else {
+        const extracted = extractVat(itemTotal, VAT_RATE);
+        itemAmount = extracted.taxable;
+        itemVat = extracted.vat;
+        item.amount = itemAmount;
+        item.vat = itemVat;
+        item.total = itemTotal;
+      }
+
+      return {
+        invoice_no: invoiceNo,
+        date,
+        customer,
+        customer_pan: customerPan,
+        has_vat_pan: hasVatPan,
+        customer_type: customerType,
+        customer_contact: customerContact,
+        customer_location: customerLocation,
+        item_name: item.itemName,
+        item_code: item.itemCode,
+        category: item.category,
+        sub_category: item.subCategory,
+        brand: item.brand,
+        model: item.model,
+        qty: item.qty,
+        rate: item.rate,
+        discount: item.discount,
+        amount: itemAmount,
+        vat: itemVat,
+        total: itemTotal,
+        payment_method: paymentMethod,
+        other_charges: otherCharges,
+        paid_amount: paidAmount,
+        remaining: 0,
+        remarks,
+        sale_type: saleType,
+        is_free: item.isFree ?? false,
+        warranty_original_invoice: saleType === "Warranty" ? warrantyOriginalInvoice : "",
+        status,
+        created_by: user?.id ?? null,
+        store_id: _currentStoreId,
+      };
+    });
 
     const grossTotal = items.reduce((a, i) => a + i.total, 0);
     const remaining = Math.max(0, grossTotal - headerDiscount + otherCharges - paidAmount);

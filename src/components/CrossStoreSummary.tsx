@@ -19,7 +19,7 @@ export function CrossStoreSummary() {
       const storeTxns = vendorTransactions.filter((t) => t.storeId === store.id);
 
       const stockValue = storeStock.reduce((a, s) => a + s.qty * s.purchasePrice, 0);
-      const totalSales = storeSales.reduce((a, s) => a + s.total, 0);
+      const totalSales = storeSales.reduce((a, s) => a + s.amount, 0);
       const totalPurchases = storePurchases.reduce((a, p) => a + p.grandTotal, 0);
       const totalVat = storeSales.reduce((a, s) => a + s.vat, 0);
       const vendorPayable = storeVendors.reduce((a, v) => {
