@@ -145,35 +145,51 @@ function IndexInner() {
             <TabsTrigger value="stock" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Stock
             </TabsTrigger>
-            <TabsTrigger value="stockin" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <PackageMinus className="mr-1.5 size-3.5 sm:size-4" /> Stock In
-            </TabsTrigger>
-            <TabsTrigger value="stockout" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <Truck className="mr-1.5 size-3.5 sm:size-4" /> Stock Out
-            </TabsTrigger>
-            <TabsTrigger value="lots" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Lot Report
-            </TabsTrigger>
-            <TabsTrigger value="lothistory" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <History className="mr-1.5 size-3.5 sm:size-4" /> Lot History
-            </TabsTrigger>
             {isAdmin && (
-            <TabsTrigger value="adjustments" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <ShieldAlert className="mr-1.5 size-3.5 sm:size-4" /> Adjustments
-            </TabsTrigger>
+              <TabsTrigger value="stockin" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <PackageMinus className="mr-1.5 size-3.5 sm:size-4" /> Stock In
+              </TabsTrigger>
             )}
-            <TabsTrigger value="profit" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <TrendingUp className="mr-1.5 size-3.5 sm:size-4" /> Profit
-            </TabsTrigger>
-            <TabsTrigger value="returns" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <RotateCcw className="mr-1.5 size-3.5 sm:size-4" /> Returns
-            </TabsTrigger>
-            <TabsTrigger value="summary" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <BarChart3 className="mr-1.5 size-3.5 sm:size-4" /> Summary
-            </TabsTrigger>
-            <TabsTrigger value="vendors" className="py-2 text-xs sm:py-1.5 sm:text-sm">
-              <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
-            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="stockout" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <Truck className="mr-1.5 size-3.5 sm:size-4" /> Stock Out
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="lots" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <Boxes className="mr-1.5 size-3.5 sm:size-4" /> Lot Report
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="lothistory" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <History className="mr-1.5 size-3.5 sm:size-4" /> Lot History
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="adjustments" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <ShieldAlert className="mr-1.5 size-3.5 sm:size-4" /> Adjustments
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="profit" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <TrendingUp className="mr-1.5 size-3.5 sm:size-4" /> Profit
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="returns" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <RotateCcw className="mr-1.5 size-3.5 sm:size-4" /> Returns
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="summary" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <BarChart3 className="mr-1.5 size-3.5 sm:size-4" /> Summary
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="vendors" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+                <Truck className="mr-1.5 size-3.5 sm:size-4" /> Vendors
+              </TabsTrigger>
+            )}
             <TabsTrigger value="transfers" className="py-2 text-xs sm:py-1.5 sm:text-sm">
               <ArrowRightLeft className="mr-1.5 size-3.5 sm:size-4" /> Transfers
             </TabsTrigger>
@@ -198,60 +214,76 @@ function IndexInner() {
         <TabsContent value="stock">
           <StockManager role={isAdmin ? "admin" : "salesman"} />
         </TabsContent>
-        <TabsContent value="stockout">
-          <StockOutSummary />
-        </TabsContent>
-        <TabsContent value="stockin">
-          <StockInSummary />
-        </TabsContent>
-        <TabsContent value="lots">
-          <LotStockReport />
-        </TabsContent>
-        <TabsContent value="lothistory">
-          <LotHistory />
-        </TabsContent>
         {isAdmin && (
-        <TabsContent value="adjustments">
-          <StockAdjustments />
-        </TabsContent>
+          <TabsContent value="stockout">
+            <StockOutSummary />
+          </TabsContent>
         )}
-        <TabsContent value="profit">
-          <ProfitReport />
-        </TabsContent>
-        <TabsContent value="returns">
-          <SalesReturns />
-        </TabsContent>
-        <TabsContent value="summary">
-          <StockSummary />
-        </TabsContent>
-        <TabsContent value="vendors">
-          <div className="flex flex-nowrap gap-1 overflow-x-auto overflow-y-hidden border-b border-border/60 pb-2 mb-4">
-            <Button variant={vendorSubTab === "dashboard" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("dashboard")} className="h-8 text-xs sm:text-sm">
-              <LayoutDashboard className="mr-1 size-3.5" /> Dashboard
-            </Button>
-            <Button variant={vendorSubTab === "master" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("master")} className="h-8 text-xs sm:text-sm">
-              <Users className="mr-1 size-3.5" /> Master
-            </Button>
-            <Button variant={vendorSubTab === "ledger" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("ledger")} className="h-8 text-xs sm:text-sm">
-              <BookOpen className="mr-1 size-3.5" /> Ledger
-            </Button>
-            <Button variant={vendorSubTab === "payments" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("payments")} className="h-8 text-xs sm:text-sm">
-              <CreditCard className="mr-1 size-3.5" /> Payments
-            </Button>
-            <Button variant={vendorSubTab === "returns" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("returns")} className="h-8 text-xs sm:text-sm">
-              <RotateCcw className="mr-1 size-3.5" /> Returns
-            </Button>
-            <Button variant={vendorSubTab === "reports" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("reports")} className="h-8 text-xs sm:text-sm">
-              <FileText className="mr-1 size-3.5" /> Reports
-            </Button>
-          </div>
-          {vendorSubTab === "dashboard" && <VendorDashboard />}
-          {vendorSubTab === "master" && <VendorMaster />}
-          {vendorSubTab === "ledger" && <VendorLedger />}
-          {vendorSubTab === "payments" && <VendorPayments />}
-          {vendorSubTab === "returns" && <PurchaseReturns />}
-          {vendorSubTab === "reports" && <VendorReports />}
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="stockin">
+            <StockInSummary />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="lots">
+            <LotStockReport />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="lothistory">
+            <LotHistory />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="adjustments">
+            <StockAdjustments />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="profit">
+            <ProfitReport />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="returns">
+            <SalesReturns />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="summary">
+            <StockSummary />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="vendors">
+            <div className="flex flex-nowrap gap-1 overflow-x-auto overflow-y-hidden border-b border-border/60 pb-2 mb-4">
+              <Button variant={vendorSubTab === "dashboard" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("dashboard")} className="h-8 text-xs sm:text-sm">
+                <LayoutDashboard className="mr-1 size-3.5" /> Dashboard
+              </Button>
+              <Button variant={vendorSubTab === "master" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("master")} className="h-8 text-xs sm:text-sm">
+                <Users className="mr-1 size-3.5" /> Master
+              </Button>
+              <Button variant={vendorSubTab === "ledger" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("ledger")} className="h-8 text-xs sm:text-sm">
+                <BookOpen className="mr-1 size-3.5" /> Ledger
+              </Button>
+              <Button variant={vendorSubTab === "payments" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("payments")} className="h-8 text-xs sm:text-sm">
+                <CreditCard className="mr-1 size-3.5" /> Payments
+              </Button>
+              <Button variant={vendorSubTab === "returns" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("returns")} className="h-8 text-xs sm:text-sm">
+                <RotateCcw className="mr-1 size-3.5" /> Returns
+              </Button>
+              <Button variant={vendorSubTab === "reports" ? "default" : "ghost"} size="sm" onClick={() => setVendorSubTab("reports")} className="h-8 text-xs sm:text-sm">
+                <FileText className="mr-1 size-3.5" /> Reports
+              </Button>
+            </div>
+            {vendorSubTab === "dashboard" && <VendorDashboard />}
+            {vendorSubTab === "master" && <VendorMaster />}
+            {vendorSubTab === "ledger" && <VendorLedger />}
+            {vendorSubTab === "payments" && <VendorPayments />}
+            {vendorSubTab === "returns" && <PurchaseReturns />}
+            {vendorSubTab === "reports" && <VendorReports />}
+          </TabsContent>
+        )}
         <TabsContent value="transfers">
           <TransferHistory />
         </TabsContent>
