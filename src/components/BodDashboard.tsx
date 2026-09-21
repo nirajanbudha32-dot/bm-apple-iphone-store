@@ -1,9 +1,29 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, ShoppingBag, PackagePlus,
-  DollarSign, BarChart3, PieChart as PieChartIcon, Building2, Download,
-  Search, Filter, Boxes, Users, AlertTriangle, Truck, RotateCcw,
-  Wallet, CreditCard, Banknote, Clock, Target, ArrowUpRight, ArrowDownRight,
+  LayoutDashboard,
+  TrendingUp,
+  TrendingDown,
+  ShoppingBag,
+  PackagePlus,
+  DollarSign,
+  BarChart3,
+  PieChart as PieChartIcon,
+  Building2,
+  Download,
+  Search,
+  Filter,
+  Boxes,
+  Users,
+  AlertTriangle,
+  Truck,
+  RotateCcw,
+  Wallet,
+  CreditCard,
+  Banknote,
+  Clock,
+  Target,
+  ArrowUpRight,
+  ArrowDownRight,
   Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,76 +32,240 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ComposedChart,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ComposedChart,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 import { useStore, LOCATION_LABELS, WAREHOUSE_ID, getVendorBalance } from "@/lib/store";
 import { useStoreContext } from "@/lib/store-context";
 import { money } from "@/lib/utils";
 import { exportRows } from "@/lib/excel";
 
-const STORE_COLORS = ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#e11d48"];
-const PIE_COLORS = ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#e11d48", "#ca8a04", "#6366f1"];
+const STORE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#f43f5e"];
+const PIE_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#06b6d4",
+  "#f43f5e",
+  "#84cc16",
+  "#fb923c",
+];
 const fmt = (d: string) => d?.slice(0, 10) || "";
 const today = () => new Date().toISOString().slice(0, 10);
 const shortMonth = (d: string) => {
-  const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const dt = new Date(d);
   return m[dt.getMonth()] + " " + dt.getDate();
 };
 
-const BORDER_COLORS: Record<string, string> = {
-  blue: "border-l-blue-500", green: "border-l-green-500", orange: "border-l-orange-500",
-  purple: "border-l-purple-500", red: "border-l-red-500", cyan: "border-l-cyan-500",
+const ACCENT_MAP: Record<string, string> = {
+  blue: "#3b82f6",
+  green: "#10b981",
+  orange: "#f59e0b",
+  purple: "#8b5cf6",
+  red: "#f43f5e",
+  cyan: "#06b6d4",
+  violet: "#8b5cf6",
+  emerald: "#10b981",
+  amber: "#f59e0b",
+  rose: "#f43f5e",
 };
 
-function Kpi({ label, value, sub, icon: Icon, trend, color }: {
-  label: string; value: string; sub?: string; icon?: any; trend?: "up" | "down"; color?: string;
+function Kpi({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  trend,
+  color,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  icon?: any;
+  trend?: "up" | "down";
+  color?: string;
 }) {
-  const borderClass = color ? BORDER_COLORS[color] || "border-l-primary" : "";
+  const accent = color ? ACCENT_MAP[color] || "#3b82f6" : undefined;
+  const isLoading = value === "0.00" || value === "0";
   return (
-    <Card className={`p-2.5 sm:p-3 ${borderClass ? `border-l-4 ${borderClass}` : ""}`}>
+    <Card
+      className={`relative overflow-hidden p-3 sm:p-4 rounded-xl border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800`}
+    >
+      {accent && (
+        <div
+          className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl"
+          style={{ backgroundColor: accent }}
+        />
+      )}
+      {trend && (
+        <div
+          className={`absolute top-2.5 right-2.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${trend === "up" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"}`}
+        >
+          {trend === "up" ? (
+            <ArrowUpRight className="size-3" />
+          ) : (
+            <ArrowDownRight className="size-3" />
+          )}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">{label}</p>
-          <p className="mt-0.5 text-base font-bold sm:text-lg md:text-xl">{value}</p>
-          {sub && <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs truncate">{sub}</p>}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            {label}
+          </p>
+          <p
+            className={`mt-1 text-[22px] font-bold leading-tight tracking-tight ${isLoading ? "animate-pulse" : ""}`}
+          >
+            {value}
+          </p>
+          {sub && <p className="mt-0.5 text-[11px] text-muted-foreground truncate">{sub}</p>}
         </div>
-        {Icon && <div className="rounded-md bg-muted p-1 sm:p-1.5 shrink-0"><Icon className="size-3.5 sm:size-4 text-muted-foreground" /></div>}
+        {Icon && (
+          <div
+            className="shrink-0 rounded-full p-2"
+            style={{ backgroundColor: accent ? `${accent}15` : "hsl(var(--muted))" }}
+          >
+            <Icon className="size-4" style={{ color: accent || "hsl(var(--muted-foreground))" }} />
+          </div>
+        )}
       </div>
     </Card>
   );
 }
 
-function ChartCard({ title, children, className = "" }: { title: string; children: any; className?: string }) {
+function ChartCard({
+  title,
+  children,
+  className = "",
+  chartColor,
+}: {
+  title: string;
+  children: any;
+  className?: string;
+  chartColor?: string;
+}) {
   return (
-    <Card className={`p-3 sm:p-4 ${className}`}>
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs sm:mb-3">{title}</p>
+    <Card className={`p-3 sm:p-4 rounded-xl border border-border/40 ${className}`}>
+      <div className="flex items-center gap-2 mb-3">
+        {chartColor && (
+          <span
+            className="inline-block size-1 rounded-full shrink-0"
+            style={{ backgroundColor: chartColor }}
+          />
+        )}
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-xs">
+          {title}
+        </p>
+      </div>
       {children}
     </Card>
   );
 }
 
-function DateFilter({ from, to, onFrom, onTo, q, onQ, placeholder }: {
-  from: string; to: string; onFrom: (v: string) => void; onTo: (v: string) => void;
-  q: string; onQ: (v: string) => void; placeholder?: string;
+function CustomTooltip({ active, payload, label, formatter }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-slate-900 text-white rounded-lg px-3 py-2 shadow-xl text-xs">
+      <p className="font-medium mb-1">{label}</p>
+      {payload.map((p: any, i: number) => (
+        <p key={i} style={{ color: p.color }} className="flex items-center gap-1.5">
+          <span
+            className="inline-block size-1.5 rounded-full"
+            style={{ backgroundColor: p.color }}
+          />
+          {p.name}: {formatter ? formatter(p.value) : p.value}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function DateFilter({
+  from,
+  to,
+  onFrom,
+  onTo,
+  q,
+  onQ,
+  placeholder,
+}: {
+  from: string;
+  to: string;
+  onFrom: (v: string) => void;
+  onTo: (v: string) => void;
+  q: string;
+  onQ: (v: string) => void;
+  placeholder?: string;
 }) {
   return (
     <div className="grid gap-3 grid-cols-1 sm:grid-cols-4">
-      <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => onFrom(e.target.value)} className="h-9 text-xs" /></div>
-      <div><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => onTo(e.target.value)} className="h-9 text-xs" /></div>
-      <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => onQ(e.target.value)} placeholder={placeholder || "Search..."} className="h-9 text-xs" /></div>
-      <div className="flex items-end"><Filter className="mr-1 size-3.5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Filter active</span></div>
+      <div>
+        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          From
+        </Label>
+        <Input
+          type="date"
+          value={from}
+          onChange={(e) => onFrom(e.target.value)}
+          className="h-9 rounded-lg text-xs"
+        />
+      </div>
+      <div>
+        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          To
+        </Label>
+        <Input
+          type="date"
+          value={to}
+          onChange={(e) => onTo(e.target.value)}
+          className="h-9 rounded-lg text-xs"
+        />
+      </div>
+      <div>
+        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          Search
+        </Label>
+        <Input
+          value={q}
+          onChange={(e) => onQ(e.target.value)}
+          placeholder={placeholder || "Search..."}
+          className="h-9 rounded-lg text-xs"
+        />
+      </div>
+      <div className="flex items-end">
+        <Filter className="mr-1 size-3.5 text-muted-foreground" />
+        <span className="text-[10px] text-muted-foreground">Filter active</span>
+      </div>
     </div>
   );
 }
 
 function ExportBtn({ onExport, label }: { onExport: () => void; label?: string }) {
   return (
-    <Button variant="outline" onClick={onExport} className="h-9 text-xs">
+    <Button variant="outline" onClick={onExport} className="h-9 text-xs rounded-lg">
       <Download className="mr-1 size-3.5" /> {label || "Export Excel"}
     </Button>
   );
@@ -92,21 +276,41 @@ const NoData = ({ msg }: { msg?: string }) => (
 );
 
 const DataTable = ({ children, className = "" }: { children: any; className?: string }) => (
-  <Card className={`overflow-hidden p-0 ${className}`}>
+  <Card className={`overflow-hidden p-0 rounded-xl border border-border/50 shadow-sm ${className}`}>
     <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto bod-table-scroll">
-      <table className="w-full min-w-[600px] sm:min-w-[800px] text-[11px] sm:text-xs">{children}</table>
+      <table className="w-full min-w-[600px] sm:min-w-[800px] text-[11px] sm:text-xs">
+        {children}
+      </table>
     </div>
   </Card>
 );
 
 const Th = ({ children, className = "" }: { children: any; className?: string }) => (
-  <th className={`p-2 sm:p-2.5 ${className}`}>{children}</th>
+  <th
+    className={`p-2.5 sm:p-3 bg-slate-50 dark:bg-slate-800/80 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground ${className}`}
+  >
+    {children}
+  </th>
 );
 const ThR = ({ children, className = "" }: { children: any; className?: string }) => (
-  <th className={`p-2 sm:p-2.5 text-right ${className}`}>{children}</th>
+  <th
+    className={`p-2.5 sm:p-3 bg-slate-50 dark:bg-slate-800/80 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground text-right ${className}`}
+  >
+    {children}
+  </th>
 );
-const Td = ({ children, className = "", colSpan }: { children: any; className?: string; colSpan?: number }) => (
-  <td className={`p-2 sm:p-2.5 ${className}`} colSpan={colSpan}>{children}</td>
+const Td = ({
+  children,
+  className = "",
+  colSpan,
+}: {
+  children: any;
+  className?: string;
+  colSpan?: number;
+}) => (
+  <td className={`p-2 sm:p-2.5 ${className}`} colSpan={colSpan}>
+    {children}
+  </td>
 );
 const TdR = ({ children, className = "" }: { children: any; className?: string }) => (
   <td className={`p-2 sm:p-2.5 text-right ${className}`}>{children}</td>
@@ -114,8 +318,16 @@ const TdR = ({ children, className = "" }: { children: any; className?: string }
 
 export function BodDashboard() {
   const {
-    stock, sales, stockLots, saleAllocations, purchaseHeaders, purchaseItems,
-    salesReturns, vendors, vendorTransactions, vendorPayments,
+    stock,
+    sales,
+    stockLots,
+    saleAllocations,
+    purchaseHeaders,
+    purchaseItems,
+    salesReturns,
+    vendors,
+    vendorTransactions,
+    vendorPayments,
     purchaseReturns,
   } = useStore();
   const { currentStoreId } = useStoreContext();
@@ -125,62 +337,239 @@ export function BodDashboard() {
   const activeFilter = filterStoreId === "__all__" ? null : filterStoreId;
   const filterLabel = activeFilter ? LOCATION_LABELS[activeFilter] || "Store" : "All Stores";
 
-  const stores = useMemo(() => Object.entries(LOCATION_LABELS).filter(([id]) => id !== WAREHOUSE_ID), []);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const fStock = useMemo(() => activeFilter ? stock.filter((s: any) => s.storeId === activeFilter) : stock, [stock, activeFilter]);
-  const fSales = useMemo(() => activeFilter ? sales.filter((s: any) => s.storeId === activeFilter) : sales, [sales, activeFilter]);
-  const fStockLots = useMemo(() => activeFilter ? stockLots.filter((l: any) => l.storeId === activeFilter) : stockLots, [stockLots, activeFilter]);
-  const fSaleAllocations = useMemo(() => activeFilter ? saleAllocations.filter((a: any) => a.storeId === activeFilter) : saleAllocations, [saleAllocations, activeFilter]);
-  const fPurchaseHeaders = useMemo(() => activeFilter ? purchaseHeaders.filter((p: any) => p.storeId === activeFilter) : purchaseHeaders, [purchaseHeaders, activeFilter]);
-  const fPurchaseItems = useMemo(() => activeFilter ? purchaseItems.filter((p: any) => p.storeId === activeFilter) : purchaseItems, [purchaseItems, activeFilter]);
-  const fSalesReturns = useMemo(() => activeFilter ? salesReturns.filter((r: any) => r.storeId === activeFilter) : salesReturns, [salesReturns, activeFilter]);
-  const fVendors = useMemo(() => activeFilter ? vendors.filter((v: any) => v.storeId === activeFilter) : vendors, [vendors, activeFilter]);
-  const fVendorTransactions = useMemo(() => activeFilter ? vendorTransactions.filter((t: any) => t.storeId === activeFilter) : vendorTransactions, [vendorTransactions, activeFilter]);
-  const fVendorPayments = useMemo(() => activeFilter ? vendorPayments.filter((p: any) => p.storeId === activeFilter) : vendorPayments, [vendorPayments, activeFilter]);
-  const fPurchaseReturns = useMemo(() => activeFilter ? purchaseReturns.filter((r: any) => r.storeId === activeFilter) : purchaseReturns, [purchaseReturns, activeFilter]);
+  const formattedDate = currentTime.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const formattedTime = currentTime.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const stores = useMemo(
+    () => Object.entries(LOCATION_LABELS).filter(([id]) => id !== WAREHOUSE_ID),
+    [],
+  );
+
+  const fStock = useMemo(
+    () => (activeFilter ? stock.filter((s: any) => s.storeId === activeFilter) : stock),
+    [stock, activeFilter],
+  );
+  const fSales = useMemo(
+    () => (activeFilter ? sales.filter((s: any) => s.storeId === activeFilter) : sales),
+    [sales, activeFilter],
+  );
+  const fStockLots = useMemo(
+    () => (activeFilter ? stockLots.filter((l: any) => l.storeId === activeFilter) : stockLots),
+    [stockLots, activeFilter],
+  );
+  const fSaleAllocations = useMemo(
+    () =>
+      activeFilter
+        ? saleAllocations.filter((a: any) => a.storeId === activeFilter)
+        : saleAllocations,
+    [saleAllocations, activeFilter],
+  );
+  const fPurchaseHeaders = useMemo(
+    () =>
+      activeFilter
+        ? purchaseHeaders.filter((p: any) => p.storeId === activeFilter)
+        : purchaseHeaders,
+    [purchaseHeaders, activeFilter],
+  );
+  const fPurchaseItems = useMemo(
+    () =>
+      activeFilter ? purchaseItems.filter((p: any) => p.storeId === activeFilter) : purchaseItems,
+    [purchaseItems, activeFilter],
+  );
+  const fSalesReturns = useMemo(
+    () =>
+      activeFilter ? salesReturns.filter((r: any) => r.storeId === activeFilter) : salesReturns,
+    [salesReturns, activeFilter],
+  );
+  const fVendors = useMemo(
+    () => (activeFilter ? vendors.filter((v: any) => v.storeId === activeFilter) : vendors),
+    [vendors, activeFilter],
+  );
+  const fVendorTransactions = useMemo(
+    () =>
+      activeFilter
+        ? vendorTransactions.filter((t: any) => t.storeId === activeFilter)
+        : vendorTransactions,
+    [vendorTransactions, activeFilter],
+  );
+  const fVendorPayments = useMemo(
+    () =>
+      activeFilter ? vendorPayments.filter((p: any) => p.storeId === activeFilter) : vendorPayments,
+    [vendorPayments, activeFilter],
+  );
+  const fPurchaseReturns = useMemo(
+    () =>
+      activeFilter
+        ? purchaseReturns.filter((r: any) => r.storeId === activeFilter)
+        : purchaseReturns,
+    [purchaseReturns, activeFilter],
+  );
 
   return (
-    <div className="space-y-3 sm:space-y-3 sm:space-y-4">
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Store className="size-3.5" />
-          <span className="font-medium hidden sm:inline">Store:</span>
+    <div className="space-y-4">
+      <div className="rounded-xl bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-950 dark:to-slate-800 px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-lg sm:text-xl font-semibold text-white tracking-tight">
+            Board of Directors Dashboard
+          </h1>
+          <div className="mt-2 flex items-center gap-2">
+            <Store className="size-3.5 text-white/60" />
+            <Select value={filterStoreId} onValueChange={setFilterStoreId}>
+              <SelectTrigger className="h-8 w-full sm:w-[200px] text-xs border-white/30 text-white bg-transparent hover:bg-white/10 focus:ring-white/30 [&>span]:text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Stores</SelectItem>
+                {stores.map(([id, name]) => (
+                  <SelectItem key={id} value={id}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <Select value={filterStoreId} onValueChange={setFilterStoreId}>
-          <SelectTrigger className="h-8 w-full sm:w-[200px] text-xs sm:h-9 sm:min-w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">All Stores</SelectItem>
-            {stores.map(([id, name]) => (
-              <SelectItem key={id} value={id}>{name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="text-[10px] sm:text-xs text-muted-foreground">
-          <strong className="text-foreground">{filterLabel}</strong>
-        </span>
+        <div className="text-right shrink-0">
+          <p className="text-white/70 text-sm">{formattedDate}</p>
+          <p className="text-white font-mono text-lg font-semibold tracking-widest">
+            {formattedTime}
+          </p>
+        </div>
       </div>
       <Tabs value={subTab} onValueChange={setSubTab}>
-        <TabsList className="mb-3 sm:mb-4 flex h-9 sm:h-10 w-full overflow-x-auto overflow-y-hidden p-0.5 sm:p-1 sm:w-auto sm:flex-nowrap bod-tabs-scroll">
-          <TabsTrigger value="overview" className="text-[11px] sm:text-sm px-2 sm:px-3"><LayoutDashboard className="mr-1 size-3 sm:size-3.5" /> Overview</TabsTrigger>
-          <TabsTrigger value="sales" className="text-[11px] sm:text-sm px-2 sm:px-3"><ShoppingBag className="mr-1 size-3 sm:size-3.5" /> Sales</TabsTrigger>
-          <TabsTrigger value="purchases" className="text-[11px] sm:text-sm px-2 sm:px-3"><PackagePlus className="mr-1 size-3 sm:size-3.5" /> Purchases</TabsTrigger>
-          <TabsTrigger value="profitability" className="text-[11px] sm:text-sm px-2 sm:px-3"><TrendingUp className="mr-1 size-3 sm:size-3.5" /> Profitability</TabsTrigger>
-          <TabsTrigger value="inventory" className="text-[11px] sm:text-sm px-2 sm:px-3"><Boxes className="mr-1 size-3 sm:size-3.5" /> Inventory</TabsTrigger>
-          <TabsTrigger value="vendors" className="text-[11px] sm:text-sm px-2 sm:px-3"><Users className="mr-1 size-3 sm:size-3.5" /> Vendors</TabsTrigger>
-          <TabsTrigger value="cashflow" className="text-[11px] sm:text-sm px-2 sm:px-3"><Wallet className="mr-1 size-3 sm:size-3.5" /> Cash Flow</TabsTrigger>
-          <TabsTrigger value="stores" className="text-[11px] sm:text-sm px-2 sm:px-3"><Building2 className="mr-1 size-3 sm:size-3.5" /> Stores</TabsTrigger>
+        <TabsList className="mb-4 bg-slate-100 dark:bg-slate-800/60 rounded-xl p-1 gap-0.5 w-full sm:w-auto overflow-x-auto overflow-y-hidden bod-tabs-scroll">
+          <TabsTrigger
+            value="overview"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <LayoutDashboard className="mr-1 size-3.5" /> Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="sales"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <ShoppingBag className="mr-1 size-3.5" /> Sales
+          </TabsTrigger>
+          <TabsTrigger
+            value="purchases"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <PackagePlus className="mr-1 size-3.5" /> Purchases
+          </TabsTrigger>
+          <TabsTrigger
+            value="profitability"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <TrendingUp className="mr-1 size-3.5" /> Profitability
+          </TabsTrigger>
+          <TabsTrigger
+            value="inventory"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <Boxes className="mr-1 size-3.5" /> Inventory
+          </TabsTrigger>
+          <TabsTrigger
+            value="vendors"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <Users className="mr-1 size-3.5" /> Vendors
+          </TabsTrigger>
+          <TabsTrigger
+            value="cashflow"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <Wallet className="mr-1 size-3.5" /> Cash Flow
+          </TabsTrigger>
+          <TabsTrigger
+            value="stores"
+            className="rounded-lg text-xs font-medium px-3 py-2 data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <Building2 className="mr-1 size-3.5" /> Stores
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview"><TabOverview stock={fStock} sales={fSales} stockLots={fStockLots} saleAllocations={fSaleAllocations} purchaseHeaders={fPurchaseHeaders} salesReturns={fSalesReturns} vendors={fVendors} vendorTransactions={fVendorTransactions} storeLabel={filterLabel} /></TabsContent>
-        <TabsContent value="sales"><TabSales sales={fSales} stockLots={fStockLots} saleAllocations={fSaleAllocations} salesReturns={fSalesReturns} /></TabsContent>
-        <TabsContent value="purchases"><TabPurchases purchaseHeaders={fPurchaseHeaders} purchaseItems={fPurchaseItems} purchaseReturns={fPurchaseReturns} /></TabsContent>
-        <TabsContent value="profitability"><TabProfitability sales={fSales} saleAllocations={fSaleAllocations} stockLots={fStockLots} /></TabsContent>
-        <TabsContent value="inventory"><TabInventory stock={fStock} sales={fSales} stockLots={fStockLots} saleAllocations={fSaleAllocations} /></TabsContent>
-        <TabsContent value="vendors"><TabVendors vendors={fVendors} vendorTransactions={fVendorTransactions} vendorPayments={fVendorPayments} /></TabsContent>
-        <TabsContent value="cashflow"><TabCashFlow sales={fSales} purchaseHeaders={fPurchaseHeaders} vendorPayments={fVendorPayments} /></TabsContent>
-        <TabsContent value="stores"><TabStores stock={fStock} sales={fSales} purchaseHeaders={fPurchaseHeaders} stockLots={fStockLots} saleAllocations={fSaleAllocations} vendors={fVendors} /></TabsContent>
+        <TabsContent value="overview">
+          <TabOverview
+            stock={fStock}
+            sales={fSales}
+            stockLots={fStockLots}
+            saleAllocations={fSaleAllocations}
+            purchaseHeaders={fPurchaseHeaders}
+            salesReturns={fSalesReturns}
+            vendors={fVendors}
+            vendorTransactions={fVendorTransactions}
+            storeLabel={filterLabel}
+          />
+        </TabsContent>
+        <TabsContent value="sales">
+          <TabSales
+            sales={fSales}
+            stockLots={fStockLots}
+            saleAllocations={fSaleAllocations}
+            salesReturns={fSalesReturns}
+          />
+        </TabsContent>
+        <TabsContent value="purchases">
+          <TabPurchases
+            purchaseHeaders={fPurchaseHeaders}
+            purchaseItems={fPurchaseItems}
+            purchaseReturns={fPurchaseReturns}
+          />
+        </TabsContent>
+        <TabsContent value="profitability">
+          <TabProfitability
+            sales={fSales}
+            saleAllocations={fSaleAllocations}
+            stockLots={fStockLots}
+          />
+        </TabsContent>
+        <TabsContent value="inventory">
+          <TabInventory
+            stock={fStock}
+            sales={fSales}
+            stockLots={fStockLots}
+            saleAllocations={fSaleAllocations}
+          />
+        </TabsContent>
+        <TabsContent value="vendors">
+          <TabVendors
+            vendors={fVendors}
+            vendorTransactions={fVendorTransactions}
+            vendorPayments={fVendorPayments}
+          />
+        </TabsContent>
+        <TabsContent value="cashflow">
+          <TabCashFlow
+            sales={fSales}
+            purchaseHeaders={fPurchaseHeaders}
+            vendorPayments={fVendorPayments}
+          />
+        </TabsContent>
+        <TabsContent value="stores">
+          <TabStores
+            stock={fStock}
+            sales={fSales}
+            purchaseHeaders={fPurchaseHeaders}
+            stockLots={fStockLots}
+            saleAllocations={fSaleAllocations}
+            vendors={fVendors}
+          />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -188,15 +577,33 @@ export function BodDashboard() {
 
 // ─── TAB 1: EXECUTIVE OVERVIEW ────────────────────────────────────────────────
 
-function TabOverview({ stock, sales, stockLots, saleAllocations, purchaseHeaders, salesReturns, vendors, vendorTransactions, storeLabel }: any) {
+function TabOverview({
+  stock,
+  sales,
+  stockLots,
+  saleAllocations,
+  purchaseHeaders,
+  salesReturns,
+  vendors,
+  vendorTransactions,
+  storeLabel,
+}: any) {
   const o = useMemo(() => {
     const totalSales = sales.reduce((a: number, s: any) => a + s.amount, 0);
     const totalPurchases = purchaseHeaders.reduce((a: number, p: any) => a + p.grandTotal, 0);
-    const stockValue = stockLots.filter((l: any) => l.qty > 0).reduce((a: number, l: any) => a + l.qty * l.purchasePrice, 0);
-    const stockQty = stockLots.filter((l: any) => l.qty > 0).reduce((a: number, l: any) => a + l.qty, 0);
+    const stockValue = stockLots
+      .filter((l: any) => l.qty > 0)
+      .reduce((a: number, l: any) => a + l.qty * l.purchasePrice, 0);
+    const stockQty = stockLots
+      .filter((l: any) => l.qty > 0)
+      .reduce((a: number, l: any) => a + l.qty, 0);
     const totalProfit = sales.reduce((a: number, s: any) => {
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
+      const cost = allocs.reduce(
+        (c: number, al: any) =>
+          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+        0,
+      );
       return a + (s.amount - cost);
     }, 0);
     const vendorPayable = vendors.reduce((a: number, v: any) => {
@@ -204,128 +611,278 @@ function TabOverview({ stock, sales, stockLots, saleAllocations, purchaseHeaders
       return a + Math.max(0, outstanding);
     }, 0);
     const today = new Date().toISOString().slice(0, 10);
-    const todaySalesTotal = sales.filter((s: any) => s.date === today).reduce((a: number, s: any) => a + s.amount, 0);
+    const todaySalesTotal = sales
+      .filter((s: any) => s.date === today)
+      .reduce((a: number, s: any) => a + s.amount, 0);
     const invoiceCount = new Set(sales.map((s: any) => s.invoiceNo)).size;
     const totalVat = sales.reduce((a: number, s: any) => a + s.vat, 0);
     const totalReturnRefund = salesReturns.reduce((a: number, r: any) => a + r.refundAmount, 0);
     const avgSaleValue = invoiceCount > 0 ? totalSales / invoiceCount : 0;
-    const profitMargin = totalSales > 0 ? (totalProfit / totalSales * 100) : 0;
+    const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
     const monthMap = new Map<string, { sales: number; purchases: number }>();
     for (const s of sales) {
       const m = s.date?.slice(0, 7);
-      if (m) { const e = monthMap.get(m) || { sales: 0, purchases: 0 }; e.sales += s.amount; monthMap.set(m, e); }
+      if (m) {
+        const e = monthMap.get(m) || { sales: 0, purchases: 0 };
+        e.sales += s.amount;
+        monthMap.set(m, e);
+      }
     }
     for (const p of purchaseHeaders) {
       const m = p.date?.slice(0, 7);
-      if (m) { const e = monthMap.get(m) || { sales: 0, purchases: 0 }; e.purchases += p.grandTotal; monthMap.set(m, e); }
+      if (m) {
+        const e = monthMap.get(m) || { sales: 0, purchases: 0 };
+        e.purchases += p.grandTotal;
+        monthMap.set(m, e);
+      }
     }
-    const monthlyTrend = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([m, v]) => ({ month: m, label: m, sales: v.sales, purchases: v.purchases }));
+    const monthlyTrend = Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([m, v]) => ({ month: m, label: m, sales: v.sales, purchases: v.purchases }));
 
     const storeMap = new Map<string, { name: string; sales: number; purchases: number }>();
     for (const [id, name] of Object.entries(LOCATION_LABELS)) {
       if (id === WAREHOUSE_ID) continue;
       storeMap.set(id, { name, sales: 0, purchases: 0 });
     }
-    for (const s of sales) { const st = storeMap.get(s.storeId || ""); if (st) st.sales += s.amount; }
-    for (const p of purchaseHeaders) { const st = storeMap.get(p.storeId || ""); if (st) st.purchases += p.grandTotal; }
-    const storePerf = Array.from(storeMap.values()).filter(s => s.sales > 0 || s.purchases > 0).map(s => ({ ...s, profit: s.sales - s.purchases, margin: s.sales > 0 ? ((s.sales - s.purchases) / s.sales * 100) : 0 }));
+    for (const s of sales) {
+      const st = storeMap.get(s.storeId || "");
+      if (st) st.sales += s.amount;
+    }
+    for (const p of purchaseHeaders) {
+      const st = storeMap.get(p.storeId || "");
+      if (st) st.purchases += p.grandTotal;
+    }
+    const storePerf = Array.from(storeMap.values())
+      .filter((s) => s.sales > 0 || s.purchases > 0)
+      .map((s) => ({
+        ...s,
+        profit: s.sales - s.purchases,
+        margin: s.sales > 0 ? ((s.sales - s.purchases) / s.sales) * 100 : 0,
+      }));
 
     const methodMap = new Map<string, number>();
-    for (const s of sales) { const m = s.paymentMethod || "Cash"; methodMap.set(m, (methodMap.get(m) || 0) + s.total); }
-    const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({ name, value }));
+    for (const s of sales) {
+      const m = s.paymentMethod || "Cash";
+      methodMap.set(m, (methodMap.get(m) || 0) + s.total);
+    }
+    const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
 
     return {
-      totalSales, totalPurchases, stockValue, stockQty, totalProfit, vendorPayable,
-      todaySalesTotal, invoiceCount, totalVat, totalReturnRefund, avgSaleValue, profitMargin,
-      monthlyTrend, storePerf, paymentBreakdown,
+      totalSales,
+      totalPurchases,
+      stockValue,
+      stockQty,
+      totalProfit,
+      vendorPayable,
+      todaySalesTotal,
+      invoiceCount,
+      totalVat,
+      totalReturnRefund,
+      avgSaleValue,
+      profitMargin,
+      monthlyTrend,
+      storePerf,
+      paymentBreakdown,
     };
-  }, [stock, sales, stockLots, saleAllocations, purchaseHeaders, salesReturns, vendors, vendorTransactions]);
+  }, [
+    stock,
+    sales,
+    stockLots,
+    saleAllocations,
+    purchaseHeaders,
+    salesReturns,
+    vendors,
+    vendorTransactions,
+  ]);
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground sm:text-sm">{storeLabel} — Executive Overview</p>
-        <ExportBtn onExport={() => {
-          exportRows([{ Metric: "Total Sales", Value: o.totalSales }, { Metric: "Total Purchases", Value: o.totalPurchases },
-            { Metric: "Total Profit", Value: o.totalProfit }, { Metric: "Profit Margin", Value: o.profitMargin.toFixed(1) + "%" },
-            { Metric: "Stock Value", Value: o.stockValue }, { Metric: "Vendor Payable", Value: o.vendorPayable },
-            { Metric: "Total VAT", Value: o.totalVat }, { Metric: "Invoices", Value: o.invoiceCount },
-            { Metric: "Avg Sale Value", Value: o.avgSaleValue }], "Overview KPIs", `BOD_Overview_${today()}.xlsx`);
-        }} />
+        <p className="text-xs text-muted-foreground sm:text-sm">
+          {storeLabel} — Executive Overview
+        </p>
+        <ExportBtn
+          onExport={() => {
+            exportRows(
+              [
+                { Metric: "Total Sales", Value: o.totalSales },
+                { Metric: "Total Purchases", Value: o.totalPurchases },
+                { Metric: "Total Profit", Value: o.totalProfit },
+                { Metric: "Profit Margin", Value: o.profitMargin.toFixed(1) + "%" },
+                { Metric: "Stock Value", Value: o.stockValue },
+                { Metric: "Vendor Payable", Value: o.vendorPayable },
+                { Metric: "Total VAT", Value: o.totalVat },
+                { Metric: "Invoices", Value: o.invoiceCount },
+                { Metric: "Avg Sale Value", Value: o.avgSaleValue },
+              ],
+              "Overview KPIs",
+              `BOD_Overview_${today()}.xlsx`,
+            );
+          }}
+        />
       </div>
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Kpi label="Total Sales" value={money(o.totalSales)} sub={`${o.invoiceCount} invoices`} icon={ShoppingBag} color="blue" />
-        <Kpi label="Total Purchases" value={money(o.totalPurchases)} icon={PackagePlus} color="green" />
-        <Kpi label="Net Profit" value={money(o.totalProfit)} sub={`${o.profitMargin.toFixed(1)}% margin`} icon={TrendingUp} color="orange" />
-        <Kpi label="Stock Value" value={money(o.stockValue)} sub={`${o.stockQty} units`} icon={Boxes} color="purple" />
-        <Kpi label="Vendor Payable" value={money(o.vendorPayable)} icon={Users} color="red" />
+        <Kpi
+          label="Total Sales"
+          value={money(o.totalSales)}
+          sub={`${o.invoiceCount} invoices`}
+          icon={ShoppingBag}
+          color="blue"
+        />
+        <Kpi
+          label="Total Purchases"
+          value={money(o.totalPurchases)}
+          icon={PackagePlus}
+          color="violet"
+        />
+        <Kpi
+          label="Net Profit"
+          value={money(o.totalProfit)}
+          sub={`${o.profitMargin.toFixed(1)}% margin`}
+          icon={TrendingUp}
+          color="emerald"
+        />
+        <Kpi
+          label="Stock Value"
+          value={money(o.stockValue)}
+          sub={`${o.stockQty} units`}
+          icon={Boxes}
+          color="amber"
+        />
+        <Kpi label="Vendor Payable" value={money(o.vendorPayable)} icon={Users} color="rose" />
       </div>
+      <hr className="border-border/40" />
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <Kpi label="Today's Sales" value={money(o.todaySalesTotal)} icon={DollarSign} />
         <Kpi label="Total VAT" value={money(o.totalVat)} icon={CreditCard} />
         <Kpi label="Returns Refund" value={money(o.totalReturnRefund)} icon={RotateCcw} />
         <Kpi label="Avg Sale Value" value={money(o.avgSaleValue)} icon={Target} />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Monthly Sales vs Purchases">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Monthly Sales vs Purchases" chartColor="#3b82f6">
           {o.monthlyTrend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <LineChart data={o.monthlyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
                 <Legend />
-                <Line type="monotone" dataKey="sales" stroke="#2563eb" strokeWidth={2} name="Sales" />
-                <Line type="monotone" dataKey="purchases" stroke="#16a34a" strokeWidth={2} name="Purchases" />
+                <Line
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="#3b82f6"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Sales"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="purchases"
+                  stroke="#10b981"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Purchases"
+                />
               </LineChart>
             </ResponsiveContainer>
-          ) : <NoData msg="No monthly data yet." />}
+          ) : (
+            <NoData msg="No monthly data yet." />
+          )}
         </ChartCard>
-        <ChartCard title="Store Performance">
+        <ChartCard title="Store Performance" chartColor="#f59e0b">
           {o.storePerf.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={o.storePerf}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
                 <Legend />
-                <Bar dataKey="sales" fill="#2563eb" name="Sales" />
-                <Bar dataKey="purchases" fill="#16a34a" name="Purchases" />
-                <Bar dataKey="profit" fill="#ea580c" name="Profit" />
+                <Bar dataKey="sales" fill="#3b82f6" name="Sales" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="purchases" fill="#10b981" name="Purchases" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="profit" fill="#f59e0b" name="Profit" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
       {o.paymentBreakdown.length > 0 && (
-        <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-          <ChartCard title="Sales by Payment Method">
-            <ResponsiveContainer width="100%" height={160}>
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <ChartCard title="Sales by Payment Method" chartColor="#8b5cf6">
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={o.paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {o.paymentBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie
+                  data={o.paymentBreakdown}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {o.paymentBreakdown.map((_: any, i: number) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>
-          <Card className="p-3 sm:p-4">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs sm:mb-3">Store Summary</p>
+          <Card className="p-3 sm:p-4 rounded-xl border border-border/40">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-block size-1 rounded-full bg-cyan-500" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-xs">
+                Store Summary
+              </p>
+            </div>
             <DataTable>
-              <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-                <tr><Th>Store</Th><ThR>Sales</ThR><ThR>Purchases</ThR><ThR>Profit</ThR><ThR>Margin</ThR></tr>
+              <thead>
+                <tr>
+                  <Th>Store</Th>
+                  <ThR>Sales</ThR>
+                  <ThR>Purchases</ThR>
+                  <ThR>Profit</ThR>
+                  <ThR>Margin</ThR>
+                </tr>
               </thead>
               <tbody>
-                {o.storePerf.map((s: any) => (
-                  <tr key={s.name} className="border-t border-border">
-                    <Td className="font-medium">{s.name}</Td>
+                {o.storePerf.map((s: any, idx: number) => (
+                  <tr
+                    key={s.name}
+                    className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+                  >
+                    <Td className="font-medium">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="inline-block size-2 rounded-full shrink-0"
+                          style={{ backgroundColor: STORE_COLORS[idx % STORE_COLORS.length] }}
+                        />
+                        {s.name}
+                      </span>
+                    </Td>
                     <TdR>{money(s.sales)}</TdR>
                     <TdR>{money(s.purchases)}</TdR>
-                    <TdR className={s.profit >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{money(s.profit)}</TdR>
-                    <TdR className={s.margin >= 0 ? "text-green-600" : "text-destructive"}>{s.margin.toFixed(1)}%</TdR>
+                    <TdR
+                      className={
+                        s.profit >= 0
+                          ? "text-emerald-600 font-semibold"
+                          : "text-rose-600 font-semibold"
+                      }
+                    >
+                      {money(s.profit)}
+                    </TdR>
+                    <TdR className={s.margin >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                      {s.margin.toFixed(1)}%
+                    </TdR>
                   </tr>
                 ))}
               </tbody>
@@ -349,21 +906,61 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
     if (dateFrom) rows = rows.filter((s: any) => s.date >= dateFrom);
     if (dateTo) rows = rows.filter((s: any) => s.date <= dateTo);
     const t = q.trim().toLowerCase();
-    if (t) rows = rows.filter((s: any) => s.invoiceNo.toLowerCase().includes(t) || s.customer.toLowerCase().includes(t) || s.itemName.toLowerCase().includes(t) || s.itemCode.toLowerCase().includes(t));
+    if (t)
+      rows = rows.filter(
+        (s: any) =>
+          s.invoiceNo.toLowerCase().includes(t) ||
+          s.customer.toLowerCase().includes(t) ||
+          s.itemName.toLowerCase().includes(t) ||
+          s.itemCode.toLowerCase().includes(t),
+      );
     return rows;
   }, [sales, dateFrom, dateTo, q]);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, { invoiceNo: string; date: string; customer: string; saleType: string; status: string; items: any[]; grandTotal: number; paidAmount: number; remaining: number; paymentMethod: string; storeId: string }>();
+    const map = new Map<
+      string,
+      {
+        invoiceNo: string;
+        date: string;
+        customer: string;
+        saleType: string;
+        status: string;
+        items: any[];
+        grandTotal: number;
+        paidAmount: number;
+        remaining: number;
+        paymentMethod: string;
+        storeId: string;
+      }
+    >();
     for (const s of filtered) {
       const existing = map.get(s.invoiceNo);
       const allocs = saleAllocations.filter((a: any) => a.saleId === s.id);
-      const lotInfo = allocs.map((a: any) => { const lot = stockLots.find((l: any) => l.id === a.lotId); return lot ? `${lot.lotNo}(${a.qtyTaken})` : ""; }).filter(Boolean).join(", ");
+      const lotInfo = allocs
+        .map((a: any) => {
+          const lot = stockLots.find((l: any) => l.id === a.lotId);
+          return lot ? `${lot.lotNo}(${a.qtyTaken})` : "";
+        })
+        .filter(Boolean)
+        .join(", ");
       if (existing) {
         existing.items.push({ ...s, lotInfo });
         existing.grandTotal += s.total;
       } else {
-        map.set(s.invoiceNo, { invoiceNo: s.invoiceNo, date: s.date, customer: s.customer, saleType: s.saleType, status: s.status, items: [{ ...s, lotInfo }], grandTotal: s.total, paidAmount: s.paidAmount, remaining: s.remaining, paymentMethod: s.paymentMethod, storeId: s.storeId });
+        map.set(s.invoiceNo, {
+          invoiceNo: s.invoiceNo,
+          date: s.date,
+          customer: s.customer,
+          saleType: s.saleType,
+          status: s.status,
+          items: [{ ...s, lotInfo }],
+          grandTotal: s.total,
+          paidAmount: s.paidAmount,
+          remaining: s.remaining,
+          paymentMethod: s.paymentMethod,
+          storeId: s.storeId,
+        });
       }
     }
     return Array.from(map.values());
@@ -373,22 +970,36 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
     const totalGrand = grouped.reduce((a, r) => a + r.grandTotal, 0);
     const totalPaid = grouped.reduce((a, r) => a + r.paidAmount, 0);
     const totalVat = filtered.reduce((a: number, s: any) => a + s.vat, 0);
-    const creditSales = grouped.filter(r => r.saleType === "Credit").reduce((a, r) => a + r.grandTotal, 0);
-    const creditPct = totalGrand > 0 ? (creditSales / totalGrand * 100) : 0;
-    const totalReturns = salesReturns.filter((r: any) => {
-      if (dateFrom && r.returnDate < dateFrom) return false;
-      if (dateTo && r.returnDate > dateTo) return false;
-      return true;
-    }).reduce((a: number, r: any) => a + r.refundAmount, 0);
-    const returnRate = totalGrand > 0 ? (totalReturns / totalGrand * 100) : 0;
+    const creditSales = grouped
+      .filter((r) => r.saleType === "Credit")
+      .reduce((a, r) => a + r.grandTotal, 0);
+    const creditPct = totalGrand > 0 ? (creditSales / totalGrand) * 100 : 0;
+    const totalReturns = salesReturns
+      .filter((r: any) => {
+        if (dateFrom && r.returnDate < dateFrom) return false;
+        if (dateTo && r.returnDate > dateTo) return false;
+        return true;
+      })
+      .reduce((a: number, r: any) => a + r.refundAmount, 0);
+    const returnRate = totalGrand > 0 ? (totalReturns / totalGrand) * 100 : 0;
 
     const dailyMap = new Map<string, number>();
-    for (const s of filtered) { const d = s.date?.slice(0, 10); if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + s.amount); }
-    const dailyTrend = Array.from(dailyMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date: shortMonth(date), label: date, total }));
+    for (const s of filtered) {
+      const d = s.date?.slice(0, 10);
+      if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + s.amount);
+    }
+    const dailyTrend = Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, total]) => ({ date: shortMonth(date), label: date, total }));
 
     const catMap = new Map<string, number>();
-    for (const s of filtered) { const c = s.category || "Uncategorized"; catMap.set(c, (catMap.get(c) || 0) + s.amount); }
-    const categoryBreakdown = Array.from(catMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    for (const s of filtered) {
+      const c = s.category || "Uncategorized";
+      catMap.set(c, (catMap.get(c) || 0) + s.amount);
+    }
+    const categoryBreakdown = Array.from(catMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
 
     const brandMap = new Map<string, { sales: number; qty: number; profit: number }>();
     for (const s of filtered) {
@@ -397,133 +1008,279 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
       e.sales += s.amount;
       e.qty += s.qty;
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
+      const cost = allocs.reduce(
+        (c: number, al: any) =>
+          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+        0,
+      );
       e.profit += s.amount - cost;
       brandMap.set(b, e);
     }
-    const brandPerformance = Array.from(brandMap.entries()).map(([brand, v]) => ({
-      brand, sales: v.sales, qty: v.qty, profit: v.profit, margin: v.sales > 0 ? (v.profit / v.sales * 100) : 0,
-    })).sort((a, b) => b.sales - a.sales);
+    const brandPerformance = Array.from(brandMap.entries())
+      .map(([brand, v]) => ({
+        brand,
+        sales: v.sales,
+        qty: v.qty,
+        profit: v.profit,
+        margin: v.sales > 0 ? (v.profit / v.sales) * 100 : 0,
+      }))
+      .sort((a, b) => b.sales - a.sales);
 
-    const itemMap = new Map<string, { name: string; code: string; qty: number; revenue: number; profit: number }>();
+    const itemMap = new Map<
+      string,
+      { name: string; code: string; qty: number; revenue: number; profit: number }
+    >();
     for (const s of filtered) {
       const key = s.itemCode;
-      const e = itemMap.get(key) || { name: s.itemName, code: s.itemCode, qty: 0, revenue: 0, profit: 0 };
+      const e = itemMap.get(key) || {
+        name: s.itemName,
+        code: s.itemCode,
+        qty: 0,
+        revenue: 0,
+        profit: 0,
+      };
       e.qty += s.qty;
       e.revenue += s.amount;
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
+      const cost = allocs.reduce(
+        (c: number, al: any) =>
+          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+        0,
+      );
       e.profit += s.amount - cost;
       itemMap.set(key, e);
     }
-    const topItems = Array.from(itemMap.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 15);
+    const topItems = Array.from(itemMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 15);
 
     const methodMap = new Map<string, number>();
-    for (const s of filtered) { const m = s.paymentMethod || "Cash"; methodMap.set(m, (methodMap.get(m) || 0) + s.total); }
-    const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({ name, value }));
+    for (const s of filtered) {
+      const m = s.paymentMethod || "Cash";
+      methodMap.set(m, (methodMap.get(m) || 0) + s.total);
+    }
+    const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
 
-    return { totalGrand, totalPaid, totalVat, creditPct, returnRate, totalReturns, dailyTrend, categoryBreakdown, brandPerformance, topItems, paymentBreakdown };
+    return {
+      totalGrand,
+      totalPaid,
+      totalVat,
+      creditPct,
+      returnRate,
+      totalReturns,
+      dailyTrend,
+      categoryBreakdown,
+      brandPerformance,
+      topItems,
+      paymentBreakdown,
+    };
   }, [filtered, grouped, salesReturns, saleAllocations, stockLots, dateFrom, dateTo]);
 
   function onExport() {
     const rows: any[] = [];
     for (const g of grouped) {
       for (const it of g.items) {
-        rows.push({ Invoice: g.invoiceNo, Date: g.date, Customer: g.customer, "Item Code": it.itemCode, Item: it.itemName, Qty: it.qty, Rate: it.rate, Amount: it.amount, VAT: it.vat, Total: it.total, "Sale Type": g.saleType, Status: g.status, "Paid Amount": g.paidAmount, Remaining: g.remaining, "Lot Info": it.lotInfo });
+        rows.push({
+          Invoice: g.invoiceNo,
+          Date: g.date,
+          Customer: g.customer,
+          "Item Code": it.itemCode,
+          Item: it.itemName,
+          Qty: it.qty,
+          Rate: it.rate,
+          Amount: it.amount,
+          VAT: it.vat,
+          Total: it.total,
+          "Sale Type": g.saleType,
+          Status: g.status,
+          "Paid Amount": g.paidAmount,
+          Remaining: g.remaining,
+          "Lot Info": it.lotInfo,
+        });
       }
     }
-    if (rows.length === 0) { toast.error("No data"); return; }
+    if (rows.length === 0) {
+      toast.error("No data");
+      return;
+    }
     exportRows(rows, "BOD Sales", `BOD_Sales_${today()}.xlsx`);
   }
 
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <Card className="p-3 sm:p-4">
+    <div className="space-y-4">
+      <Card className="p-3 sm:p-4 rounded-xl border border-border/40 bg-slate-50/80 dark:bg-slate-900/60">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-5">
-          <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Invoice, customer, item..." className="h-9 text-xs" /></div>
-          <div className="flex items-end sm:col-span-2"><ExportBtn onExport={onExport} /></div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              From
+            </Label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              To
+            </Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Search
+            </Label>
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Invoice, customer, item..."
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div className="flex items-end sm:col-span-2">
+            <ExportBtn onExport={onExport} />
+          </div>
         </div>
       </Card>
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         <Kpi label="Invoices" value={String(grouped.length)} icon={ReceiptText} />
         <Kpi label="Revenue" value={money(a.totalGrand)} icon={DollarSign} />
-        <Kpi label="Avg Sale" value={money(grouped.length > 0 ? a.totalGrand / grouped.length : 0)} icon={Target} />
+        <Kpi
+          label="Avg Sale"
+          value={money(grouped.length > 0 ? a.totalGrand / grouped.length : 0)}
+          icon={Target}
+        />
         <Kpi label="VAT Collected" value={money(a.totalVat)} icon={CreditCard} />
         <Kpi label="Credit Sales" value={a.creditPct.toFixed(1) + "%"} icon={Banknote} />
-        <Kpi label="Return Rate" value={a.returnRate.toFixed(1) + "%"} sub={money(a.totalReturns) + " refund"} icon={RotateCcw} />
+        <Kpi
+          label="Return Rate"
+          value={a.returnRate.toFixed(1) + "%"}
+          sub={money(a.totalReturns) + " refund"}
+          icon={RotateCcw}
+        />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Daily Sales Trend">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Daily Sales Trend" chartColor="#3b82f6">
           {a.dailyTrend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={a.dailyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
-                <Bar dataKey="total" fill="#2563eb" name="Sales" />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
+                <Bar dataKey="total" fill="#3b82f6" name="Sales" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
-        <ChartCard title="Sales by Category">
+        <ChartCard title="Sales by Category" chartColor="#10b981">
           {a.categoryBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={a.categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {a.categoryBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie
+                  data={a.categoryBreakdown}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {a.categoryBreakdown.map((_: any, i: number) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Sales by Payment Method">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Sales by Payment Method" chartColor="#8b5cf6">
           {a.paymentBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={150}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={a.paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {a.paymentBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie
+                  data={a.paymentBreakdown}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {a.paymentBreakdown.map((_: any, i: number) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
-        <ChartCard title="Brand Performance">
+        <ChartCard title="Brand Performance" chartColor="#f59e0b">
           {a.brandPerformance.length > 0 ? (
-            <ResponsiveContainer width="100%" height={150}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={a.brandPerformance.slice(0, 8)} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="brand" tick={{ fontSize: 10 }} width={80} />
-                <Tooltip formatter={(v: number) => money(v)} />
-                <Bar dataKey="sales" fill="#16a34a" name="Sales" />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
+                <Bar dataKey="sales" fill="#10b981" name="Sales" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
       {a.brandPerformance.length > 0 && (
         <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
+          <thead>
             <tr>
-              <Th>Brand</Th><ThR>Sales</ThR><ThR>Qty</ThR><ThR>Profit</ThR><ThR>Margin</ThR>
+              <Th>Brand</Th>
+              <ThR>Sales</ThR>
+              <ThR>Qty</ThR>
+              <ThR>Profit</ThR>
+              <ThR>Margin</ThR>
             </tr>
           </thead>
           <tbody>
             {a.brandPerformance.map((b: any) => (
-              <tr key={b.brand} className="border-t border-border">
+              <tr
+                key={b.brand}
+                className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+              >
                 <Td className="font-medium">{b.brand}</Td>
                 <TdR className="font-semibold">{money(b.sales)}</TdR>
                 <TdR>{b.qty}</TdR>
-                <TdR className={b.profit >= 0 ? "text-green-600" : "text-destructive"}>{money(b.profit)}</TdR>
+                <TdR
+                  className={
+                    b.profit >= 0 ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold"
+                  }
+                >
+                  {money(b.profit)}
+                </TdR>
                 <TdR>{b.margin.toFixed(1)}%</TdR>
               </tr>
             ))}
@@ -532,18 +1289,38 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
       )}
       {a.topItems.length > 0 && (
         <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th>Item</Th><Th>Code</Th><ThR>Qty Sold</ThR><ThR>Revenue</ThR><ThR>Profit</ThR><ThR>Margin</ThR></tr>
+          <thead>
+            <tr>
+              <Th>Item</Th>
+              <Th>Code</Th>
+              <ThR>Qty Sold</ThR>
+              <ThR>Revenue</ThR>
+              <ThR>Profit</ThR>
+              <ThR>Margin</ThR>
+            </tr>
           </thead>
           <tbody>
             {a.topItems.map((it: any, i: number) => (
-              <tr key={it.code} className="border-t border-border">
-                <Td className="font-medium">{i + 1}. {it.name}</Td>
+              <tr
+                key={it.code}
+                className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+              >
+                <Td className="font-medium">
+                  {i + 1}. {it.name}
+                </Td>
                 <Td className="font-mono">{it.code}</Td>
                 <TdR>{it.qty}</TdR>
                 <TdR className="font-semibold">{money(it.revenue)}</TdR>
-                <TdR className={it.profit >= 0 ? "text-green-600" : "text-destructive"}>{money(it.profit)}</TdR>
-                <TdR>{it.revenue > 0 ? (it.profit / it.revenue * 100).toFixed(1) : 0}%</TdR>
+                <TdR
+                  className={
+                    it.profit >= 0
+                      ? "text-emerald-600 font-semibold"
+                      : "text-rose-600 font-semibold"
+                  }
+                >
+                  {money(it.profit)}
+                </TdR>
+                <TdR>{it.revenue > 0 ? ((it.profit / it.revenue) * 100).toFixed(1) : 0}%</TdR>
               </tr>
             ))}
           </tbody>
@@ -554,7 +1331,25 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
 }
 
 function ReceiptText({ className }: { className?: string }) {
-  return <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8h-4"/><path d="M16 12h-6"/><path d="M10 16h6"/></svg>;
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+      <path d="M14 8h-4" />
+      <path d="M16 12h-6" />
+      <path d="M10 16h6" />
+    </svg>
+  );
 }
 
 // ─── TAB 3: PURCHASE ANALYTICS ────────────────────────────────────────────────
@@ -569,7 +1364,13 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
     if (dateFrom) rows = rows.filter((p: any) => p.date >= dateFrom);
     if (dateTo) rows = rows.filter((p: any) => p.date <= dateTo);
     const t = q.trim().toLowerCase();
-    if (t) rows = rows.filter((p: any) => p.purchaseNo.toLowerCase().includes(t) || p.supplierName.toLowerCase().includes(t) || p.supplierInvoiceNo.toLowerCase().includes(t));
+    if (t)
+      rows = rows.filter(
+        (p: any) =>
+          p.purchaseNo.toLowerCase().includes(t) ||
+          p.supplierName.toLowerCase().includes(t) ||
+          p.supplierInvoiceNo.toLowerCase().includes(t),
+      );
     return rows;
   }, [purchaseHeaders, dateFrom, dateTo, q]);
 
@@ -577,21 +1378,39 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
     const totalGrand = filtered.reduce((a: number, p: any) => a + p.grandTotal, 0);
     const totalPaid = filtered.reduce((a: number, p: any) => a + p.paidAmount, 0);
     const totalVat = filtered.reduce((a: number, p: any) => a + p.vatAmount, 0);
-    const creditPurchases = filtered.filter((p: any) => p.purchaseType === "Credit").reduce((a: number, p: any) => a + p.grandTotal, 0);
-    const creditPct = totalGrand > 0 ? (creditPurchases / totalGrand * 100) : 0;
-    const totalReturns = purchaseReturns.filter((r: any) => {
-      if (dateFrom && r.returnDate < dateFrom) return false;
-      if (dateTo && r.returnDate > dateTo) return false;
-      return true;
-    }).reduce((a: number, r: any) => a + r.refundAmount, 0);
+    const creditPurchases = filtered
+      .filter((p: any) => p.purchaseType === "Credit")
+      .reduce((a: number, p: any) => a + p.grandTotal, 0);
+    const creditPct = totalGrand > 0 ? (creditPurchases / totalGrand) * 100 : 0;
+    const totalReturns = purchaseReturns
+      .filter((r: any) => {
+        if (dateFrom && r.returnDate < dateFrom) return false;
+        if (dateTo && r.returnDate > dateTo) return false;
+        return true;
+      })
+      .reduce((a: number, r: any) => a + r.refundAmount, 0);
 
     const dailyMap = new Map<string, number>();
-    for (const p of filtered) { const d = p.date?.slice(0, 10); if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + p.grandTotal); }
-    const dailyTrend = Array.from(dailyMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date: shortMonth(date), label: date, total }));
-
-    const supplierMap = new Map<string, { name: string; purchases: number; count: number; paid: number; remaining: number }>();
     for (const p of filtered) {
-      const e = supplierMap.get(p.supplierName) || { name: p.supplierName, purchases: 0, count: 0, paid: 0, remaining: 0 };
+      const d = p.date?.slice(0, 10);
+      if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + p.grandTotal);
+    }
+    const dailyTrend = Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, total]) => ({ date: shortMonth(date), label: date, total }));
+
+    const supplierMap = new Map<
+      string,
+      { name: string; purchases: number; count: number; paid: number; remaining: number }
+    >();
+    for (const p of filtered) {
+      const e = supplierMap.get(p.supplierName) || {
+        name: p.supplierName,
+        purchases: 0,
+        count: 0,
+        paid: 0,
+        remaining: 0,
+      };
       e.purchases += p.grandTotal;
       e.count++;
       e.paid += p.paidAmount;
@@ -610,7 +1429,9 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
       e.qty += pi.qty;
       catMap.set(c, e);
     }
-    const categoryBreakdown = Array.from(catMap.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.amount - a.amount);
+    const categoryBreakdown = Array.from(catMap.entries())
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.amount - a.amount);
 
     const brandMap = new Map<string, number>();
     for (const pi of purchaseItems) {
@@ -618,24 +1439,83 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
       const b = pi.brand || "Unknown";
       brandMap.set(b, (brandMap.get(b) || 0) + pi.total);
     }
-    const brandBreakdown = Array.from(brandMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 10);
+    const brandBreakdown = Array.from(brandMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
 
-    return { totalGrand, totalPaid, totalVat, creditPct, totalReturns, dailyTrend, topSuppliers, categoryBreakdown, brandBreakdown };
+    return {
+      totalGrand,
+      totalPaid,
+      totalVat,
+      creditPct,
+      totalReturns,
+      dailyTrend,
+      topSuppliers,
+      categoryBreakdown,
+      brandBreakdown,
+    };
   }, [filtered, purchaseItems, purchaseReturns, dateFrom, dateTo]);
 
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <Card className="p-3 sm:p-4">
+    <div className="space-y-4">
+      <Card className="p-3 sm:p-4 rounded-xl border border-border/40 bg-slate-50/80 dark:bg-slate-900/60">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-5">
-          <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Purchase no, supplier..." className="h-9 text-xs" /></div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              From
+            </Label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              To
+            </Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Search
+            </Label>
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Purchase no, supplier..."
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
           <div className="flex items-end sm:col-span-2">
-            <ExportBtn onExport={() => {
-              exportRows(filtered.map((p: any) => ({ "Purchase No": p.purchaseNo, Date: p.date, Supplier: p.supplierName, "Grand Total": p.grandTotal, Paid: p.paidAmount, Remaining: p.remainingBalance, Type: p.purchaseType })), "BOD Purchases", `BOD_Purchases_${today()}.xlsx`);
-            }} />
+            <ExportBtn
+              onExport={() => {
+                exportRows(
+                  filtered.map((p: any) => ({
+                    "Purchase No": p.purchaseNo,
+                    Date: p.date,
+                    Supplier: p.supplierName,
+                    "Grand Total": p.grandTotal,
+                    Paid: p.paidAmount,
+                    Remaining: p.remainingBalance,
+                    Type: p.purchaseType,
+                  })),
+                  "BOD Purchases",
+                  `BOD_Purchases_${today()}.xlsx`,
+                );
+              }}
+            />
           </div>
         </div>
       </Card>
@@ -646,59 +1526,91 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
         <Kpi label="Credit %" value={a.creditPct.toFixed(1) + "%"} icon={Banknote} />
         <Kpi label="Returns" value={money(a.totalReturns)} icon={RotateCcw} />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Purchase Trend">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Purchase Trend" chartColor="#10b981">
           {a.dailyTrend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <LineChart data={a.dailyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
-                <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Purchases" />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#10b981"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Purchases"
+                />
               </LineChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
-        <ChartCard title="Purchases by Category">
+        <ChartCard title="Purchases by Category" chartColor="#f59e0b">
           {a.categoryBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={a.categoryBreakdown} dataKey="amount" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {a.categoryBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie
+                  data={a.categoryBreakdown}
+                  dataKey="amount"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {a.categoryBreakdown.map((_: any, i: number) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
       {a.brandBreakdown.length > 0 && (
-        <ChartCard title="Purchases by Brand">
-          <ResponsiveContainer width="100%" height={150}>
+        <ChartCard title="Purchases by Brand" chartColor="#8b5cf6">
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={a.brandBreakdown}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => money(v)} />
-              <Bar dataKey="value" fill="#9333ea" name="Amount" />
+              <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
+              <Bar dataKey="value" fill="#8b5cf6" name="Amount" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       )}
       {a.topSuppliers.length > 0 && (
         <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th>Supplier</Th><ThR>Purchases</ThR><ThR>Count</ThR><ThR>Paid</ThR><ThR>Outstanding</ThR></tr>
+          <thead>
+            <tr>
+              <Th>Supplier</Th>
+              <ThR>Purchases</ThR>
+              <ThR>Count</ThR>
+              <ThR>Paid</ThR>
+              <ThR>Outstanding</ThR>
+            </tr>
           </thead>
           <tbody>
             {a.topSuppliers.map((s) => (
-              <tr key={s.name} className="border-t border-border">
+              <tr
+                key={s.name}
+                className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+              >
                 <Td className="font-medium">{s.name}</Td>
                 <TdR className="font-semibold">{money(s.purchases)}</TdR>
                 <TdR>{s.count}</TdR>
                 <TdR>{money(s.paid)}</TdR>
-                <TdR className={s.remaining > 0 ? "text-destructive" : ""}>{money(s.remaining)}</TdR>
+                <TdR className={s.remaining > 0 ? "text-rose-600 font-semibold" : ""}>
+                  {money(s.remaining)}
+                </TdR>
               </tr>
             ))}
           </tbody>
@@ -720,162 +1632,348 @@ function TabProfitability({ sales, saleAllocations, stockLots }: any) {
     if (dateFrom) rows = rows.filter((s: any) => s.date >= dateFrom);
     if (dateTo) rows = rows.filter((s: any) => s.date <= dateTo);
     const t = q.trim().toLowerCase();
-    if (t) rows = rows.filter((s: any) => s.invoiceNo.toLowerCase().includes(t) || s.customer.toLowerCase().includes(t) || s.itemName.toLowerCase().includes(t));
+    if (t)
+      rows = rows.filter(
+        (s: any) =>
+          s.invoiceNo.toLowerCase().includes(t) ||
+          s.customer.toLowerCase().includes(t) ||
+          s.itemName.toLowerCase().includes(t),
+      );
     return rows;
   }, [sales, dateFrom, dateTo, q]);
 
   const a = useMemo(() => {
-    let totalRevenue = 0, totalCost = 0;
+    let totalRevenue = 0,
+      totalCost = 0;
     const catMap = new Map<string, { revenue: number; cost: number }>();
     const brandMap = new Map<string, { revenue: number; cost: number }>();
     const storeMap = new Map<string, { revenue: number; cost: number }>();
-    const itemMap = new Map<string, { name: string; code: string; revenue: number; cost: number; qty: number }>();
+    const itemMap = new Map<
+      string,
+      { name: string; code: string; revenue: number; cost: number; qty: number }
+    >();
     const dailyMap = new Map<string, { revenue: number; cost: number }>();
 
     for (const s of filtered) {
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
+      const cost = allocs.reduce(
+        (c: number, al: any) =>
+          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+        0,
+      );
       const profit = s.amount - cost;
       totalRevenue += s.amount;
       totalCost += cost;
 
       const cat = s.category || "Uncategorized";
-      const ce = catMap.get(cat) || { revenue: 0, cost: 0 }; ce.revenue += s.amount; ce.cost += cost; catMap.set(cat, ce);
+      const ce = catMap.get(cat) || { revenue: 0, cost: 0 };
+      ce.revenue += s.amount;
+      ce.cost += cost;
+      catMap.set(cat, ce);
       const br = s.brand || "Unknown";
-      const be = brandMap.get(br) || { revenue: 0, cost: 0 }; be.revenue += s.amount; be.cost += cost; brandMap.set(br, be);
+      const be = brandMap.get(br) || { revenue: 0, cost: 0 };
+      be.revenue += s.amount;
+      be.cost += cost;
+      brandMap.set(br, be);
       const st = LOCATION_LABELS[s.storeId] || "Unknown";
-      const se = storeMap.get(st) || { revenue: 0, cost: 0 }; se.revenue += s.amount; se.cost += cost; storeMap.set(st, se);
+      const se = storeMap.get(st) || { revenue: 0, cost: 0 };
+      se.revenue += s.amount;
+      se.cost += cost;
+      storeMap.set(st, se);
       const key = s.itemCode;
-      const ie = itemMap.get(key) || { name: s.itemName, code: s.itemCode, revenue: 0, cost: 0, qty: 0 }; ie.revenue += s.amount; ie.cost += cost; ie.qty += s.qty; itemMap.set(key, ie);
+      const ie = itemMap.get(key) || {
+        name: s.itemName,
+        code: s.itemCode,
+        revenue: 0,
+        cost: 0,
+        qty: 0,
+      };
+      ie.revenue += s.amount;
+      ie.cost += cost;
+      ie.qty += s.qty;
+      itemMap.set(key, ie);
       const day = s.date?.slice(0, 10);
-      if (day) { const de = dailyMap.get(day) || { revenue: 0, cost: 0 }; de.revenue += s.amount; de.cost += cost; dailyMap.set(day, de); }
+      if (day) {
+        const de = dailyMap.get(day) || { revenue: 0, cost: 0 };
+        de.revenue += s.amount;
+        de.cost += cost;
+        dailyMap.set(day, de);
+      }
     }
 
     const totalProfit = totalRevenue - totalCost;
-    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
+    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
-    const categoryData = Array.from(catMap.entries()).map(([name, v]) => ({
-      name, revenue: v.revenue, cost: v.cost, profit: v.revenue - v.cost, margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue * 100) : 0,
-    })).sort((a, b) => b.profit - a.profit);
+    const categoryData = Array.from(catMap.entries())
+      .map(([name, v]) => ({
+        name,
+        revenue: v.revenue,
+        cost: v.cost,
+        profit: v.revenue - v.cost,
+        margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue) * 100 : 0,
+      }))
+      .sort((a, b) => b.profit - a.profit);
 
-    const brandData = Array.from(brandMap.entries()).map(([name, v]) => ({
-      name, revenue: v.revenue, cost: v.cost, profit: v.revenue - v.cost, margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue * 100) : 0,
-    })).sort((a, b) => b.profit - a.profit);
+    const brandData = Array.from(brandMap.entries())
+      .map(([name, v]) => ({
+        name,
+        revenue: v.revenue,
+        cost: v.cost,
+        profit: v.revenue - v.cost,
+        margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue) * 100 : 0,
+      }))
+      .sort((a, b) => b.profit - a.profit);
 
-    const storeData = Array.from(storeMap.entries()).map(([name, v]) => ({
-      name, revenue: v.revenue, cost: v.cost, profit: v.revenue - v.cost, margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue * 100) : 0,
-    })).sort((a, b) => b.profit - a.profit);
+    const storeData = Array.from(storeMap.entries())
+      .map(([name, v]) => ({
+        name,
+        revenue: v.revenue,
+        cost: v.cost,
+        profit: v.revenue - v.cost,
+        margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue) * 100 : 0,
+      }))
+      .sort((a, b) => b.profit - a.profit);
 
-    const itemData = Array.from(itemMap.values()).map(v => ({
-      ...v, profit: v.revenue - v.cost, margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue * 100) : 0,
-    })).sort((a, b) => b.profit - a.profit);
+    const itemData = Array.from(itemMap.values())
+      .map((v) => ({
+        ...v,
+        profit: v.revenue - v.cost,
+        margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue) * 100 : 0,
+      }))
+      .sort((a, b) => b.profit - a.profit);
     const top10 = itemData.slice(0, 10);
-    const bottom10 = itemData.filter(i => i.revenue > 0).slice(-10).reverse();
+    const bottom10 = itemData
+      .filter((i) => i.revenue > 0)
+      .slice(-10)
+      .reverse();
 
-    const trendData = Array.from(dailyMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({
-      date: shortMonth(day), revenue: v.revenue, cost: v.cost, profit: v.revenue - v.cost, margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue * 100) : 0,
-    }));
+    const trendData = Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([day, v]) => ({
+        date: shortMonth(day),
+        revenue: v.revenue,
+        cost: v.cost,
+        profit: v.revenue - v.cost,
+        margin: v.revenue > 0 ? ((v.revenue - v.cost) / v.revenue) * 100 : 0,
+      }));
 
-    return { totalRevenue, totalCost, totalProfit, avgMargin, categoryData, brandData, storeData, itemData, top10, bottom10, trendData };
+    return {
+      totalRevenue,
+      totalCost,
+      totalProfit,
+      avgMargin,
+      categoryData,
+      brandData,
+      storeData,
+      itemData,
+      top10,
+      bottom10,
+      trendData,
+    };
   }, [filtered, saleAllocations, stockLots, dateFrom, dateTo]);
 
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <Card className="p-3 sm:p-4">
+    <div className="space-y-4">
+      <Card className="p-3 sm:p-4 rounded-xl border border-border/40 bg-slate-50/80 dark:bg-slate-900/60">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-5">
-          <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Invoice, customer, item..." className="h-9 text-xs" /></div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              From
+            </Label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              To
+            </Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Search
+            </Label>
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Invoice, customer, item..."
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
           <div className="flex items-end sm:col-span-2">
-            <ExportBtn onExport={() => {
-              exportRows(a.categoryData.map(c => ({ Category: c.name, Revenue: c.revenue, Cost: c.cost, Profit: c.profit, Margin: c.margin.toFixed(1) + "%" })), "Profit by Category", `BOD_Profit_Cat_${today()}.xlsx`);
-            }} />
+            <ExportBtn
+              onExport={() => {
+                exportRows(
+                  a.categoryData.map((c) => ({
+                    Category: c.name,
+                    Revenue: c.revenue,
+                    Cost: c.cost,
+                    Profit: c.profit,
+                    Margin: c.margin.toFixed(1) + "%",
+                  })),
+                  "Profit by Category",
+                  `BOD_Profit_Cat_${today()}.xlsx`,
+                );
+              }}
+            />
           </div>
         </div>
       </Card>
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Revenue" value={money(a.totalRevenue)} icon={DollarSign} />
         <Kpi label="Cost of Goods" value={money(a.totalCost)} icon={PackagePlus} />
-        <Kpi label="Net Profit" value={money(a.totalProfit)} icon={TrendingUp} color="green" />
+        <Kpi label="Net Profit" value={money(a.totalProfit)} icon={TrendingUp} color="emerald" />
         <Kpi label="Avg Margin" value={a.avgMargin.toFixed(1) + "%"} icon={Target} />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Profit Margin Trend">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Profit Margin Trend" chartColor="#3b82f6">
           {a.trendData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <LineChart data={a.trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number, name: string) => name === "margin" ? v.toFixed(1) + "%" : money(v)} />
+                <Tooltip
+                  content={
+                    <CustomTooltip
+                      formatter={(v: number, name: string) =>
+                        name === "margin" ? v.toFixed(1) + "%" : money(v)
+                      }
+                    />
+                  }
+                />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={2} name="Revenue" />
-                <Line type="monotone" dataKey="cost" stroke="#ea580c" strokeWidth={2} name="Cost" />
-                <Line type="monotone" dataKey="profit" stroke="#16a34a" strokeWidth={2} name="Profit" />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#3b82f6"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Revenue"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="cost"
+                  stroke="#f59e0b"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Cost"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="profit"
+                  stroke="#10b981"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Profit"
+                />
               </LineChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
-        <ChartCard title="Profit by Category">
+        <ChartCard title="Profit by Category" chartColor="#f59e0b">
           {a.categoryData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={a.categoryData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
                 <Legend />
-                <Bar dataKey="revenue" fill="#2563eb" name="Revenue" />
-                <Bar dataKey="cost" fill="#ea580c" name="Cost" />
-                <Bar dataKey="profit" fill="#16a34a" name="Profit" />
+                <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cost" fill="#f59e0b" name="Cost" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="profit" fill="#10b981" name="Profit" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Profit by Brand">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Profit by Brand" chartColor="#8b5cf6">
           {a.brandData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={a.brandData.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
-                <Bar dataKey="profit" fill="#9333ea" name="Profit" />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
+                <Bar dataKey="profit" fill="#8b5cf6" name="Profit" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
-        <ChartCard title="Profit by Store">
+        <ChartCard title="Profit by Store" chartColor="#06b6d4">
           {a.storeData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={a.storeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
                 <Legend />
-                <Bar dataKey="revenue" fill="#2563eb" name="Revenue" />
-                <Bar dataKey="profit" fill="#16a34a" name="Profit" />
+                <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="profit" fill="#10b981" name="Profit" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
       {a.top10.length > 0 && (
         <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th>#</Th><Th>Item</Th><Th>Code</Th><ThR>Qty</ThR><ThR>Revenue</ThR><ThR>Cost</ThR><ThR>Profit</ThR><ThR>Margin</ThR></tr>
+          <thead>
+            <tr>
+              <Th>#</Th>
+              <Th>Item</Th>
+              <Th>Code</Th>
+              <ThR>Qty</ThR>
+              <ThR>Revenue</ThR>
+              <ThR>Cost</ThR>
+              <ThR>Profit</ThR>
+              <ThR>Margin</ThR>
+            </tr>
           </thead>
           <tbody>
             {a.top10.map((it, i) => (
-              <tr key={it.code} className="border-t border-border">
-                <Td>{i + 1}</Td><Td className="font-medium">{it.name}</Td><Td className="font-mono">{it.code}</Td>
-                <TdR>{it.qty}</TdR><TdR className="font-semibold">{money(it.revenue)}</TdR><TdR>{money(it.cost)}</TdR>
-                <TdR className={it.profit >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{money(it.profit)}</TdR>
+              <tr
+                key={it.code}
+                className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+              >
+                <Td>{i + 1}</Td>
+                <Td className="font-medium">{it.name}</Td>
+                <Td className="font-mono">{it.code}</Td>
+                <TdR>{it.qty}</TdR>
+                <TdR className="font-semibold">{money(it.revenue)}</TdR>
+                <TdR>{money(it.cost)}</TdR>
+                <TdR
+                  className={
+                    it.profit >= 0
+                      ? "text-emerald-600 font-semibold"
+                      : "text-rose-600 font-semibold"
+                  }
+                >
+                  {money(it.profit)}
+                </TdR>
                 <TdR>{it.margin.toFixed(1)}%</TdR>
               </tr>
             ))}
@@ -884,15 +1982,39 @@ function TabProfitability({ sales, saleAllocations, stockLots }: any) {
       )}
       {a.bottom10.length > 0 && (
         <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th>#</Th><Th>Item</Th><Th>Code</Th><ThR>Qty</ThR><ThR>Revenue</ThR><ThR>Cost</ThR><ThR>Profit</ThR><ThR>Margin</ThR></tr>
+          <thead>
+            <tr>
+              <Th>#</Th>
+              <Th>Item</Th>
+              <Th>Code</Th>
+              <ThR>Qty</ThR>
+              <ThR>Revenue</ThR>
+              <ThR>Cost</ThR>
+              <ThR>Profit</ThR>
+              <ThR>Margin</ThR>
+            </tr>
           </thead>
           <tbody>
             {a.bottom10.map((it, i) => (
-              <tr key={it.code} className="border-t border-border">
-                <Td>{i + 1}</Td><Td className="font-medium">{it.name}</Td><Td className="font-mono">{it.code}</Td>
-                <TdR>{it.qty}</TdR><TdR className="font-semibold">{money(it.revenue)}</TdR><TdR>{money(it.cost)}</TdR>
-                <TdR className={it.profit >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{money(it.profit)}</TdR>
+              <tr
+                key={it.code}
+                className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+              >
+                <Td>{i + 1}</Td>
+                <Td className="font-medium">{it.name}</Td>
+                <Td className="font-mono">{it.code}</Td>
+                <TdR>{it.qty}</TdR>
+                <TdR className="font-semibold">{money(it.revenue)}</TdR>
+                <TdR>{money(it.cost)}</TdR>
+                <TdR
+                  className={
+                    it.profit >= 0
+                      ? "text-emerald-600 font-semibold"
+                      : "text-rose-600 font-semibold"
+                  }
+                >
+                  {money(it.profit)}
+                </TdR>
                 <TdR>{it.margin.toFixed(1)}%</TdR>
               </tr>
             ))}
@@ -901,24 +2023,43 @@ function TabProfitability({ sales, saleAllocations, stockLots }: any) {
       )}
       {a.storeData.length > 0 && (
         <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th>Store</Th><ThR>Revenue</ThR><ThR>Cost</ThR><ThR>Profit</ThR><ThR>Margin</ThR></tr>
+          <thead>
+            <tr>
+              <Th>Store</Th>
+              <ThR>Revenue</ThR>
+              <ThR>Cost</ThR>
+              <ThR>Profit</ThR>
+              <ThR>Margin</ThR>
+            </tr>
           </thead>
           <tbody>
             {a.storeData.map((s) => (
-              <tr key={s.name} className="border-t border-border">
+              <tr
+                key={s.name}
+                className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+              >
                 <Td className="font-medium">{s.name}</Td>
                 <TdR className="font-semibold">{money(s.revenue)}</TdR>
                 <TdR>{money(s.cost)}</TdR>
-                <TdR className={s.profit >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{money(s.profit)}</TdR>
+                <TdR
+                  className={
+                    s.profit >= 0 ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold"
+                  }
+                >
+                  {money(s.profit)}
+                </TdR>
                 <TdR>{s.margin.toFixed(1)}%</TdR>
               </tr>
             ))}
           </tbody>
-          <tfoot className="sticky bottom-0 bg-muted">
-            <tr className="border-t border-border font-semibold">
-              <Td>Total</Td><TdR>{money(a.totalRevenue)}</TdR><TdR>{money(a.totalCost)}</TdR>
-              <TdR className={a.totalProfit >= 0 ? "text-green-600" : "text-destructive"}>{money(a.totalProfit)}</TdR>
+          <tfoot>
+            <tr className="border-t border-border font-semibold bg-slate-100 dark:bg-slate-800">
+              <Td>Total</Td>
+              <TdR>{money(a.totalRevenue)}</TdR>
+              <TdR>{money(a.totalCost)}</TdR>
+              <TdR className={a.totalProfit >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                {money(a.totalProfit)}
+              </TdR>
               <TdR>{a.avgMargin.toFixed(1)}%</TdR>
             </tr>
           </tfoot>
@@ -938,7 +2079,13 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
     let items = stock;
     if (q.trim()) {
       const t = q.trim().toLowerCase();
-      items = items.filter((s: any) => s.name.toLowerCase().includes(t) || s.code.toLowerCase().includes(t) || s.brand.toLowerCase().includes(t) || s.category.toLowerCase().includes(t));
+      items = items.filter(
+        (s: any) =>
+          s.name.toLowerCase().includes(t) ||
+          s.code.toLowerCase().includes(t) ||
+          s.brand.toLowerCase().includes(t) ||
+          s.category.toLowerCase().includes(t),
+      );
     }
 
     const stockValue = items.reduce((a: number, s: any) => a + s.qty * s.purchasePrice, 0);
@@ -957,17 +2104,39 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
 
     const stockAge = items.map((s: any) => {
       const lots = stockLots.filter((l: any) => l.itemCode === s.code && l.qty > 0);
-      const oldestDate = lots.length > 0 ? lots.reduce((min: string, l: any) => !min || l.date < min ? l.date : min, "") : "";
-      const daysInStock = oldestDate ? Math.floor((today.getTime() - new Date(oldestDate).getTime()) / 86400000) : 0;
+      const oldestDate =
+        lots.length > 0
+          ? lots.reduce((min: string, l: any) => (!min || l.date < min ? l.date : min), "")
+          : "";
+      const daysInStock = oldestDate
+        ? Math.floor((today.getTime() - new Date(oldestDate).getTime()) / 86400000)
+        : 0;
       const saleInfo = saleItemMap.get(s.code);
       const turnover = saleInfo ? saleInfo.totalSold : 0;
-      return { ...s, daysInStock, turnover, oldestDate, lastSaleDate: saleInfo?.lastSaleDate || "" };
+      return {
+        ...s,
+        daysInStock,
+        turnover,
+        oldestDate,
+        lastSaleDate: saleInfo?.lastSaleDate || "",
+      };
     });
 
-    const fastMoving = [...stockAge].filter(s => s.turnover > 0).sort((a, b) => b.turnover - a.turnover).slice(0, 10);
-    const slowMoving = [...stockAge].filter(s => s.turnover > 0 && s.turnover <= 2).sort((a, b) => a.turnover - b.turnover).slice(0, 10);
-    const deadStock = [...stockAge].filter(s => s.turnover === 0 && s.qty > 0).sort((a, b) => b.daysInStock - a.daysInStock).slice(0, 20);
-    const lowStock = [...stockAge].filter(s => s.qty > 0 && s.qty <= 3).sort((a, b) => a.qty - b.qty);
+    const fastMoving = [...stockAge]
+      .filter((s) => s.turnover > 0)
+      .sort((a, b) => b.turnover - a.turnover)
+      .slice(0, 10);
+    const slowMoving = [...stockAge]
+      .filter((s) => s.turnover > 0 && s.turnover <= 2)
+      .sort((a, b) => a.turnover - b.turnover)
+      .slice(0, 10);
+    const deadStock = [...stockAge]
+      .filter((s) => s.turnover === 0 && s.qty > 0)
+      .sort((a, b) => b.daysInStock - a.daysInStock)
+      .slice(0, 20);
+    const lowStock = [...stockAge]
+      .filter((s) => s.qty > 0 && s.qty <= 3)
+      .sort((a, b) => a.qty - b.qty);
 
     const ageBuckets = [
       { label: "0-7 days", count: 0, value: 0 },
@@ -992,22 +2161,54 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
     const catMap = new Map<string, { qty: number; value: number }>();
     for (const s of items) {
       const c = s.category || "Uncategorized";
-      const e = catMap.get(c) || { qty: 0, value: 0 }; e.qty += s.qty; e.value += s.qty * s.purchasePrice; catMap.set(c, e);
+      const e = catMap.get(c) || { qty: 0, value: 0 };
+      e.qty += s.qty;
+      e.value += s.qty * s.purchasePrice;
+      catMap.set(c, e);
     }
     const categoryBreakdown = Array.from(catMap.entries()).map(([name, v]) => ({ name, ...v }));
 
-    return { stockValue, totalQty, fastMoving, slowMoving, deadStock, lowStock, ageBuckets, filteredStock, categoryBreakdown };
+    return {
+      stockValue,
+      totalQty,
+      fastMoving,
+      slowMoving,
+      deadStock,
+      lowStock,
+      ageBuckets,
+      filteredStock,
+      categoryBreakdown,
+    };
   }, [stock, stockLots, saleAllocations, q, statusFilter, sales]);
 
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <Card className="p-3 sm:p-4">
+    <div className="space-y-4">
+      <Card className="p-3 sm:p-4 rounded-xl border border-border/40 bg-slate-50/80 dark:bg-slate-900/60">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
-          <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Item name, code, brand..." className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">Filter</Label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs">
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Search
+            </Label>
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Item name, code, brand..."
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Filter
+            </Label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-9 w-full rounded-lg border border-border bg-white dark:bg-slate-800 px-2 text-xs"
+            >
               <option value="all">All Items</option>
               <option value="low">Low Stock (≤3)</option>
               <option value="dead">Dead Stock (No Sales)</option>
@@ -1016,13 +2217,26 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
             </select>
           </div>
           <div className="flex items-end">
-            <ExportBtn onExport={() => {
-              exportRows(a.filteredStock.map((s: any) => ({
-                Code: s.code, Name: s.name, Category: s.category, Brand: s.brand, Qty: s.qty,
-                "Purchase Price": s.purchasePrice, "Selling Price": s.sellingPrice, Value: s.qty * s.purchasePrice,
-                "Days in Stock": s.daysInStock, "Total Sold": s.turnover,
-              })), "Inventory", `BOD_Inventory_${today()}.xlsx`);
-            }} />
+            <ExportBtn
+              onExport={() => {
+                exportRows(
+                  a.filteredStock.map((s: any) => ({
+                    Code: s.code,
+                    Name: s.name,
+                    Category: s.category,
+                    Brand: s.brand,
+                    Qty: s.qty,
+                    "Purchase Price": s.purchasePrice,
+                    "Selling Price": s.sellingPrice,
+                    Value: s.qty * s.purchasePrice,
+                    "Days in Stock": s.daysInStock,
+                    "Total Sold": s.turnover,
+                  })),
+                  "Inventory",
+                  `BOD_Inventory_${today()}.xlsx`,
+                );
+              }}
+            />
           </div>
         </div>
       </Card>
@@ -1030,42 +2244,74 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
         <Kpi label="Stock Items" value={String(stock.length)} icon={Boxes} />
         <Kpi label="Total Qty" value={String(a.totalQty)} icon={PackagePlus} />
         <Kpi label="Stock Value" value={money(a.stockValue)} icon={DollarSign} />
-        <Kpi label="Low Stock" value={String(a.lowStock.length)} sub="≤3 units" icon={AlertTriangle} color="orange" />
-        <Kpi label="Dead Stock" value={String(a.deadStock.length)} sub="No sales" icon={Clock} color="red" />
+        <Kpi
+          label="Low Stock"
+          value={String(a.lowStock.length)}
+          sub="≤3 units"
+          icon={AlertTriangle}
+          color="orange"
+        />
+        <Kpi
+          label="Dead Stock"
+          value={String(a.deadStock.length)}
+          sub="No sales"
+          icon={Clock}
+          color="red"
+        />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Stock Age Distribution">
-          <ResponsiveContainer width="100%" height={160}>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Stock Age Distribution" chartColor="#f59e0b">
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={a.ageBuckets}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#ea580c" name="Qty" />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="count" fill="#f59e0b" name="Qty" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="Stock by Category">
+        <ChartCard title="Stock by Category" chartColor="#06b6d4">
           {a.categoryBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={160}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={a.categoryBreakdown} dataKey="qty" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {a.categoryBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie
+                  data={a.categoryBreakdown}
+                  dataKey="qty"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {a.categoryBreakdown.map((_: any, i: number) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
       {a.deadStock.length > 0 && (
-        <Card className="overflow-hidden p-0">
-          <div className="px-3 py-2 sm:px-4 sm:py-2.5 border-b border-border bg-destructive/5">
-            <p className="text-xs font-semibold text-destructive">Dead Stock — No Sales ({a.deadStock.length} items)</p>
+        <Card className="overflow-hidden p-0 rounded-xl border border-border/50 shadow-sm">
+          <div className="px-4 py-2.5 border-b border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="size-4 text-rose-500" />
+              <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                Dead Stock — No Sales
+              </p>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+              {a.deadStock.length} items
+            </span>
           </div>
           <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto bod-table-scroll">
             <table className="w-full text-[11px] sm:text-xs">
-              <thead className="sticky top-0 bg-secondary text-secondary-foreground">
+              <thead>
                 <tr>
                   <Th>Code</Th>
                   <Th>Name</Th>
@@ -1078,14 +2324,19 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
               </thead>
               <tbody>
                 {a.deadStock.map((s: any) => (
-                  <tr key={s.code} className="border-t border-border">
+                  <tr
+                    key={s.code}
+                    className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+                  >
                     <Td className="font-mono">{s.code}</Td>
                     <Td className="font-medium">{s.name}</Td>
                     <Td>{s.category}</Td>
                     <Td>{s.brand}</Td>
                     <TdR className="font-semibold">{s.qty}</TdR>
                     <TdR>{money(s.qty * s.purchasePrice)}</TdR>
-                    <TdR className={s.daysInStock > 60 ? "text-destructive font-semibold" : ""}>{s.daysInStock} days</TdR>
+                    <TdR className={s.daysInStock > 60 ? "text-rose-600 font-semibold" : ""}>
+                      {s.daysInStock} days
+                    </TdR>
                   </tr>
                 ))}
               </tbody>
@@ -1094,13 +2345,21 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
         </Card>
       )}
       {a.lowStock.length > 0 && (
-        <Card className="overflow-hidden p-0">
-          <div className="px-3 py-2 sm:px-4 sm:py-2.5 border-b border-border bg-orange-500/5">
-            <p className="text-xs font-semibold text-orange-600">Low Stock Alert ({a.lowStock.length} items)</p>
+        <Card className="overflow-hidden p-0 rounded-xl border border-border/50 shadow-sm">
+          <div className="px-4 py-2.5 border-b border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="size-4 text-amber-500" />
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                Low Stock Alert
+              </p>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+              {a.lowStock.length} items
+            </span>
           </div>
           <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto bod-table-scroll">
             <table className="w-full text-[11px] sm:text-xs">
-              <thead className="sticky top-0 bg-secondary text-secondary-foreground">
+              <thead>
                 <tr>
                   <Th>Code</Th>
                   <Th>Name</Th>
@@ -1112,12 +2371,17 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
               </thead>
               <tbody>
                 {a.lowStock.map((s: any) => (
-                  <tr key={s.code} className="border-t border-border">
+                  <tr
+                    key={s.code}
+                    className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+                  >
                     <Td className="font-mono">{s.code}</Td>
                     <Td className="font-medium">{s.name}</Td>
                     <Td>{s.category}</Td>
                     <Td>{s.brand}</Td>
-                    <TdR className={`font-bold ${s.qty <= 1 ? "text-destructive" : "text-orange-600"}`}>{s.qty}</TdR>
+                    <TdR className={`font-bold ${s.qty <= 1 ? "text-rose-600" : "text-amber-600"}`}>
+                      {s.qty}
+                    </TdR>
                     <TdR>{money(s.qty * s.purchasePrice)}</TdR>
                   </tr>
                 ))}
@@ -1128,16 +2392,36 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
       )}
       {a.filteredStock.length > 0 && (
         <DataTable>
-          <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-            <tr><Th>Code</Th><Th>Name</Th><Th>Category</Th><Th>Brand</Th><ThR>Qty</ThR><ThR>Purchase</ThR><ThR>Selling</ThR><ThR>Value</ThR><ThR>Days</ThR><ThR>Sold</ThR></tr>
+          <thead>
+            <tr>
+              <Th>Code</Th>
+              <Th>Name</Th>
+              <Th>Category</Th>
+              <Th>Brand</Th>
+              <ThR>Qty</ThR>
+              <ThR>Purchase</ThR>
+              <ThR>Selling</ThR>
+              <ThR>Value</ThR>
+              <ThR>Days</ThR>
+              <ThR>Sold</ThR>
+            </tr>
           </thead>
           <tbody>
             {a.filteredStock.map((s: any) => (
-              <tr key={s.code} className="border-t border-border">
-                <Td className="font-mono">{s.code}</Td><Td className="font-medium">{s.name}</Td><Td>{s.category}</Td><Td>{s.brand}</Td>
-                <TdR className={`font-semibold ${s.qty === 0 ? "text-destructive" : ""}`}>{s.qty}</TdR>
-                <TdR>{money(s.purchasePrice)}</TdR><TdR>{money(s.sellingPrice)}</TdR><TdR>{money(s.qty * s.purchasePrice)}</TdR>
-                <TdR>{s.daysInStock}</TdR><TdR>{s.turnover}</TdR>
+              <tr
+                key={s.code}
+                className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+              >
+                <Td className="font-mono">{s.code}</Td>
+                <Td className="font-medium">{s.name}</Td>
+                <Td>{s.category}</Td>
+                <Td>{s.brand}</Td>
+                <TdR className={`font-semibold ${s.qty === 0 ? "text-rose-600" : ""}`}>{s.qty}</TdR>
+                <TdR>{money(s.purchasePrice)}</TdR>
+                <TdR>{money(s.sellingPrice)}</TdR>
+                <TdR>{money(s.qty * s.purchasePrice)}</TdR>
+                <TdR>{s.daysInStock}</TdR>
+                <TdR>{s.turnover}</TdR>
               </tr>
             ))}
           </tbody>
@@ -1156,22 +2440,40 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
     let rows = vendors;
     if (q.trim()) {
       const t = q.trim().toLowerCase();
-      rows = rows.filter((v: any) => v.vendorName.toLowerCase().includes(t) || v.vendorCode.toLowerCase().includes(t) || v.vendorType.toLowerCase().includes(t));
+      rows = rows.filter(
+        (v: any) =>
+          v.vendorName.toLowerCase().includes(t) ||
+          v.vendorCode.toLowerCase().includes(t) ||
+          v.vendorType.toLowerCase().includes(t),
+      );
     }
 
-    const vendorData = rows.map((v: any) => {
-      const txns = vendorTransactions.filter((t: any) => t.vendorId === v.id);
-      const totalPurchases = txns.filter((t: any) => t.transactionType === "PURCHASE").reduce((a: number, t: any) => a + t.debit, 0);
-      const totalPayments = txns.filter((t: any) => t.transactionType === "PAYMENT").reduce((a: number, t: any) => a + t.credit, 0);
-      const totalReturns = txns.filter((t: any) => t.transactionType === "PURCHASE_RETURN").reduce((a: number, t: any) => a + t.credit, 0);
-      const outstanding = getVendorBalance(v.id);
-      const lastTxn = txns.length > 0 ? txns[txns.length - 1].transactionDate : v.openingBalanceDate;
-      const daysSinceLastTxn = lastTxn ? Math.floor((Date.now() - new Date(lastTxn).getTime()) / 86400000) : 999;
-      return { ...v, totalPurchases, totalPayments, totalReturns, outstanding, daysSinceLastTxn };
-    }).sort((a: any, b: any) => b.totalPurchases - a.totalPurchases);
+    const vendorData = rows
+      .map((v: any) => {
+        const txns = vendorTransactions.filter((t: any) => t.vendorId === v.id);
+        const totalPurchases = txns
+          .filter((t: any) => t.transactionType === "PURCHASE")
+          .reduce((a: number, t: any) => a + t.debit, 0);
+        const totalPayments = txns
+          .filter((t: any) => t.transactionType === "PAYMENT")
+          .reduce((a: number, t: any) => a + t.credit, 0);
+        const totalReturns = txns
+          .filter((t: any) => t.transactionType === "PURCHASE_RETURN")
+          .reduce((a: number, t: any) => a + t.credit, 0);
+        const outstanding = getVendorBalance(v.id);
+        const lastTxn =
+          txns.length > 0 ? txns[txns.length - 1].transactionDate : v.openingBalanceDate;
+        const daysSinceLastTxn = lastTxn
+          ? Math.floor((Date.now() - new Date(lastTxn).getTime()) / 86400000)
+          : 999;
+        return { ...v, totalPurchases, totalPayments, totalReturns, outstanding, daysSinceLastTxn };
+      })
+      .sort((a: any, b: any) => b.totalPurchases - a.totalPurchases);
 
     const totalOutstanding = vendorData.reduce((a: number, v: any) => a + v.outstanding, 0);
-    const overdueVendors = vendorData.filter((v: any) => v.outstanding > 0 && v.daysSinceLastTxn > 30);
+    const overdueVendors = vendorData.filter(
+      (v: any) => v.outstanding > 0 && v.daysSinceLastTxn > 30,
+    );
     const overdueAmount = overdueVendors.reduce((a: number, v: any) => a + v.outstanding, 0);
 
     const aging = [
@@ -1188,7 +2490,10 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
       aging[bucket]!.count++;
     }
 
-    const typeMap = new Map<string, { count: number; totalPurchases: number; outstanding: number }>();
+    const typeMap = new Map<
+      string,
+      { count: number; totalPurchases: number; outstanding: number }
+    >();
     for (const v of vendorData) {
       const e = typeMap.get(v.vendorType) || { count: 0, totalPurchases: 0, outstanding: 0 };
       e.count++;
@@ -1203,93 +2508,185 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
       const m = p.paymentMethod || "Cash";
       paymentMethodMap.set(m, (paymentMethodMap.get(m) || 0) + p.amount);
     }
-    const paymentBreakdown = Array.from(paymentMethodMap.entries()).map(([name, value]) => ({ name, value }));
+    const paymentBreakdown = Array.from(paymentMethodMap.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
 
-    return { vendorData, totalOutstanding, overdueVendors, overdueAmount, aging, typeBreakdown, paymentBreakdown };
+    return {
+      vendorData,
+      totalOutstanding,
+      overdueVendors,
+      overdueAmount,
+      aging,
+      typeBreakdown,
+      paymentBreakdown,
+    };
   }, [vendors, vendorTransactions, vendorPayments, q]);
 
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <Card className="p-3 sm:p-4">
+    <div className="space-y-4">
+      <Card className="p-3 sm:p-4 rounded-xl border border-border/40 bg-slate-50/80 dark:bg-slate-900/60">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
-          <div><Label className="text-xs">Search</Label><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Vendor name, code, type..." className="h-9 text-xs" /></div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Search
+            </Label>
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Vendor name, code, type..."
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
           <div className="flex items-end">
-            <ExportBtn onExport={() => {
-              exportRows(a.vendorData.map((v: any) => ({
-                Code: v.vendorCode, Name: v.vendorName, Type: v.vendorType, PAN: v.pan,
-                "Total Purchases": v.totalPurchases, "Total Payments": v.totalPayments,
-                Returns: v.totalReturns, Outstanding: v.outstanding, "Days Since Activity": v.daysSinceLastTxn,
-              })), "Vendor Analytics", `BOD_VendorAnalytics_${today()}.xlsx`);
-            }} />
+            <ExportBtn
+              onExport={() => {
+                exportRows(
+                  a.vendorData.map((v: any) => ({
+                    Code: v.vendorCode,
+                    Name: v.vendorName,
+                    Type: v.vendorType,
+                    PAN: v.pan,
+                    "Total Purchases": v.totalPurchases,
+                    "Total Payments": v.totalPayments,
+                    Returns: v.totalReturns,
+                    Outstanding: v.outstanding,
+                    "Days Since Activity": v.daysSinceLastTxn,
+                  })),
+                  "Vendor Analytics",
+                  `BOD_VendorAnalytics_${today()}.xlsx`,
+                );
+              }}
+            />
           </div>
         </div>
       </Card>
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Total Vendors" value={String(a.vendorData.length)} icon={Users} />
-        <Kpi label="Total Outstanding" value={money(a.totalOutstanding)} icon={DollarSign} color={a.totalOutstanding > 0 ? "red" : "green"} />
-        <Kpi label="Overdue Vendors" value={String(a.overdueVendors.length)} sub={money(a.overdueAmount)} icon={AlertTriangle} color="red" />
-        <Kpi label="Total Purchases" value={money(a.vendorData.reduce((a: number, v: any) => a + v.totalPurchases, 0))} icon={PackagePlus} />
+        <Kpi
+          label="Total Outstanding"
+          value={money(a.totalOutstanding)}
+          icon={DollarSign}
+          color={a.totalOutstanding > 0 ? "red" : "green"}
+        />
+        <Kpi
+          label="Overdue Vendors"
+          value={String(a.overdueVendors.length)}
+          sub={money(a.overdueAmount)}
+          icon={AlertTriangle}
+          color="red"
+        />
+        <Kpi
+          label="Total Purchases"
+          value={money(a.vendorData.reduce((a: number, v: any) => a + v.totalPurchases, 0))}
+          icon={PackagePlus}
+        />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Payment Aging (Outstanding by Days)">
-          <ResponsiveContainer width="100%" height={160}>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Payment Aging (Outstanding by Days)" chartColor="#f43f5e">
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={a.aging}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number, name: string) => name === "amount" ? money(v) : v} />
+              <Tooltip
+                content={
+                  <CustomTooltip
+                    formatter={(v: number, name: string) => (name === "amount" ? money(v) : v)}
+                  />
+                }
+              />
               <Legend />
-              <Bar dataKey="amount" fill="#e11d48" name="Amount" />
-              <Bar dataKey="count" fill="#9333ea" name="Vendors" />
+              <Bar dataKey="amount" fill="#f43f5e" name="Amount" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#8b5cf6" name="Vendors" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="Vendors by Type">
+        <ChartCard title="Vendors by Type" chartColor="#8b5cf6">
           {a.typeBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={160}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={a.typeBreakdown} dataKey="totalPurchases" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {a.typeBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie
+                  data={a.typeBreakdown}
+                  dataKey="totalPurchases"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {a.typeBreakdown.map((_: any, i: number) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
       {a.paymentBreakdown.length > 0 && (
-        <ChartCard title="Vendor Payments by Method">
-          <ResponsiveContainer width="100%" height={140}>
+        <ChartCard title="Vendor Payments by Method" chartColor="#10b981">
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={a.paymentBreakdown}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => money(v)} />
-              <Bar dataKey="value" fill="#16a34a" name="Amount" />
+              <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
+              <Bar dataKey="value" fill="#10b981" name="Amount" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       )}
       <DataTable>
-        <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-          <tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><ThR>Purchases</ThR><ThR>Payments</ThR><ThR>Returns</ThR><ThR>Outstanding</ThR><ThR>Days</ThR></tr>
+        <thead>
+          <tr>
+            <Th>Code</Th>
+            <Th>Name</Th>
+            <Th>Type</Th>
+            <ThR>Purchases</ThR>
+            <ThR>Payments</ThR>
+            <ThR>Returns</ThR>
+            <ThR>Outstanding</ThR>
+            <ThR>Days</ThR>
+          </tr>
         </thead>
         <tbody>
           {a.vendorData.map((v: any) => (
-            <tr key={v.id} className="border-t border-border">
+            <tr
+              key={v.id}
+              className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+            >
               <Td className="font-mono">{v.vendorCode}</Td>
               <Td className="font-medium">{v.vendorName}</Td>
-              <Td><Badge variant="outline" className="text-[10px]">{v.vendorType}</Badge></Td>
+              <Td>
+                <Badge variant="outline" className="text-[10px]">
+                  {v.vendorType}
+                </Badge>
+              </Td>
               <TdR>{money(v.totalPurchases)}</TdR>
               <TdR>{money(v.totalPayments)}</TdR>
               <TdR>{v.totalReturns > 0 ? money(v.totalReturns) : "-"}</TdR>
-              <TdR className={v.outstanding > 0 ? "text-destructive font-semibold" : ""}>{money(v.outstanding)}</TdR>
+              <TdR className={v.outstanding > 0 ? "text-rose-600 font-semibold" : ""}>
+                {money(v.outstanding)}
+              </TdR>
               <TdR>{v.daysSinceLastTxn}d</TdR>
             </tr>
           ))}
-          {a.vendorData.length === 0 && <tr><Td colSpan={8}><NoData msg="No vendors found." /></Td></tr>}
+          {a.vendorData.length === 0 && (
+            <tr>
+              <Td colSpan={8}>
+                <NoData msg="No vendors found." />
+              </Td>
+            </tr>
+          )}
         </tbody>
       </DataTable>
     </div>
@@ -1306,8 +2703,16 @@ function TabCashFlow({ sales, purchaseHeaders, vendorPayments }: any) {
     let sFiltered = sales;
     let pFiltered = purchaseHeaders;
     let vpFiltered = vendorPayments;
-    if (dateFrom) { sFiltered = sFiltered.filter((s: any) => s.date >= dateFrom); pFiltered = pFiltered.filter((p: any) => p.date >= dateFrom); vpFiltered = vpFiltered.filter((p: any) => p.paymentDate >= dateFrom); }
-    if (dateTo) { sFiltered = sFiltered.filter((s: any) => s.date <= dateTo); pFiltered = pFiltered.filter((p: any) => p.date <= dateTo); vpFiltered = vpFiltered.filter((p: any) => p.paymentDate <= dateTo); }
+    if (dateFrom) {
+      sFiltered = sFiltered.filter((s: any) => s.date >= dateFrom);
+      pFiltered = pFiltered.filter((p: any) => p.date >= dateFrom);
+      vpFiltered = vpFiltered.filter((p: any) => p.paymentDate >= dateFrom);
+    }
+    if (dateTo) {
+      sFiltered = sFiltered.filter((s: any) => s.date <= dateTo);
+      pFiltered = pFiltered.filter((p: any) => p.date <= dateTo);
+      vpFiltered = vpFiltered.filter((p: any) => p.paymentDate <= dateTo);
+    }
 
     const totalInflows = sFiltered.reduce((a: number, s: any) => a + s.paidAmount, 0);
     const totalOutflows = vpFiltered.reduce((a: number, p: any) => a + p.amount, 0);
@@ -1316,114 +2721,286 @@ function TabCashFlow({ sales, purchaseHeaders, vendorPayments }: any) {
     const monthlyMap = new Map<string, { inflow: number; outflow: number }>();
     for (const s of sFiltered) {
       const m = s.date?.slice(0, 7);
-      if (m) { const e = monthlyMap.get(m) || { inflow: 0, outflow: 0 }; e.inflow += s.paidAmount; monthlyMap.set(m, e); }
+      if (m) {
+        const e = monthlyMap.get(m) || { inflow: 0, outflow: 0 };
+        e.inflow += s.paidAmount;
+        monthlyMap.set(m, e);
+      }
     }
     for (const p of vpFiltered) {
       const m = p.paymentDate?.slice(0, 7);
-      if (m) { const e = monthlyMap.get(m) || { inflow: 0, outflow: 0 }; e.outflow += p.amount; monthlyMap.set(m, e); }
+      if (m) {
+        const e = monthlyMap.get(m) || { inflow: 0, outflow: 0 };
+        e.outflow += p.amount;
+        monthlyMap.set(m, e);
+      }
     }
-    const monthlyFlow = Array.from(monthlyMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([m, v]) => ({
-      month: m, inflow: v.inflow, outflow: v.outflow, net: v.inflow - v.outflow,
-    }));
+    const monthlyFlow = Array.from(monthlyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([m, v]) => ({
+        month: m,
+        inflow: v.inflow,
+        outflow: v.outflow,
+        net: v.inflow - v.outflow,
+      }));
 
     const methodMap = new Map<string, number>();
-    for (const s of sFiltered) { const m = s.paymentMethod || "Cash"; methodMap.set(m, (methodMap.get(m) || 0) + s.paidAmount); }
-    const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({ name, value }));
+    for (const s of sFiltered) {
+      const m = s.paymentMethod || "Cash";
+      methodMap.set(m, (methodMap.get(m) || 0) + s.paidAmount);
+    }
+    const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
 
-    const receivables = sFiltered.filter((s: any) => s.remaining > 0).reduce((a: number, s: any) => a + s.remaining, 0);
-    const payables = pFiltered.filter((p: any) => p.remainingBalance > 0).reduce((a: number, p: any) => a + p.remainingBalance, 0);
+    const receivables = sFiltered
+      .filter((s: any) => s.remaining > 0)
+      .reduce((a: number, s: any) => a + s.remaining, 0);
+    const payables = pFiltered
+      .filter((p: any) => p.remainingBalance > 0)
+      .reduce((a: number, p: any) => a + p.remainingBalance, 0);
 
-    return { totalInflows, totalOutflows, netCashFlow, monthlyFlow, paymentBreakdown, receivables, payables };
+    return {
+      totalInflows,
+      totalOutflows,
+      netCashFlow,
+      monthlyFlow,
+      paymentBreakdown,
+      receivables,
+      payables,
+    };
   }, [sales, purchaseHeaders, vendorPayments, dateFrom, dateTo]);
 
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  const netWorkingCapital = a.receivables - a.payables;
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <Card className="p-3 sm:p-4">
+    <div className="space-y-4">
+      <Card className="p-3 sm:p-4 rounded-xl border border-border/40 bg-slate-50/80 dark:bg-slate-900/60">
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
-          <div><Label className="text-xs">From</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" /></div>
-          <div><Label className="text-xs">To</Label><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-xs" /></div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              From
+            </Label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              To
+            </Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 rounded-lg text-xs"
+            />
+          </div>
           <div className="flex items-end">
-            <ExportBtn onExport={() => {
-              exportRows(a.monthlyFlow.map(m => ({ Month: m.month, Inflow: m.inflow, Outflow: m.outflow, Net: m.net })), "Cash Flow", `BOD_CashFlow_${today()}.xlsx`);
-            }} />
+            <ExportBtn
+              onExport={() => {
+                exportRows(
+                  a.monthlyFlow.map((m) => ({
+                    Month: m.month,
+                    Inflow: m.inflow,
+                    Outflow: m.outflow,
+                    Net: m.net,
+                  })),
+                  "Cash Flow",
+                  `BOD_CashFlow_${today()}.xlsx`,
+                );
+              }}
+            />
           </div>
         </div>
       </Card>
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Total Inflows" value={money(a.totalInflows)} sub="Cash received" icon={ArrowUpRight} color="green" />
-        <Kpi label="Total Outflows" value={money(a.totalOutflows)} sub="Cash paid" icon={ArrowDownRight} color="red" />
-        <Kpi label="Net Cash Flow" value={money(a.netCashFlow)} icon={Wallet} color={a.netCashFlow >= 0 ? "green" : "red"} />
-        <Kpi label="Outstanding" value={money(a.receivables)} sub={`Payables: ${money(a.payables)}`} icon={CreditCard} />
+        <Kpi
+          label="Total Inflows"
+          value={money(a.totalInflows)}
+          sub="Cash received"
+          icon={ArrowUpRight}
+          color="green"
+        />
+        <Kpi
+          label="Total Outflows"
+          value={money(a.totalOutflows)}
+          sub="Cash paid"
+          icon={ArrowDownRight}
+          color="red"
+        />
+        <Kpi
+          label="Net Cash Flow"
+          value={money(a.netCashFlow)}
+          icon={Wallet}
+          color={a.netCashFlow >= 0 ? "green" : "red"}
+        />
+        <Kpi
+          label="Outstanding"
+          value={money(a.receivables)}
+          sub={`Payables: ${money(a.payables)}`}
+          icon={CreditCard}
+        />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Monthly Cash Inflow vs Outflow">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Monthly Cash Inflow vs Outflow" chartColor="#3b82f6">
           {a.monthlyFlow.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <ComposedChart data={a.monthlyFlow}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
                 <Legend />
-                <Bar dataKey="inflow" fill="#16a34a" name="Inflow (Sales)" />
-                <Bar dataKey="outflow" fill="#e11d48" name="Outflow (Purchases)" />
-                <Line type="monotone" dataKey="net" stroke="#2563eb" strokeWidth={2} name="Net" />
+                <Bar dataKey="inflow" fill="#10b981" name="Inflow (Sales)" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="outflow"
+                  fill="#f43f5e"
+                  name="Outflow (Purchases)"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  stroke="#3b82f6"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Net"
+                />
               </ComposedChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
-        <ChartCard title="Sales Payment Methods">
+        <ChartCard title="Sales Payment Methods" chartColor="#8b5cf6">
           {a.paymentBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={a.paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {a.paymentBreakdown.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie
+                  data={a.paymentBreakdown}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {a.paymentBreakdown.map((_: any, i: number) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <NoData />}
+          ) : (
+            <NoData />
+          )}
         </ChartCard>
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card className="p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Receivables vs Payables</p>
-          <div className="space-y-3 sm:space-y-4">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <Card className="p-4 rounded-xl border border-border/40">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Receivables vs Payables
+          </p>
+          <div className="space-y-4">
             <div>
-              <div className="flex justify-between text-xs mb-1"><span className="text-green-600 font-medium">Receivables (Credit Sales)</span><span className="font-semibold">{money(a.receivables)}</span></div>
-              <div className="h-3 w-full rounded-full bg-muted">
-                <div className="h-3 rounded-full bg-green-500" style={{ width: `${Math.min((a.receivables / Math.max(a.receivables + a.payables, 1)) * 100, 100)}%` }} />
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-emerald-600 font-medium">Receivables (Credit Sales)</span>
+                <span className="font-semibold">{money(a.receivables)}</span>
+              </div>
+              <div className="h-4 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="h-4 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 flex items-center justify-end pr-2"
+                  style={{
+                    width: `${Math.min((a.receivables / Math.max(a.receivables + a.payables, 1)) * 100, 100)}%`,
+                  }}
+                >
+                  {a.receivables > 0 && (
+                    <span className="text-[10px] font-semibold text-white">
+                      {money(a.receivables)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div>
-              <div className="flex justify-between text-xs mb-1"><span className="text-red-600 font-medium">Payables (Outstanding)</span><span className="font-semibold">{money(a.payables)}</span></div>
-              <div className="h-3 w-full rounded-full bg-muted">
-                <div className="h-3 rounded-full bg-red-500" style={{ width: `${Math.min((a.payables / Math.max(a.receivables + a.payables, 1)) * 100, 100)}%` }} />
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-rose-600 font-medium">Payables (Outstanding)</span>
+                <span className="font-semibold">{money(a.payables)}</span>
+              </div>
+              <div className="h-4 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="h-4 rounded-full bg-gradient-to-r from-rose-500 to-rose-400 flex items-center justify-end pr-2"
+                  style={{
+                    width: `${Math.min((a.payables / Math.max(a.receivables + a.payables, 1)) * 100, 100)}%`,
+                  }}
+                >
+                  {a.payables > 0 && (
+                    <span className="text-[10px] font-semibold text-white">
+                      {money(a.payables)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-border/40">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground font-medium">Net Working Capital</span>
+                <span
+                  className={`font-bold ${netWorkingCapital >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+                >
+                  {money(netWorkingCapital)}
+                </span>
               </div>
             </div>
           </div>
         </Card>
         {a.monthlyFlow.length > 0 && (
           <DataTable>
-            <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-              <tr><Th>Month</Th><ThR>Inflow</ThR><ThR>Outflow</ThR><ThR>Net</ThR></tr>
+            <thead>
+              <tr>
+                <Th>Month</Th>
+                <ThR>Inflow</ThR>
+                <ThR>Outflow</ThR>
+                <ThR>Net</ThR>
+              </tr>
             </thead>
             <tbody>
               {a.monthlyFlow.map((m) => (
-                <tr key={m.month} className="border-t border-border">
+                <tr
+                  key={m.month}
+                  className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+                >
                   <Td className="font-medium">{m.month}</Td>
-                  <TdR className="text-green-600">{money(m.inflow)}</TdR>
-                  <TdR className="text-red-600">{money(m.outflow)}</TdR>
-                  <TdR className={m.net >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{money(m.net)}</TdR>
+                  <TdR className="text-emerald-600">{money(m.inflow)}</TdR>
+                  <TdR className="text-rose-600">{money(m.outflow)}</TdR>
+                  <TdR
+                    className={
+                      m.net >= 0 ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold"
+                    }
+                  >
+                    {money(m.net)}
+                  </TdR>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="sticky bottom-0 bg-muted">
-              <tr className="border-t border-border font-semibold">
-                <Td>Total</Td><TdR>{money(a.totalInflows)}</TdR><TdR>{money(a.totalOutflows)}</TdR>
-                <TdR className={a.netCashFlow >= 0 ? "text-green-600" : "text-destructive"}>{money(a.netCashFlow)}</TdR>
+            <tfoot>
+              <tr className="border-t border-border font-semibold bg-slate-100 dark:bg-slate-800">
+                <Td>Total</Td>
+                <TdR>{money(a.totalInflows)}</TdR>
+                <TdR>{money(a.totalOutflows)}</TdR>
+                <TdR className={a.netCashFlow >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                  {money(a.netCashFlow)}
+                </TdR>
               </tr>
             </tfoot>
           </DataTable>
@@ -1437,32 +3014,83 @@ function TabCashFlow({ sales, purchaseHeaders, vendorPayments }: any) {
 
 function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, vendors }: any) {
   const stores = useMemo(() => {
-    const storeMap = new Map<string, {
-      name: string; stockItems: number; stockQty: number; stockValue: number;
-      sales: number; salesCount: number; purchases: number; vat: number;
-      vendorCount: number; payable: number; profit: number; avgSaleValue: number;
-      cogs: number;
-    }>();
+    const storeMap = new Map<
+      string,
+      {
+        name: string;
+        stockItems: number;
+        stockQty: number;
+        stockValue: number;
+        sales: number;
+        salesCount: number;
+        purchases: number;
+        vat: number;
+        vendorCount: number;
+        payable: number;
+        profit: number;
+        avgSaleValue: number;
+        cogs: number;
+      }
+    >();
     for (const [id, name] of Object.entries(LOCATION_LABELS)) {
       if (id === WAREHOUSE_ID) continue;
       storeMap.set(id, {
-        name, stockItems: 0, stockQty: 0, stockValue: 0, sales: 0, salesCount: 0,
-        purchases: 0, vat: 0, vendorCount: 0, payable: 0, profit: 0, avgSaleValue: 0, cogs: 0,
+        name,
+        stockItems: 0,
+        stockQty: 0,
+        stockValue: 0,
+        sales: 0,
+        salesCount: 0,
+        purchases: 0,
+        vat: 0,
+        vendorCount: 0,
+        payable: 0,
+        profit: 0,
+        avgSaleValue: 0,
+        cogs: 0,
       });
     }
-    for (const s of stock) { const st = storeMap.get(s.storeId || ""); if (st) { st.stockItems++; st.stockQty += s.qty; } }
-    for (const l of stockLots) { const st = storeMap.get(l.storeId || ""); if (st && l.qty > 0) st.stockValue += l.qty * l.purchasePrice; }
+    for (const s of stock) {
+      const st = storeMap.get(s.storeId || "");
+      if (st) {
+        st.stockItems++;
+        st.stockQty += s.qty;
+      }
+    }
+    for (const l of stockLots) {
+      const st = storeMap.get(l.storeId || "");
+      if (st && l.qty > 0) st.stockValue += l.qty * l.purchasePrice;
+    }
     for (const s of sales) {
       const st = storeMap.get(s.storeId || "");
-      if (st) { st.sales += s.amount; st.salesCount++; st.vat += s.vat; }
+      if (st) {
+        st.sales += s.amount;
+        st.salesCount++;
+        st.vat += s.vat;
+      }
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce((c: number, al: any) => c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0), 0);
+      const cost = allocs.reduce(
+        (c: number, al: any) =>
+          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+        0,
+      );
       if (st) st.cogs += cost;
     }
-    for (const p of purchaseHeaders) { const st = storeMap.get(p.storeId || ""); if (st) st.purchases += p.grandTotal; }
+    for (const p of purchaseHeaders) {
+      const st = storeMap.get(p.storeId || "");
+      if (st) st.purchases += p.grandTotal;
+    }
     const vendorStoreMap = new Map<string, Set<string>>();
-    for (const v of vendors) { if (v.storeId) { if (!vendorStoreMap.has(v.storeId)) vendorStoreMap.set(v.storeId, new Set()); vendorStoreMap.get(v.storeId)!.add(v.id); } }
-    for (const [storeId, ids] of vendorStoreMap) { const st = storeMap.get(storeId); if (st) st.vendorCount = ids.size; }
+    for (const v of vendors) {
+      if (v.storeId) {
+        if (!vendorStoreMap.has(v.storeId)) vendorStoreMap.set(v.storeId, new Set());
+        vendorStoreMap.get(v.storeId)!.add(v.id);
+      }
+    }
+    for (const [storeId, ids] of vendorStoreMap) {
+      const st = storeMap.get(storeId);
+      if (st) st.vendorCount = ids.size;
+    }
     for (const [, st] of storeMap) {
       st.profit = st.sales - st.cogs;
       st.avgSaleValue = st.salesCount > 0 ? st.sales / st.salesCount : 0;
@@ -1471,97 +3099,225 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
   }, [stock, sales, purchaseHeaders, stockLots, saleAllocations, vendors]);
 
   const g = useMemo(() => {
-    const total = stores.reduce((a, s) => ({
-      stockItems: a.stockItems + s.stockItems, stockQty: a.stockQty + s.stockQty, stockValue: a.stockValue + s.stockValue,
-      sales: a.sales + s.sales, purchases: a.purchases + s.purchases, vat: a.vat + s.vat,
-      vendorCount: a.vendorCount + s.vendorCount, profit: a.profit + s.profit, salesCount: a.salesCount + s.salesCount,
-    }), { stockItems: 0, stockQty: 0, stockValue: 0, sales: 0, purchases: 0, vat: 0, vendorCount: 0, profit: 0, salesCount: 0 });
+    const total = stores.reduce(
+      (a, s) => ({
+        stockItems: a.stockItems + s.stockItems,
+        stockQty: a.stockQty + s.stockQty,
+        stockValue: a.stockValue + s.stockValue,
+        sales: a.sales + s.sales,
+        purchases: a.purchases + s.purchases,
+        vat: a.vat + s.vat,
+        vendorCount: a.vendorCount + s.vendorCount,
+        profit: a.profit + s.profit,
+        salesCount: a.salesCount + s.salesCount,
+      }),
+      {
+        stockItems: 0,
+        stockQty: 0,
+        stockValue: 0,
+        sales: 0,
+        purchases: 0,
+        vat: 0,
+        vendorCount: 0,
+        profit: 0,
+        salesCount: 0,
+      },
+    );
     return total;
   }, [stores]);
 
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  const bestStore =
+    stores.length > 0 ? [...stores].sort((a: any, b: any) => b.sales - a.sales)[0] : null;
+  const mostProfitable =
+    stores.length > 0 ? [...stores].sort((a: any, b: any) => b.profit - a.profit)[0] : null;
+  const highestAvg =
+    stores.length > 0
+      ? [...stores].sort((a: any, b: any) => b.avgSaleValue - a.avgSaleValue)[0]
+      : null;
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-4">
       <div className="flex justify-end">
-        <ExportBtn onExport={() => {
-          exportRows([...stores.map(s => ({ Store: s.name, "Stock Items": s.stockItems, "Stock Qty": s.stockQty, "Stock Value": s.stockValue, Sales: s.sales, Purchases: s.purchases, Profit: s.profit, VAT: s.vat, "Avg Sale": s.avgSaleValue, Vendors: s.vendorCount })),
-            { Store: "GRAND TOTAL", "Stock Items": g.stockItems, "Stock Qty": g.stockQty, "Stock Value": g.stockValue, Sales: g.sales, Purchases: g.purchases, Profit: g.profit, VAT: g.vat, "Avg Sale": g.salesCount > 0 ? g.sales / g.salesCount : 0, Vendors: g.vendorCount }
-          ], "Store Comparison", `BOD_StoreComparison_${today()}.xlsx`);
-        }} />
+        <ExportBtn
+          onExport={() => {
+            exportRows(
+              [
+                ...stores.map((s) => ({
+                  Store: s.name,
+                  "Stock Items": s.stockItems,
+                  "Stock Qty": s.stockQty,
+                  "Stock Value": s.stockValue,
+                  Sales: s.sales,
+                  Purchases: s.purchases,
+                  Profit: s.profit,
+                  VAT: s.vat,
+                  "Avg Sale": s.avgSaleValue,
+                  Vendors: s.vendorCount,
+                })),
+                {
+                  Store: "GRAND TOTAL",
+                  "Stock Items": g.stockItems,
+                  "Stock Qty": g.stockQty,
+                  "Stock Value": g.stockValue,
+                  Sales: g.sales,
+                  Purchases: g.purchases,
+                  Profit: g.profit,
+                  VAT: g.vat,
+                  "Avg Sale": g.salesCount > 0 ? g.sales / g.salesCount : 0,
+                  Vendors: g.vendorCount,
+                },
+              ],
+              "Store Comparison",
+              `BOD_StoreComparison_${today()}.xlsx`,
+            );
+          }}
+        />
       </div>
-      <div className="grid gap-2 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-        <ChartCard title="Sales by Store">
-          <ResponsiveContainer width="100%" height={180}>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <ChartCard title="Sales by Store" chartColor="#3b82f6">
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={stores}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => money(v)} />
+              <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
               <Legend />
-              <Bar dataKey="sales" fill="#2563eb" name="Sales" />
-              <Bar dataKey="purchases" fill="#16a34a" name="Purchases" />
-              <Bar dataKey="profit" fill="#ea580c" name="Profit" />
+              <Bar dataKey="sales" fill="#3b82f6" name="Sales" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="purchases" fill="#10b981" name="Purchases" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="profit" fill="#f59e0b" name="Profit" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="Stock Value Distribution">
-          <ResponsiveContainer width="100%" height={180}>
+        <ChartCard title="Stock Value Distribution" chartColor="#8b5cf6">
+          <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={stores} dataKey="stockValue" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                {stores.map((_: any, i: number) => <Cell key={i} fill={STORE_COLORS[i % STORE_COLORS.length]} />)}
+              <Pie
+                data={stores}
+                dataKey="stockValue"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              >
+                {stores.map((_: any, i: number) => (
+                  <Cell key={i} fill={STORE_COLORS[i % STORE_COLORS.length]} />
+                ))}
               </Pie>
-              <Tooltip formatter={(v: number) => money(v)} />
+              <Tooltip content={<CustomTooltip formatter={(v: number) => money(v)} />} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
       <DataTable>
-        <thead className="sticky top-0 bg-secondary text-secondary-foreground">
-          <tr><Th>Store</Th><ThR>Stock Items</ThR><ThR>Stock Qty</ThR><ThR>Stock Value</ThR><ThR>Sales</ThR><ThR>Purchases</ThR><ThR>Profit</ThR><ThR>Avg Sale</ThR><ThR>VAT</ThR><ThR>Vendors</ThR></tr>
+        <thead>
+          <tr>
+            <Th>Store</Th>
+            <ThR>Stock Items</ThR>
+            <ThR>Stock Qty</ThR>
+            <ThR>Stock Value</ThR>
+            <ThR>Sales</ThR>
+            <ThR>Purchases</ThR>
+            <ThR>Profit</ThR>
+            <ThR>Avg Sale</ThR>
+            <ThR>VAT</ThR>
+            <ThR>Vendors</ThR>
+          </tr>
         </thead>
         <tbody>
           {stores.map((s) => (
-            <tr key={s.name} className="border-t border-border">
+            <tr
+              key={s.name}
+              className="border-t border-border/50 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-white odd:bg-slate-50/30"
+            >
               <Td className="font-medium">{s.name}</Td>
-              <TdR>{s.stockItems}</TdR><TdR>{s.stockQty}</TdR><TdR>{money(s.stockValue)}</TdR>
-              <TdR className="font-semibold">{money(s.sales)}</TdR><TdR>{money(s.purchases)}</TdR>
-              <TdR className={s.profit >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>{money(s.profit)}</TdR>
-              <TdR>{money(s.avgSaleValue)}</TdR><TdR>{money(s.vat)}</TdR><TdR>{s.vendorCount}</TdR>
+              <TdR>{s.stockItems}</TdR>
+              <TdR>{s.stockQty}</TdR>
+              <TdR>{money(s.stockValue)}</TdR>
+              <TdR className="font-semibold">{money(s.sales)}</TdR>
+              <TdR>{money(s.purchases)}</TdR>
+              <TdR
+                className={
+                  s.profit >= 0 ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold"
+                }
+              >
+                {money(s.profit)}
+              </TdR>
+              <TdR>{money(s.avgSaleValue)}</TdR>
+              <TdR>{money(s.vat)}</TdR>
+              <TdR>{s.vendorCount}</TdR>
             </tr>
           ))}
         </tbody>
-        <tfoot className="sticky bottom-0 bg-muted">
-          <tr className="border-t border-border font-semibold">
-            <Td>Grand Total</Td><TdR>{g.stockItems}</TdR><TdR>{g.stockQty}</TdR><TdR>{money(g.stockValue)}</TdR>
-            <TdR>{money(g.sales)}</TdR><TdR>{money(g.purchases)}</TdR>
-            <TdR className={g.profit >= 0 ? "text-green-600" : "text-destructive"}>{money(g.profit)}</TdR>
-            <TdR>{g.salesCount > 0 ? money(g.sales / g.salesCount) : "0.00"}</TdR><TdR>{money(g.vat)}</TdR><TdR>{g.vendorCount}</TdR>
+        <tfoot>
+          <tr className="border-t border-border font-semibold bg-slate-100 dark:bg-slate-800">
+            <Td>Grand Total</Td>
+            <TdR>{g.stockItems}</TdR>
+            <TdR>{g.stockQty}</TdR>
+            <TdR>{money(g.stockValue)}</TdR>
+            <TdR>{money(g.sales)}</TdR>
+            <TdR>{money(g.purchases)}</TdR>
+            <TdR className={g.profit >= 0 ? "text-emerald-600" : "text-rose-600"}>
+              {money(g.profit)}
+            </TdR>
+            <TdR>{g.salesCount > 0 ? money(g.sales / g.salesCount) : "0.00"}</TdR>
+            <TdR>{money(g.vat)}</TdR>
+            <TdR>{g.vendorCount}</TdR>
           </tr>
         </tfoot>
       </DataTable>
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
-        <Card className="p-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Best Performing Store</p>
-          {stores.length > 0 && (() => {
-            const best = [...stores].sort((a: any, b: any) => b.sales - a.sales)[0];
-            return best ? <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Sales: {money(best.sales)} | Profit: {money(best.profit)} | Margin: {best.sales > 0 ? (best.profit / best.sales * 100).toFixed(1) : 0}%</p></div> : null;
-          })()}
-        </Card>
-        <Card className="p-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Most Profitable Store</p>
-          {stores.length > 0 && (() => {
-            const best = [...stores].sort((a: any, b: any) => b.profit - a.profit)[0];
-            return best ? <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Profit: {money(best.profit)} | Margin: {best.sales > 0 ? (best.profit / best.sales * 100).toFixed(1) : 0}%</p></div> : null;
-          })()}
-        </Card>
-        <Card className="p-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Highest Avg Sale</p>
-          {stores.length > 0 && (() => {
-            const best = [...stores].sort((a: any, b: any) => b.avgSaleValue - a.avgSaleValue)[0];
-            return best ? <div><p className="text-lg font-bold">{best.name}</p><p className="text-xs text-muted-foreground">Avg: {money(best.avgSaleValue)} | Invoices: {best.salesCount}</p></div> : null;
-          })()}
-        </Card>
+        <div className="rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 text-white relative overflow-hidden">
+          <ShoppingBag className="absolute top-3 right-3 size-8 opacity-20" />
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-white/70 mb-2">
+            Best Performing Store
+          </p>
+          {bestStore ? (
+            <div>
+              <p className="text-xl font-bold">{bestStore.name}</p>
+              <p className="text-sm text-white/80 mt-1">
+                Sales: {money(bestStore.sales)} | Profit: {money(bestStore.profit)} | Margin:{" "}
+                {bestStore.sales > 0 ? ((bestStore.profit / bestStore.sales) * 100).toFixed(1) : 0}%
+              </p>
+            </div>
+          ) : null}
+        </div>
+        <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white relative overflow-hidden">
+          <TrendingUp className="absolute top-3 right-3 size-8 opacity-20" />
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-white/70 mb-2">
+            Most Profitable Store
+          </p>
+          {mostProfitable ? (
+            <div>
+              <p className="text-xl font-bold">{mostProfitable.name}</p>
+              <p className="text-sm text-white/80 mt-1">
+                Profit: {money(mostProfitable.profit)} | Margin:{" "}
+                {mostProfitable.sales > 0
+                  ? ((mostProfitable.profit / mostProfitable.sales) * 100).toFixed(1)
+                  : 0}
+                %
+              </p>
+            </div>
+          ) : null}
+        </div>
+        <div className="rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 p-5 text-white relative overflow-hidden">
+          <Target className="absolute top-3 right-3 size-8 opacity-20" />
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-white/70 mb-2">
+            Highest Avg Sale
+          </p>
+          {highestAvg ? (
+            <div>
+              <p className="text-xl font-bold">{highestAvg.name}</p>
+              <p className="text-sm text-white/80 mt-1">
+                Avg: {money(highestAvg.avgSaleValue)} | Invoices: {highestAvg.salesCount}
+              </p>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
