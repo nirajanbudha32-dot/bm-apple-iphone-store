@@ -4,8 +4,12 @@ import { useStoreContext } from "@/lib/store-context";
 import { extractVat } from "@/lib/utils";
 
 let _currentStoreId: string | null = null;
-export function setCurrentStoreIdForStore(id: string | null) { _currentStoreId = id; }
-export function getCurrentStoreId(): string | null { return _currentStoreId; }
+export function setCurrentStoreIdForStore(id: string | null) {
+  _currentStoreId = id;
+}
+export function getCurrentStoreId(): string | null {
+  return _currentStoreId;
+}
 
 // Double-submit prevention guard
 const inFlightOps = new Set<string>();
@@ -14,12 +18,22 @@ function acquireOp(key: string): boolean {
   inFlightOps.add(key);
   return true;
 }
-function releaseOp(key: string) { inFlightOps.delete(key); }
+function releaseOp(key: string) {
+  inFlightOps.delete(key);
+}
 
 // Audit trail logger
-async function logAudit(action: string, tableName: string, recordId?: string, oldData?: unknown, newData?: unknown) {
+async function logAudit(
+  action: string,
+  tableName: string,
+  recordId?: string,
+  oldData?: unknown,
+  newData?: unknown,
+) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     await supabase.from("audit_log").insert({
       user_id: user?.id,
       action,
@@ -57,7 +71,15 @@ export type StockItem = {
 
 export type PaymentMethod = "Cash" | "Bank" | "Khalti" | "eSewa" | "Other Bank" | "Card" | "Online";
 
-export const PAYMENT_METHODS: PaymentMethod[] = ["Cash", "Bank", "Card", "Khalti", "eSewa", "Online", "Other Bank"];
+export const PAYMENT_METHODS: PaymentMethod[] = [
+  "Cash",
+  "Bank",
+  "Card",
+  "Khalti",
+  "eSewa",
+  "Online",
+  "Other Bank",
+];
 
 export const WAREHOUSE_ID = "a0000000-0000-0000-0000-000000000004";
 export const LOCATION_LABELS: Record<string, string> = {
@@ -437,328 +459,328 @@ function emit() {
 
 function mapStockRow(r: Record<string, unknown>): StockItem {
   return {
-    code: r['code'] as string,
-    name: r['name'] as string,
-    category: r['category'] as string,
-    subCategory: r['sub_category'] as string,
-    brand: r['brand'] as string,
-    subBrand: r['sub_brand'] as string,
-    model: r['model'] as string,
-    unit: r['unit'] as string,
-    qty: r['qty'] as number,
-    purchasePrice: r['purchase_price'] as number,
-    sellingPrice: r['selling_price'] as number,
-    storeId: (r['store_id'] as string) ?? "",
+    code: r["code"] as string,
+    name: r["name"] as string,
+    category: r["category"] as string,
+    subCategory: r["sub_category"] as string,
+    brand: r["brand"] as string,
+    subBrand: r["sub_brand"] as string,
+    model: r["model"] as string,
+    unit: r["unit"] as string,
+    qty: r["qty"] as number,
+    purchasePrice: r["purchase_price"] as number,
+    sellingPrice: r["selling_price"] as number,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapSaleRow(r: Record<string, unknown>): Sale {
   return {
-    id: r['id'] as string,
-    invoiceNo: r['invoice_no'] as string,
-    date: r['date'] as string,
-    customer: r['customer'] as string,
-    customerPan: (r['customer_pan'] as string) ?? "",
-    hasVatPan: (r['has_vat_pan'] as boolean) ?? false,
-    customerType: (r['customer_type'] as string) ?? "Individual",
-    customerContact: (r['customer_contact'] as string) ?? "",
-    customerLocation: (r['customer_location'] as string) ?? "",
-    itemName: r['item_name'] as string,
-    itemCode: r['item_code'] as string,
-    category: r['category'] as string,
-    subCategory: r['sub_category'] as string,
-    brand: r['brand'] as string,
-    model: r['model'] as string,
-    qty: r['qty'] as number,
-    rate: r['rate'] as number,
-    discount: Number(r['discount'] ?? 0),
-    amount: r['amount'] as number,
-    vat: r['vat'] as number,
-    total: r['total'] as number,
-    paymentMethod: r['payment_method'] as PaymentMethod,
-    otherCharges: Number(r['other_charges'] ?? 0),
-    paidAmount: Number(r['paid_amount'] ?? 0),
-    remaining: Number(r['remaining'] ?? 0),
-    remarks: (r['remarks'] as string) ?? "",
-    saleType: (r['sale_type'] as string) ?? "Cash",
-    isFree: (r['is_free'] as boolean) ?? false,
-    warrantyOriginalInvoice: (r['warranty_original_invoice'] as string) ?? "",
-    status: (r['status'] as string) ?? "CONFIRMED",
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    invoiceNo: r["invoice_no"] as string,
+    date: r["date"] as string,
+    customer: r["customer"] as string,
+    customerPan: (r["customer_pan"] as string) ?? "",
+    hasVatPan: (r["has_vat_pan"] as boolean) ?? false,
+    customerType: (r["customer_type"] as string) ?? "Individual",
+    customerContact: (r["customer_contact"] as string) ?? "",
+    customerLocation: (r["customer_location"] as string) ?? "",
+    itemName: r["item_name"] as string,
+    itemCode: r["item_code"] as string,
+    category: r["category"] as string,
+    subCategory: r["sub_category"] as string,
+    brand: r["brand"] as string,
+    model: r["model"] as string,
+    qty: r["qty"] as number,
+    rate: r["rate"] as number,
+    discount: Number(r["discount"] ?? 0),
+    amount: r["amount"] as number,
+    vat: r["vat"] as number,
+    total: r["total"] as number,
+    paymentMethod: r["payment_method"] as PaymentMethod,
+    otherCharges: Number(r["other_charges"] ?? 0),
+    paidAmount: Number(r["paid_amount"] ?? 0),
+    remaining: Number(r["remaining"] ?? 0),
+    remarks: (r["remarks"] as string) ?? "",
+    saleType: (r["sale_type"] as string) ?? "Cash",
+    isFree: (r["is_free"] as boolean) ?? false,
+    warrantyOriginalInvoice: (r["warranty_original_invoice"] as string) ?? "",
+    status: (r["status"] as string) ?? "CONFIRMED",
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapPurchaseRow(r: Record<string, unknown>): Purchase {
   return {
-    id: r['id'] as string,
-    billNo: (r['bill_no'] as string) ?? "",
-    date: r['date'] as string,
-    supplier: (r['supplier'] as string) ?? "",
-    itemCode: (r['item_code'] as string) ?? "",
-    itemName: r['item_name'] as string,
-    category: (r['category'] as string) ?? "",
-    subCategory: (r['sub_category'] as string) ?? "",
-    brand: (r['brand'] as string) ?? "",
-    model: (r['model'] as string) ?? "",
-    qty: r['qty'] as number,
-    rate: r['rate'] as number,
-    amount: r['amount'] as number,
-    paymentMethod: (r['payment_method'] as PaymentMethod) ?? "Cash",
-    note: (r['note'] as string) ?? "",
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    billNo: (r["bill_no"] as string) ?? "",
+    date: r["date"] as string,
+    supplier: (r["supplier"] as string) ?? "",
+    itemCode: (r["item_code"] as string) ?? "",
+    itemName: r["item_name"] as string,
+    category: (r["category"] as string) ?? "",
+    subCategory: (r["sub_category"] as string) ?? "",
+    brand: (r["brand"] as string) ?? "",
+    model: (r["model"] as string) ?? "",
+    qty: r["qty"] as number,
+    rate: r["rate"] as number,
+    amount: r["amount"] as number,
+    paymentMethod: (r["payment_method"] as PaymentMethod) ?? "Cash",
+    note: (r["note"] as string) ?? "",
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapStockLotRow(r: Record<string, unknown>): StockLot {
   return {
-    id: r['id'] as string,
-    lotNo: r['lot_no'] as string,
-    purchaseId: (r['purchase_id'] as string) ?? null,
-    itemCode: r['item_code'] as string,
-    itemName: r['item_name'] as string,
-    date: r['date'] as string,
-    supplier: r['supplier'] as string,
-    qty: r['qty'] as number,
-    purchasePrice: r['purchase_price'] as number,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    lotNo: r["lot_no"] as string,
+    purchaseId: (r["purchase_id"] as string) ?? null,
+    itemCode: r["item_code"] as string,
+    itemName: r["item_name"] as string,
+    date: r["date"] as string,
+    supplier: r["supplier"] as string,
+    qty: r["qty"] as number,
+    purchasePrice: r["purchase_price"] as number,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapSaleAllocationRow(r: Record<string, unknown>): SaleAllocation {
   return {
-    id: r['id'] as string,
-    saleId: r['sale_id'] as string,
-    lotId: r['lot_id'] as string,
-    qtyTaken: r['qty_taken'] as number,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    saleId: r["sale_id"] as string,
+    lotId: r["lot_id"] as string,
+    qtyTaken: r["qty_taken"] as number,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapStockAdjustmentRow(r: Record<string, unknown>): StockAdjustment {
   return {
-    id: r['id'] as string,
-    lotId: r['lot_id'] as string,
-    itemCode: r['item_code'] as string,
-    itemName: r['item_name'] as string,
-    date: r['date'] as string,
-    adjustmentType: r['adjustment_type'] as string,
-    qtyAdjusted: r['qty_adjusted'] as number,
-    reason: r['reason'] as string,
-    createdAt: r['created_at'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    lotId: r["lot_id"] as string,
+    itemCode: r["item_code"] as string,
+    itemName: r["item_name"] as string,
+    date: r["date"] as string,
+    adjustmentType: r["adjustment_type"] as string,
+    qtyAdjusted: r["qty_adjusted"] as number,
+    reason: r["reason"] as string,
+    createdAt: r["created_at"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapPurchaseHeaderRow(r: Record<string, unknown>): PurchaseHeader {
   return {
-    id: r['id'] as string,
-    purchaseNo: r['purchase_no'] as string,
-    supplierInvoiceNo: (r['supplier_invoice_no'] as string) ?? "",
-    date: r['date'] as string,
-    supplierName: (r['supplier_name'] as string) ?? "",
-    supplierAddress: (r['supplier_address'] as string) ?? "",
-    supplierPan: (r['supplier_pan'] as string) ?? "",
-    supplierVat: (r['supplier_vat'] as string) ?? "",
-    purchaseType: (r['purchase_type'] as "Cash" | "Credit") ?? "Cash",
-    dueDate: (r['due_date'] as string) ?? "",
-    remarks: (r['remarks'] as string) ?? "",
-    paymentMethod: (r['payment_method'] as PaymentMethod) ?? "Cash",
-    grossAmount: Number(r['gross_amount'] ?? 0),
-    discount: Number(r['discount'] ?? 0),
-    taxableAmount: Number(r['taxable_amount'] ?? 0),
-    vatRate: Number(r['vat_rate'] ?? 13),
-    vatAmount: Number(r['vat_amount'] ?? 0),
-    otherCharges: Number(r['other_charges'] ?? 0),
-    grandTotal: Number(r['grand_total'] ?? 0),
-    paidAmount: Number(r['paid_amount'] ?? 0),
-    remainingBalance: Number(r['remaining_balance'] ?? 0),
-    vendorId: (r['vendor_id'] as string) ?? "",
-    createdAt: r['created_at'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    purchaseNo: r["purchase_no"] as string,
+    supplierInvoiceNo: (r["supplier_invoice_no"] as string) ?? "",
+    date: r["date"] as string,
+    supplierName: (r["supplier_name"] as string) ?? "",
+    supplierAddress: (r["supplier_address"] as string) ?? "",
+    supplierPan: (r["supplier_pan"] as string) ?? "",
+    supplierVat: (r["supplier_vat"] as string) ?? "",
+    purchaseType: (r["purchase_type"] as "Cash" | "Credit") ?? "Cash",
+    dueDate: (r["due_date"] as string) ?? "",
+    remarks: (r["remarks"] as string) ?? "",
+    paymentMethod: (r["payment_method"] as PaymentMethod) ?? "Cash",
+    grossAmount: Number(r["gross_amount"] ?? 0),
+    discount: Number(r["discount"] ?? 0),
+    taxableAmount: Number(r["taxable_amount"] ?? 0),
+    vatRate: Number(r["vat_rate"] ?? 13),
+    vatAmount: Number(r["vat_amount"] ?? 0),
+    otherCharges: Number(r["other_charges"] ?? 0),
+    grandTotal: Number(r["grand_total"] ?? 0),
+    paidAmount: Number(r["paid_amount"] ?? 0),
+    remainingBalance: Number(r["remaining_balance"] ?? 0),
+    vendorId: (r["vendor_id"] as string) ?? "",
+    createdAt: r["created_at"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapPurchaseItemRow(r: Record<string, unknown>): PurchaseItem {
   return {
-    id: r['id'] as string,
-    purchaseHeaderId: r['purchase_header_id'] as string,
-    sn: Number(r['sn'] ?? 1),
-    itemCode: (r['item_code'] as string) ?? "",
-    itemName: r['item_name'] as string,
-    category: (r['category'] as string) ?? "",
-    subCategory: (r['sub_category'] as string) ?? "",
-    brand: (r['brand'] as string) ?? "",
-    model: (r['model'] as string) ?? "",
-    unit: (r['unit'] as string) ?? "PCS",
-    qty: Number(r['qty'] ?? 0),
-    rate: Number(r['rate'] ?? 0),
-    discount: Number(r['discount'] ?? 0),
-    amount: Number(r['amount'] ?? 0),
-    taxableAmount: Number(r['taxable_amount'] ?? 0),
-    vatRate: Number(r['vat_rate'] ?? 13),
-    vatAmount: Number(r['vat_amount'] ?? 0),
-    total: Number(r['total'] ?? 0),
-    lotNo: (r['lot_no'] as string) ?? "",
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    purchaseHeaderId: r["purchase_header_id"] as string,
+    sn: Number(r["sn"] ?? 1),
+    itemCode: (r["item_code"] as string) ?? "",
+    itemName: r["item_name"] as string,
+    category: (r["category"] as string) ?? "",
+    subCategory: (r["sub_category"] as string) ?? "",
+    brand: (r["brand"] as string) ?? "",
+    model: (r["model"] as string) ?? "",
+    unit: (r["unit"] as string) ?? "PCS",
+    qty: Number(r["qty"] ?? 0),
+    rate: Number(r["rate"] ?? 0),
+    discount: Number(r["discount"] ?? 0),
+    amount: Number(r["amount"] ?? 0),
+    taxableAmount: Number(r["taxable_amount"] ?? 0),
+    vatRate: Number(r["vat_rate"] ?? 13),
+    vatAmount: Number(r["vat_amount"] ?? 0),
+    total: Number(r["total"] ?? 0),
+    lotNo: (r["lot_no"] as string) ?? "",
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapPurchaseImeiRow(r: Record<string, unknown>): PurchaseItemImei {
   return {
-    id: r['id'] as string,
-    purchaseItemId: r['purchase_item_id'] as string,
-    imei: r['imei'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    purchaseItemId: r["purchase_item_id"] as string,
+    imei: r["imei"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapPurchaseAttachmentRow(r: Record<string, unknown>): PurchaseAttachment {
   return {
-    id: r['id'] as string,
-    purchaseHeaderId: r['purchase_header_id'] as string,
-    fileName: r['file_name'] as string,
-    fileType: (r['file_type'] as string) ?? "",
-    fileSize: Number(r['file_size'] ?? 0),
-    fileData: (r['file_data'] as string) ?? "",
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    purchaseHeaderId: r["purchase_header_id"] as string,
+    fileName: r["file_name"] as string,
+    fileType: (r["file_type"] as string) ?? "",
+    fileSize: Number(r["file_size"] ?? 0),
+    fileData: (r["file_data"] as string) ?? "",
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapSaleImeiRow(r: Record<string, unknown>): SaleItemImei {
   return {
-    id: r['id'] as string,
-    saleId: r['sale_id'] as string,
-    imei: r['imei'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    saleId: r["sale_id"] as string,
+    imei: r["imei"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapSalesReturnRow(r: Record<string, unknown>): SalesReturn {
   return {
-    id: r['id'] as string,
-    returnNo: r['return_no'] as string,
-    originalInvoiceNo: r['original_invoice_no'] as string,
-    saleId: (r['sale_id'] as string) ?? "",
-    saleItemName: r['sale_item_name'] as string,
-    saleItemCode: r['sale_item_code'] as string,
-    lotId: (r['lot_id'] as string) ?? "",
-    imei: (r['imei'] as string) ?? "",
-    qty: r['qty'] as number,
-    returnDate: r['return_date'] as string,
-    reason: (r['reason'] as string) ?? "",
-    refundAmount: Number(r['refund_amount'] ?? 0),
-    status: (r['status'] as string) ?? "COMPLETED",
-    createdBy: (r['created_by'] as string) ?? "",
-    createdAt: r['created_at'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    returnNo: r["return_no"] as string,
+    originalInvoiceNo: r["original_invoice_no"] as string,
+    saleId: (r["sale_id"] as string) ?? "",
+    saleItemName: r["sale_item_name"] as string,
+    saleItemCode: r["sale_item_code"] as string,
+    lotId: (r["lot_id"] as string) ?? "",
+    imei: (r["imei"] as string) ?? "",
+    qty: r["qty"] as number,
+    returnDate: r["return_date"] as string,
+    reason: (r["reason"] as string) ?? "",
+    refundAmount: Number(r["refund_amount"] ?? 0),
+    status: (r["status"] as string) ?? "COMPLETED",
+    createdBy: (r["created_by"] as string) ?? "",
+    createdAt: r["created_at"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapVendorRow(r: Record<string, unknown>): Vendor {
   return {
-    id: r['id'] as string,
-    vendorCode: r['vendor_code'] as string,
-    vendorName: r['vendor_name'] as string,
-    vendorType: (r['vendor_type'] as string) ?? "Local Supplier",
-    pan: (r['pan'] as string) ?? "",
-    vatNumber: (r['vat_number'] as string) ?? "",
-    vatStatus: (r['vat_status'] as string) ?? "PAN Only",
-    address: (r['address'] as string) ?? "",
-    contactPerson: (r['contact_person'] as string) ?? "",
-    phone: (r['phone'] as string) ?? "",
-    email: (r['email'] as string) ?? "",
-    paymentTerms: (r['payment_terms'] as string) ?? "30 Days",
-    creditLimit: Number(r['credit_limit'] ?? 0),
-    bankName: (r['bank_name'] as string) ?? "",
-    bankAccountNo: (r['bank_account_no'] as string) ?? "",
-    openingBalance: Number(r['opening_balance'] ?? 0),
-    openingBalanceDate: (r['opening_balance_date'] as string) ?? "",
-    status: (r['status'] as string) ?? "Active",
-    remarks: (r['remarks'] as string) ?? "",
-    createdBy: (r['created_by'] as string) ?? "",
-    createdAt: r['created_at'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    vendorCode: r["vendor_code"] as string,
+    vendorName: r["vendor_name"] as string,
+    vendorType: (r["vendor_type"] as string) ?? "Local Supplier",
+    pan: (r["pan"] as string) ?? "",
+    vatNumber: (r["vat_number"] as string) ?? "",
+    vatStatus: (r["vat_status"] as string) ?? "PAN Only",
+    address: (r["address"] as string) ?? "",
+    contactPerson: (r["contact_person"] as string) ?? "",
+    phone: (r["phone"] as string) ?? "",
+    email: (r["email"] as string) ?? "",
+    paymentTerms: (r["payment_terms"] as string) ?? "30 Days",
+    creditLimit: Number(r["credit_limit"] ?? 0),
+    bankName: (r["bank_name"] as string) ?? "",
+    bankAccountNo: (r["bank_account_no"] as string) ?? "",
+    openingBalance: Number(r["opening_balance"] ?? 0),
+    openingBalanceDate: (r["opening_balance_date"] as string) ?? "",
+    status: (r["status"] as string) ?? "Active",
+    remarks: (r["remarks"] as string) ?? "",
+    createdBy: (r["created_by"] as string) ?? "",
+    createdAt: r["created_at"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapVendorTransactionRow(r: Record<string, unknown>): VendorTransaction {
   return {
-    id: r['id'] as string,
-    vendorId: r['vendor_id'] as string,
-    transactionType: r['transaction_type'] as string,
-    referenceNo: (r['reference_no'] as string) ?? "",
-    referenceId: (r['reference_id'] as string) ?? "",
-    transactionDate: r['transaction_date'] as string,
-    debit: Number(r['debit'] ?? 0),
-    credit: Number(r['credit'] ?? 0),
-    balance: Number(r['balance'] ?? 0),
-    remarks: (r['remarks'] as string) ?? "",
-    createdAt: r['created_at'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    vendorId: r["vendor_id"] as string,
+    transactionType: r["transaction_type"] as string,
+    referenceNo: (r["reference_no"] as string) ?? "",
+    referenceId: (r["reference_id"] as string) ?? "",
+    transactionDate: r["transaction_date"] as string,
+    debit: Number(r["debit"] ?? 0),
+    credit: Number(r["credit"] ?? 0),
+    balance: Number(r["balance"] ?? 0),
+    remarks: (r["remarks"] as string) ?? "",
+    createdAt: r["created_at"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapVendorPaymentRow(r: Record<string, unknown>): VendorPayment {
   return {
-    id: r['id'] as string,
-    paymentNo: r['payment_no'] as string,
-    vendorId: r['vendor_id'] as string,
-    paymentDate: r['payment_date'] as string,
-    paymentMethod: (r['payment_method'] as string) ?? "Cash",
-    amount: Number(r['amount'] ?? 0),
-    bankName: (r['bank_name'] as string) ?? "",
-    referenceNo: (r['reference_no'] as string) ?? "",
-    remarks: (r['remarks'] as string) ?? "",
-    createdBy: (r['created_by'] as string) ?? "",
-    createdAt: r['created_at'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    paymentNo: r["payment_no"] as string,
+    vendorId: r["vendor_id"] as string,
+    paymentDate: r["payment_date"] as string,
+    paymentMethod: (r["payment_method"] as string) ?? "Cash",
+    amount: Number(r["amount"] ?? 0),
+    bankName: (r["bank_name"] as string) ?? "",
+    referenceNo: (r["reference_no"] as string) ?? "",
+    remarks: (r["remarks"] as string) ?? "",
+    createdBy: (r["created_by"] as string) ?? "",
+    createdAt: r["created_at"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapVendorPaymentAllocationRow(r: Record<string, unknown>): VendorPaymentAllocation {
   return {
-    id: r['id'] as string,
-    paymentId: r['payment_id'] as string,
-    purchaseHeaderId: (r['purchase_header_id'] as string) ?? "",
-    amount: Number(r['amount'] ?? 0),
-    allocationType: (r['allocation_type'] as string) ?? "bill",
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    paymentId: r["payment_id"] as string,
+    purchaseHeaderId: (r["purchase_header_id"] as string) ?? "",
+    amount: Number(r["amount"] ?? 0),
+    allocationType: (r["allocation_type"] as string) ?? "bill",
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapPurchaseReturnRow(r: Record<string, unknown>): PurchaseReturn {
   return {
-    id: r['id'] as string,
-    returnNo: r['return_no'] as string,
-    originalPurchaseNo: r['original_purchase_no'] as string,
-    purchaseHeaderId: (r['purchase_header_id'] as string) ?? "",
-    vendorId: (r['vendor_id'] as string) ?? "",
-    itemCode: r['item_code'] as string,
-    itemName: r['item_name'] as string,
-    lotId: (r['lot_id'] as string) ?? "",
-    imei: (r['imei'] as string) ?? "",
-    qty: r['qty'] as number,
-    returnDate: r['return_date'] as string,
-    reason: (r['reason'] as string) ?? "",
-    refundAmount: Number(r['refund_amount'] ?? 0),
-    status: (r['status'] as string) ?? "COMPLETED",
-    createdBy: (r['created_by'] as string) ?? "",
-    createdAt: r['created_at'] as string,
-    storeId: (r['store_id'] as string) ?? "",
+    id: r["id"] as string,
+    returnNo: r["return_no"] as string,
+    originalPurchaseNo: r["original_purchase_no"] as string,
+    purchaseHeaderId: (r["purchase_header_id"] as string) ?? "",
+    vendorId: (r["vendor_id"] as string) ?? "",
+    itemCode: r["item_code"] as string,
+    itemName: r["item_name"] as string,
+    lotId: (r["lot_id"] as string) ?? "",
+    imei: (r["imei"] as string) ?? "",
+    qty: r["qty"] as number,
+    returnDate: r["return_date"] as string,
+    reason: (r["reason"] as string) ?? "",
+    refundAmount: Number(r["refund_amount"] ?? 0),
+    status: (r["status"] as string) ?? "COMPLETED",
+    createdBy: (r["created_by"] as string) ?? "",
+    createdAt: r["created_at"] as string,
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
 function mapVendorDocumentRow(r: Record<string, unknown>): VendorDocument {
   return {
-    id: r['id'] as string,
-    vendorId: r['vendor_id'] as string,
-    fileName: r['file_name'] as string,
-    fileType: (r['file_type'] as string) ?? "",
+    id: r["id"] as string,
+    vendorId: r["vendor_id"] as string,
+    fileName: r["file_name"] as string,
+    fileType: (r["file_type"] as string) ?? "",
     fileUrl: "",
-    fileSize: Number(r['file_size'] ?? 0),
-    fileData: (r['file_data'] as string) ?? "",
-    uploadedAt: (r['created_at'] as string) ?? "",
-    storeId: (r['store_id'] as string) ?? "",
+    fileSize: Number(r["file_size"] ?? 0),
+    fileData: (r["file_data"] as string) ?? "",
+    uploadedAt: (r["created_at"] as string) ?? "",
+    storeId: (r["store_id"] as string) ?? "",
   };
 }
 
@@ -879,7 +901,10 @@ export async function addBill(
       rows[0].remaining = remaining;
     }
 
-    const { data: insertedSales, error: salesError } = await supabase.from("sales").insert(rows).select("id, item_name, qty");
+    const { data: insertedSales, error: salesError } = await supabase
+      .from("sales")
+      .insert(rows)
+      .select("id, item_name, qty");
 
     if (!salesError && insertedSales) {
       const affectedItems = new Set<string>();
@@ -926,14 +951,20 @@ export async function addBill(
       if (!isRepair) {
         for (const itemName of affectedItems) {
           try {
-            await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+            await supabase.rpc("reconcile_stock_from_lots", {
+              p_item_name: itemName,
+              p_store_id: _currentStoreId,
+            });
           } catch (err) {
             console.error("[store] reconcile_stock_from_lots failed:", err);
           }
         }
       }
 
-      await logAudit("INSERT", "sales", undefined, null, { invoice_no: invoiceNo, items: items.length });
+      await logAudit("INSERT", "sales", undefined, null, {
+        invoice_no: invoiceNo,
+        items: items.length,
+      });
       await reload();
     }
     return { error: salesError };
@@ -955,8 +986,8 @@ export async function deleteSale(id: string) {
 
     if (allocations && allocations.length > 0) {
       for (const alloc of allocations) {
-        const lotId = alloc['lot_id'] as string;
-        const qtyTaken = alloc['qty_taken'] as number;
+        const lotId = alloc["lot_id"] as string;
+        const qtyTaken = alloc["qty_taken"] as number;
         await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: qtyTaken });
       }
       await supabase.from("sale_lot_allocations").delete().eq("sale_id", id);
@@ -980,7 +1011,10 @@ export async function deleteSale(id: string) {
 
   if (sale.saleType !== "Repair") {
     try {
-      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: sale.itemName, p_store_id: _currentStoreId });
+      await supabase.rpc("reconcile_stock_from_lots", {
+        p_item_name: sale.itemName,
+        p_store_id: _currentStoreId,
+      });
     } catch (err) {
       console.error("[store] deleteSale reconcile failed:", err);
     }
@@ -1004,8 +1038,8 @@ export async function deleteInvoice(invoiceNo: string) {
 
       if (allocations && allocations.length > 0) {
         for (const alloc of allocations) {
-          const lotId = alloc['lot_id'] as string;
-          const qtyTaken = alloc['qty_taken'] as number;
+          const lotId = alloc["lot_id"] as string;
+          const qtyTaken = alloc["qty_taken"] as number;
           await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: qtyTaken });
         }
         await supabase.from("sale_lot_allocations").delete().eq("sale_id", sale.id);
@@ -1032,15 +1066,18 @@ export async function deleteInvoice(invoiceNo: string) {
   if (!lotRestored && nonRepairItems.length > 0) {
     await Promise.all(
       nonRepairItems.map((item) =>
-        supabase.rpc("adjust_stock_by_code", { p_code: item.itemCode, p_delta: item.qty })
-      )
+        supabase.rpc("adjust_stock_by_code", { p_code: item.itemCode, p_delta: item.qty }),
+      ),
     );
   }
 
   const affectedItems = new Set(nonRepairItems.map((i) => i.itemName));
   for (const itemName of affectedItems) {
     try {
-      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+      await supabase.rpc("reconcile_stock_from_lots", {
+        p_item_name: itemName,
+        p_store_id: _currentStoreId,
+      });
     } catch (err) {
       console.error("[store] deleteInvoice reconcile failed:", err);
     }
@@ -1051,21 +1088,24 @@ export async function deleteInvoice(invoiceNo: string) {
 }
 
 export async function upsertStock(item: StockItem, originalCode?: string) {
-  const { error } = await supabase.from("stock").upsert({
-    code: item.code,
-    name: item.name,
-    category: item.category,
-    sub_category: item.subCategory,
-    brand: item.brand,
-    sub_brand: item.subBrand,
-    model: item.model,
-    unit: item.unit,
-    qty: item.qty,
-    purchase_price: item.purchasePrice,
-    selling_price: item.sellingPrice,
-    updated_at: new Date().toISOString(),
-    store_id: _currentStoreId,
-  }, { onConflict: "code" });
+  const { error } = await supabase.from("stock").upsert(
+    {
+      code: item.code,
+      name: item.name,
+      category: item.category,
+      sub_category: item.subCategory,
+      brand: item.brand,
+      sub_brand: item.subBrand,
+      model: item.model,
+      unit: item.unit,
+      qty: item.qty,
+      purchase_price: item.purchasePrice,
+      selling_price: item.sellingPrice,
+      updated_at: new Date().toISOString(),
+      store_id: _currentStoreId,
+    },
+    { onConflict: "code" },
+  );
   if (error) return { error: error.message };
   await reload();
   return {};
@@ -1073,9 +1113,16 @@ export async function upsertStock(item: StockItem, originalCode?: string) {
 
 export async function deleteStock(code: string) {
   try {
-    const { data: stockItem } = await supabase.from("stock").select("name").eq("code", code).maybeSingle();
+    const { data: stockItem } = await supabase
+      .from("stock")
+      .select("name")
+      .eq("code", code)
+      .maybeSingle();
     if (stockItem) {
-      await supabase.from("stock_lots").delete().eq("item_name", (stockItem as Record<string, unknown>)['name'] as string);
+      await supabase
+        .from("stock_lots")
+        .delete()
+        .eq("item_name", (stockItem as Record<string, unknown>)["name"] as string);
     }
   } catch (err) {
     console.error("[store] deleteStock lot cleanup failed:", err);
@@ -1086,18 +1133,27 @@ export async function deleteStock(code: string) {
 }
 
 export async function calculateMaxStockCode(): Promise<number> {
-  try {
-    const { data, error } = await supabase.rpc("next_stock_code");
-    if (!error && data) {
-      const parsed = Number(data);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed - 1;
+  // Try store-scoped RPC first
+  if (_currentStoreId) {
+    try {
+      const { data, error } = await supabase.rpc("next_stock_code_for_store", {
+        p_store_id: _currentStoreId,
+      });
+      if (!error && data) {
+        const parsed = Number(data);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed - 1;
+      }
+    } catch (err) {
+      console.error("[store] calculateMaxStockCode store-scoped RPC failed:", err);
     }
-  } catch (err) {
-    console.error("[store] calculateMaxStockCode RPC failed:", err);
   }
 
-  // Fallback: query max code from stock table directly
-  const { data: allRows } = await supabase.from("stock").select("code").order("code", { ascending: false }).limit(1);
+  // Fallback: query max code from stock table for current store
+  let query = supabase.from("stock").select("code").order("code", { ascending: false }).limit(1);
+  if (_currentStoreId) {
+    query = query.eq("store_id", _currentStoreId);
+  }
+  const { data: allRows } = await query;
   let max = 0;
   if (allRows && allRows.length > 0) {
     const n = parseInt(String((allRows[0] as any).code ?? "").replace(/\D/g, ""), 10);
@@ -1109,11 +1165,19 @@ export async function calculateMaxStockCode(): Promise<number> {
 export async function nextItemCode(): Promise<string> {
   const max = await calculateMaxStockCode();
   let candidate = max + 1;
-  // Dedup: check against DB
-  const { data: existing } = await supabase.from("stock").select("code").eq("code", String(candidate));
+  // Dedup: check against current store only
+  let query = supabase.from("stock").select("code").eq("code", String(candidate));
+  if (_currentStoreId) {
+    query = query.eq("store_id", _currentStoreId);
+  }
+  const { data: existing } = await query;
   while (existing && existing.length > 0) {
     candidate++;
-    const { data: check } = await supabase.from("stock").select("code").eq("code", String(candidate));
+    let checkQuery = supabase.from("stock").select("code").eq("code", String(candidate));
+    if (_currentStoreId) {
+      checkQuery = checkQuery.eq("store_id", _currentStoreId);
+    }
+    const { data: check } = await checkQuery;
     if (!check || check.length === 0) break;
   }
   return String(candidate);
@@ -1131,7 +1195,11 @@ export async function calculateMaxLotNo(): Promise<number> {
   }
 
   // Fallback: query from stock_lots table directly
-  const { data: allLots } = await supabase.from("stock_lots").select("lot_no").order("lot_no", { ascending: false }).limit(1);
+  const { data: allLots } = await supabase
+    .from("stock_lots")
+    .select("lot_no")
+    .order("lot_no", { ascending: false })
+    .limit(1);
   let max = 0;
   if (allLots && allLots.length > 0) {
     const n = parseInt(String((allLots[0] as any).lot_no ?? "").replace(/\D/g, ""), 10);
@@ -1145,11 +1213,17 @@ export async function getNextLotNo(): Promise<string> {
   let candidate = max + 1;
   // Dedup: check against DB
   const lotNoStr = `LOT-${String(candidate).padStart(4, "0")}`;
-  const { data: existing } = await supabase.from("stock_lots").select("lot_no").eq("lot_no", lotNoStr);
+  const { data: existing } = await supabase
+    .from("stock_lots")
+    .select("lot_no")
+    .eq("lot_no", lotNoStr);
   while (existing && existing.length > 0) {
     candidate++;
     const nextStr = `LOT-${String(candidate).padStart(4, "0")}`;
-    const { data: check } = await supabase.from("stock_lots").select("lot_no").eq("lot_no", nextStr);
+    const { data: check } = await supabase
+      .from("stock_lots")
+      .select("lot_no")
+      .eq("lot_no", nextStr);
     if (!check || check.length === 0) break;
   }
   return `LOT-${String(candidate).padStart(4, "0")}`;
@@ -1164,24 +1238,28 @@ export async function addPurchase(entry: Omit<Purchase, "id">) {
   if (stockResult.error) return { error: new Error(stockResult.error) };
   const resolvedItemCode = stockResult.itemCode || entry.itemCode;
 
-  const { data: inserted, error } = await supabase.from("purchases").insert({
-    bill_no: entry.billNo,
-    date: entry.date,
-    supplier: entry.supplier,
-    item_code: resolvedItemCode,
-    item_name: entry.itemName,
-    category: entry.category,
-    sub_category: entry.subCategory,
-    brand: entry.brand,
-    model: entry.model,
-    qty: entry.qty,
-    rate: entry.rate,
-    amount: entry.amount,
-    payment_method: entry.paymentMethod,
-    note: entry.note,
-    created_by: user?.id ?? null,
-    store_id: _currentStoreId,
-  }).select("id").single();
+  const { data: inserted, error } = await supabase
+    .from("purchases")
+    .insert({
+      bill_no: entry.billNo,
+      date: entry.date,
+      supplier: entry.supplier,
+      item_code: resolvedItemCode,
+      item_name: entry.itemName,
+      category: entry.category,
+      sub_category: entry.subCategory,
+      brand: entry.brand,
+      model: entry.model,
+      qty: entry.qty,
+      rate: entry.rate,
+      amount: entry.amount,
+      payment_method: entry.paymentMethod,
+      note: entry.note,
+      created_by: user?.id ?? null,
+      store_id: _currentStoreId,
+    })
+    .select("id")
+    .single();
 
   if (error) return { error };
 
@@ -1246,15 +1324,45 @@ export async function nextPurchaseNo(): Promise<string> {
 
 async function rollbackPurchaseItems(
   headerId: string,
-  processedItems: { itemId: string; itemCode: string; qty: number; itemName: string; lotNo: string }[],
+  processedItems: {
+    itemId: string;
+    itemCode: string;
+    qty: number;
+    itemName: string;
+    lotNo: string;
+  }[],
 ) {
-  console.warn("[store] Rolling back purchase header", headerId, "due to", processedItems.length, "processed items");
+  console.warn(
+    "[store] Rolling back purchase header",
+    headerId,
+    "due to",
+    processedItems.length,
+    "processed items",
+  );
   for (const pi of processedItems) {
     try {
       await supabase.from("stock_lots").delete().eq("purchase_id", pi.itemId);
       await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", pi.itemId);
       await supabase.from("purchase_items").delete().eq("id", pi.itemId);
-      await applyStockDelta({ billNo: "", date: "", supplier: "", itemCode: pi.itemCode, itemName: pi.itemName, category: "", subCategory: "", brand: "", model: "", qty: pi.qty, rate: 0, amount: 0, paymentMethod: "Cash", note: "" }, -pi.qty);
+      await applyStockDelta(
+        {
+          billNo: "",
+          date: "",
+          supplier: "",
+          itemCode: pi.itemCode,
+          itemName: pi.itemName,
+          category: "",
+          subCategory: "",
+          brand: "",
+          model: "",
+          qty: pi.qty,
+          rate: 0,
+          amount: 0,
+          paymentMethod: "Cash",
+          note: "",
+        },
+        -pi.qty,
+      );
     } catch (err) {
       console.error("[store] rollbackPurchaseItems failed for item:", pi.itemName, err);
     }
@@ -1275,7 +1383,9 @@ export async function addPurchaseHeader(
   const opKey = `addPurchaseHeader:${header.purchaseNo}`;
   if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const targetStoreId = destinationStoreId || _currentStoreId;
 
     let purchaseNo = header.purchaseNo;
@@ -1288,36 +1398,46 @@ export async function addPurchaseHeader(
       console.error("[store] next_purchase_no failed:", err);
     }
 
-    const { data: inserted, error } = await supabase.from("purchase_headers").insert({
-      purchase_no: purchaseNo,
-      supplier_invoice_no: header.supplierInvoiceNo,
-      date: header.date,
-      supplier_name: header.supplierName,
-      supplier_address: header.supplierAddress,
-      supplier_pan: header.supplierPan,
-      supplier_vat: header.supplierVat,
-      purchase_type: header.purchaseType,
-      due_date: header.dueDate,
-      remarks: header.remarks,
-      payment_method: header.paymentMethod,
-      gross_amount: header.grossAmount,
-      discount: header.discount,
-      taxable_amount: header.taxableAmount,
-      vat_rate: header.vatRate,
-      vat_amount: header.vatAmount,
-      other_charges: header.otherCharges,
-      grand_total: header.grandTotal,
-      paid_amount: header.paidAmount,
-      remaining_balance: header.grandTotal - header.paidAmount,
-      vendor_id: (header as Record<string, unknown>)['vendorId'] || null,
-      created_by: user?.id ?? null,
-      store_id: targetStoreId,
-    }).select("id").single();
+    const { data: inserted, error } = await supabase
+      .from("purchase_headers")
+      .insert({
+        purchase_no: purchaseNo,
+        supplier_invoice_no: header.supplierInvoiceNo,
+        date: header.date,
+        supplier_name: header.supplierName,
+        supplier_address: header.supplierAddress,
+        supplier_pan: header.supplierPan,
+        supplier_vat: header.supplierVat,
+        purchase_type: header.purchaseType,
+        due_date: header.dueDate,
+        remarks: header.remarks,
+        payment_method: header.paymentMethod,
+        gross_amount: header.grossAmount,
+        discount: header.discount,
+        taxable_amount: header.taxableAmount,
+        vat_rate: header.vatRate,
+        vat_amount: header.vatAmount,
+        other_charges: header.otherCharges,
+        grand_total: header.grandTotal,
+        paid_amount: header.paidAmount,
+        remaining_balance: header.grandTotal - header.paidAmount,
+        vendor_id: (header as Record<string, unknown>)["vendorId"] || null,
+        created_by: user?.id ?? null,
+        store_id: targetStoreId,
+      })
+      .select("id")
+      .single();
 
     if (error) return { error: error.message };
     const headerId = inserted!.id as string;
 
-    const processedItems: { itemId: string; itemCode: string; qty: number; itemName: string; lotNo: string }[] = [];
+    const processedItems: {
+      itemId: string;
+      itemCode: string;
+      qty: number;
+      itemName: string;
+      lotNo: string;
+    }[] = [];
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!;
@@ -1362,34 +1482,38 @@ export async function addPurchaseHeader(
         }
       }
 
-      const { data: insertedItem, error: itemErr } = await supabase.from("purchase_items").insert({
-        purchase_header_id: headerId,
-        sn: item.sn,
-        item_code: resolvedItemCode,
-        item_name: item.itemName,
-        category: item.category,
-        sub_category: item.subCategory,
-        brand: item.brand,
-        model: item.model,
-        unit: item.unit,
-        qty: item.qty,
-        rate: item.rate,
-        discount: item.discount,
-        amount: item.amount,
-        taxable_amount: item.taxableAmount,
-        vat_rate: item.vatRate,
-        vat_amount: item.vatAmount,
-        total: item.total,
-        lot_no: lotNo,
-        store_id: targetStoreId,
-      }).select("id").single();
+      const { data: insertedItem, error: itemErr } = await supabase
+        .from("purchase_items")
+        .insert({
+          purchase_header_id: headerId,
+          sn: item.sn,
+          item_code: resolvedItemCode,
+          item_name: item.itemName,
+          category: item.category,
+          sub_category: item.subCategory,
+          brand: item.brand,
+          model: item.model,
+          unit: item.unit,
+          qty: item.qty,
+          rate: item.rate,
+          discount: item.discount,
+          amount: item.amount,
+          taxable_amount: item.taxableAmount,
+          vat_rate: item.vatRate,
+          vat_amount: item.vatAmount,
+          total: item.total,
+          lot_no: lotNo,
+          store_id: targetStoreId,
+        })
+        .select("id")
+        .single();
 
       if (itemErr) {
         await rollbackPurchaseItems(headerId, processedItems);
         return { error: `Failed to save item ${item.itemName}: ${itemErr.message}` };
       }
 
-      const itemId = (insertedItem as Record<string, unknown>)['id'] as string;
+      const itemId = (insertedItem as Record<string, unknown>)["id"] as string;
 
       const imeis = imeisByItem[i] || [];
       if (imeis.length > 0 && insertedItem) {
@@ -1421,10 +1545,16 @@ export async function addPurchaseHeader(
         console.warn("[store] Stock lot insert warning for " + item.itemName, lotInsertErr.message);
       }
 
-      processedItems.push({ itemId, itemCode: resolvedItemCode, qty: item.qty, itemName: item.itemName, lotNo });
+      processedItems.push({
+        itemId,
+        itemCode: resolvedItemCode,
+        qty: item.qty,
+        itemName: item.itemName,
+        lotNo,
+      });
     }
 
-    const vendorIdForTxn = (header as Record<string, unknown>)['vendorId'] as string | undefined;
+    const vendorIdForTxn = (header as Record<string, unknown>)["vendorId"] as string | undefined;
     if (vendorIdForTxn && header.grandTotal > 0) {
       const paidAmt = header.paidAmount ?? 0;
       await supabase.rpc("insert_vendor_txn", {
@@ -1436,23 +1566,26 @@ export async function addPurchaseHeader(
         p_debit: header.grandTotal,
         p_credit: 0,
         p_remarks: `Purchase ${purchaseNo}`,
-        p_store_id: targetStoreId,
       });
 
       if (paidAmt > 0) {
         const purchasePaymentNo = await nextVendorPaymentNo();
-        const { data: paymentInserted } = await supabase.from("vendor_payments").insert({
-          payment_no: purchasePaymentNo,
-          vendor_id: vendorIdForTxn,
-          payment_date: header.date,
-          payment_method: header.paymentMethod,
-          amount: paidAmt,
-          bank_name: "",
-          reference_no: purchaseNo,
-          remarks: `Payment at purchase ${purchaseNo}`,
-          created_by: user?.id ?? null,
-          store_id: targetStoreId,
-        }).select("id").single();
+        const { data: paymentInserted } = await supabase
+          .from("vendor_payments")
+          .insert({
+            payment_no: purchasePaymentNo,
+            vendor_id: vendorIdForTxn,
+            payment_date: header.date,
+            payment_method: header.paymentMethod,
+            amount: paidAmt,
+            bank_name: "",
+            reference_no: purchaseNo,
+            remarks: `Payment at purchase ${purchaseNo}`,
+            created_by: user?.id ?? null,
+            // store_id intentionally omitted — vendor payments are global
+          })
+          .select("id")
+          .single();
 
         if (paymentInserted) {
           await supabase.from("vendor_payment_allocations").insert({
@@ -1460,7 +1593,7 @@ export async function addPurchaseHeader(
             purchase_header_id: headerId,
             amount: paidAmt,
             allocation_type: "bill",
-            store_id: targetStoreId,
+            // store_id intentionally omitted — vendor payment allocations are global
           });
         }
 
@@ -1473,12 +1606,14 @@ export async function addPurchaseHeader(
           p_debit: 0,
           p_credit: paidAmt,
           p_remarks: `Payment at purchase ${purchaseNo}`,
-          p_store_id: targetStoreId,
         });
       }
     }
 
-    await logAudit("INSERT", "purchase_headers", headerId, null, { purchase_no: purchaseNo, items: items.length });
+    await logAudit("INSERT", "purchase_headers", headerId, null, {
+      purchase_no: purchaseNo,
+      items: items.length,
+    });
     await reload();
     return { headerId };
   } finally {
@@ -1488,14 +1623,22 @@ export async function addPurchaseHeader(
 
 export async function deletePurchaseHeader(id: string): Promise<{ error?: string }> {
   try {
-    const { data: linkedPayments } = await supabase.from("vendor_payment_allocations").select("payment_id").eq("purchase_header_id", id);
-    const linkedPaymentIds = [...new Set((linkedPayments ?? []).map((p) => p.payment_id as string))];
+    const { data: linkedPayments } = await supabase
+      .from("vendor_payment_allocations")
+      .select("payment_id")
+      .eq("purchase_header_id", id);
+    const linkedPaymentIds = [
+      ...new Set((linkedPayments ?? []).map((p) => p.payment_id as string)),
+    ];
 
     await supabase.from("vendor_payment_allocations").delete().eq("purchase_header_id", id);
 
     const header = state.purchaseHeaders.find((h) => h.id === id);
     if (header) {
-      const { data: autoPayments } = await supabase.from("vendor_payments").select("id").eq("reference_no", header.purchaseNo);
+      const { data: autoPayments } = await supabase
+        .from("vendor_payments")
+        .select("id")
+        .eq("reference_no", header.purchaseNo);
       if (autoPayments && autoPayments.length > 0) {
         for (const ap of autoPayments) {
           await supabase.from("vendor_payment_allocations").delete().eq("payment_id", ap.id);
@@ -1506,7 +1649,10 @@ export async function deletePurchaseHeader(id: string): Promise<{ error?: string
 
     await supabase.from("vendor_transactions").delete().eq("reference_id", id);
     if (header) {
-      const { data: autoVtxns } = await supabase.from("vendor_transactions").select("id").eq("reference_no", header.purchaseNo);
+      const { data: autoVtxns } = await supabase
+        .from("vendor_transactions")
+        .select("id")
+        .eq("reference_no", header.purchaseNo);
       if (autoVtxns && autoVtxns.length > 0) {
         for (const vt of autoVtxns) {
           await supabase.from("vendor_transactions").delete().eq("id", vt.id);
@@ -1578,9 +1724,12 @@ export async function addStockAdjustment(
 ): Promise<{ error?: Error }> {
   const lot = state.stockLots.find((l) => l.id === lotId);
   if (!lot) return { error: new Error("Lot not found") };
-  if (lot.qty + qtyAdjusted < 0) return { error: new Error(`Cannot reduce below 0. Available: ${lot.qty}`) };
+  if (lot.qty + qtyAdjusted < 0)
+    return { error: new Error(`Cannot reduce below 0. Available: ${lot.qty}`) };
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { error } = await supabase.from("stock_adjustments").insert({
     lot_id: lotId,
@@ -1596,13 +1745,22 @@ export async function addStockAdjustment(
   if (error) return { error: new Error(error.message) };
 
   await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: qtyAdjusted });
-  await supabase.rpc("reconcile_stock_from_lots", { p_item_name: lot.itemName, p_store_id: _currentStoreId });
-  await logAudit("INSERT", "stock_adjustments", undefined, null, { lot_id: lotId, qty_adjusted: qtyAdjusted, reason });
+  await supabase.rpc("reconcile_stock_from_lots", {
+    p_item_name: lot.itemName,
+    p_store_id: _currentStoreId,
+  });
+  await logAudit("INSERT", "stock_adjustments", undefined, null, {
+    lot_id: lotId,
+    qty_adjusted: qtyAdjusted,
+    reason,
+  });
   await reload();
   return {};
 }
 
-export async function findItemByImei(imei: string): Promise<{ item?: StockItem; lot?: StockLot; error?: string }> {
+export async function findItemByImei(
+  imei: string,
+): Promise<{ item?: StockItem; lot?: StockLot; error?: string }> {
   if (!imei.trim()) return { error: "IMEI is required" };
 
   // Find the IMEI in purchase_item_imeis
@@ -1627,13 +1785,13 @@ export async function findItemByImei(imei: string): Promise<{ item?: StockItem; 
   const { data: purchaseItem } = await supabase
     .from("purchase_items")
     .select("item_code, item_name, category, sub_category, brand, model, unit, rate")
-    .eq("id", imeiRow['purchase_item_id'] as string)
+    .eq("id", imeiRow["purchase_item_id"] as string)
     .maybeSingle();
 
   if (!purchaseItem) return { error: "Purchase item not found" };
 
   // Find the stock item
-  const itemName = purchaseItem['item_name'] as string;
+  const itemName = purchaseItem["item_name"] as string;
   const { data: stockItem } = await supabase
     .from("stock")
     .select("*")
@@ -1670,7 +1828,7 @@ export async function getAvailableImeis(itemName: string): Promise<string[]> {
 
   if (!purchaseItems || purchaseItems.length === 0) return [];
 
-  const purchaseItemIds = purchaseItems.map((pi) => pi['id'] as string);
+  const purchaseItemIds = purchaseItems.map((pi) => pi["id"] as string);
 
   // Get all purchase IMEIs for these items
   const { data: purchaseImeis } = await supabase
@@ -1681,13 +1839,13 @@ export async function getAvailableImeis(itemName: string): Promise<string[]> {
   if (!purchaseImeis || purchaseImeis.length === 0) return [];
 
   // Get all sold IMEIs
-  const allImeis = purchaseImeis.map((pi) => pi['imei'] as string);
+  const allImeis = purchaseImeis.map((pi) => pi["imei"] as string);
   const { data: soldImeis } = await supabase
     .from("sale_item_imeis")
     .select("imei")
     .in("imei", allImeis);
 
-  const soldSet = new Set((soldImeis ?? []).map((si) => si['imei'] as string));
+  const soldSet = new Set((soldImeis ?? []).map((si) => si["imei"] as string));
 
   // Return only unsold IMEIs
   return allImeis.filter((imei) => !soldSet.has(imei));
@@ -1708,7 +1866,9 @@ export async function addSalesReturn(
   const opKey = `addSalesReturn:${saleId}:${lotId}`;
   if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     let returnNo = "";
     try {
@@ -1742,7 +1902,11 @@ export async function addSalesReturn(
 
     if (saleId && lotId) {
       try {
-        await supabase.from("sale_lot_allocations").delete().eq("sale_id", saleId).eq("lot_id", lotId);
+        await supabase
+          .from("sale_lot_allocations")
+          .delete()
+          .eq("sale_id", saleId)
+          .eq("lot_id", lotId);
       } catch (err) {
         console.error("[store] addSalesReturn alloc delete failed:", err);
       }
@@ -1757,25 +1921,39 @@ export async function addSalesReturn(
     }
 
     try {
-      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+      await supabase.rpc("reconcile_stock_from_lots", {
+        p_item_name: itemName,
+        p_store_id: _currentStoreId,
+      });
     } catch (err) {
       console.error("[store] addSalesReturn reconcile failed:", err);
     }
 
     if (saleId) {
       try {
-        const { data: existingReturns } = await supabase.from("sales_returns").select("qty").eq("sale_id", saleId);
-        const totalReturned = (existingReturns ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + (r['qty'] as number), 0);
+        const { data: existingReturns } = await supabase
+          .from("sales_returns")
+          .select("qty")
+          .eq("sale_id", saleId);
+        const totalReturned = (existingReturns ?? []).reduce(
+          (sum: number, r: Record<string, unknown>) => sum + (r["qty"] as number),
+          0,
+        );
         const originalSale = state.sales.find((s) => s.id === saleId);
         const saleQty = originalSale?.qty ?? 0;
-        const newStatus = saleQty > 0 && totalReturned >= saleQty ? "RETURNED" : "PARTIALLY_RETURNED";
+        const newStatus =
+          saleQty > 0 && totalReturned >= saleQty ? "RETURNED" : "PARTIALLY_RETURNED";
         await supabase.from("sales").update({ status: newStatus }).eq("id", saleId);
       } catch (err) {
         console.error("[store] addSalesReturn status update failed:", err);
       }
     }
 
-    await logAudit("INSERT", "sales_returns", undefined, null, { return_no: returnNo, sale_id: saleId, qty });
+    await logAudit("INSERT", "sales_returns", undefined, null, {
+      return_no: returnNo,
+      sale_id: saleId,
+      qty,
+    });
     await reload();
     return {};
   } finally {
@@ -1794,15 +1972,14 @@ async function getNextStockCode(): Promise<string> {
   }
 
   let candidate = nextStockCode;
-  // Check against ALL stores in DB (not just local state) to avoid unique constraint violations
-  // The stock.code column has a global UNIQUE constraint, but state.stock only has current store's items
+  // Check within current store only (codes are unique per store, not global)
   let exists = true;
   while (exists) {
-    const { data: found } = await supabase
-      .from("stock")
-      .select("code")
-      .eq("code", String(candidate))
-      .maybeSingle();
+    let query = supabase.from("stock").select("code").eq("code", String(candidate));
+    if (_currentStoreId) {
+      query = query.eq("store_id", _currentStoreId);
+    }
+    const { data: found } = await query.maybeSingle();
     if (found) {
       candidate++;
     } else {
@@ -1831,11 +2008,7 @@ async function applyStockDelta(
   }
 
   const { data } = itemCode
-    ? await supabase
-        .from("stock")
-        .select("code, qty")
-        .eq("code", itemCode)
-        .maybeSingle()
+    ? await supabase.from("stock").select("code, qty").eq("code", itemCode).maybeSingle()
     : { data: null };
 
   if (data) {
@@ -1915,33 +2088,39 @@ export async function nextVendorCode(): Promise<string> {
 export async function addVendor(
   vendor: Omit<Vendor, "id" | "createdAt">,
 ): Promise<{ error?: string; vendorId?: string }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   let vendorCode = vendor.vendorCode;
   if (!vendorCode) {
     vendorCode = await nextVendorCode();
   }
-  const { data: inserted, error } = await supabase.from("vendors").insert({
-    vendor_code: vendorCode,
-    vendor_name: vendor.vendorName,
-    vendor_type: vendor.vendorType,
-    pan: vendor.pan,
-    vat_number: vendor.vatNumber,
-    vat_status: vendor.vatStatus,
-    address: vendor.address,
-    contact_person: vendor.contactPerson,
-    phone: vendor.phone,
-    email: vendor.email,
-    payment_terms: vendor.paymentTerms,
-    credit_limit: vendor.creditLimit,
-    bank_name: vendor.bankName,
-    bank_account_no: vendor.bankAccountNo,
-    opening_balance: vendor.openingBalance,
-    opening_balance_date: vendor.openingBalanceDate,
-    status: vendor.status,
-    remarks: vendor.remarks,
-    created_by: user?.id ?? null,
-    store_id: _currentStoreId,
-  }).select("id").single();
+  const { data: inserted, error } = await supabase
+    .from("vendors")
+    .insert({
+      vendor_code: vendorCode,
+      vendor_name: vendor.vendorName,
+      vendor_type: vendor.vendorType,
+      pan: vendor.pan,
+      vat_number: vendor.vatNumber,
+      vat_status: vendor.vatStatus,
+      address: vendor.address,
+      contact_person: vendor.contactPerson,
+      phone: vendor.phone,
+      email: vendor.email,
+      payment_terms: vendor.paymentTerms,
+      credit_limit: vendor.creditLimit,
+      bank_name: vendor.bankName,
+      bank_account_no: vendor.bankAccountNo,
+      opening_balance: vendor.openingBalance,
+      opening_balance_date: vendor.openingBalanceDate,
+      status: vendor.status,
+      remarks: vendor.remarks,
+      created_by: user?.id ?? null,
+      // store_id intentionally omitted — vendors are global, shared across all stores
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: error.message };
   const vendorId = inserted!.id as string;
@@ -1958,7 +2137,7 @@ export async function addVendor(
       credit: vendor.openingBalance < 0 ? Math.abs(vendor.openingBalance) : 0,
       balance: vendor.openingBalance,
       remarks: "Opening balance",
-      store_id: _currentStoreId,
+      // store_id intentionally omitted — vendor transactions are global
     });
   }
 
@@ -1970,42 +2149,53 @@ export async function updateVendor(
   id: string,
   vendor: Omit<Vendor, "id" | "createdAt">,
 ): Promise<{ error?: string }> {
-  const { error } = await supabase.from("vendors").update({
-    vendor_code: vendor.vendorCode,
-    vendor_name: vendor.vendorName,
-    vendor_type: vendor.vendorType,
-    pan: vendor.pan,
-    vat_number: vendor.vatNumber,
-    vat_status: vendor.vatStatus,
-    address: vendor.address,
-    contact_person: vendor.contactPerson,
-    phone: vendor.phone,
-    email: vendor.email,
-    payment_terms: vendor.paymentTerms,
-    credit_limit: vendor.creditLimit,
-    bank_name: vendor.bankName,
-    bank_account_no: vendor.bankAccountNo,
-    opening_balance: vendor.openingBalance,
-    opening_balance_date: vendor.openingBalanceDate,
-    status: vendor.status,
-    remarks: vendor.remarks,
-    updated_at: new Date().toISOString(),
-  }).eq("id", id);
+  const { error } = await supabase
+    .from("vendors")
+    .update({
+      vendor_code: vendor.vendorCode,
+      vendor_name: vendor.vendorName,
+      vendor_type: vendor.vendorType,
+      pan: vendor.pan,
+      vat_number: vendor.vatNumber,
+      vat_status: vendor.vatStatus,
+      address: vendor.address,
+      contact_person: vendor.contactPerson,
+      phone: vendor.phone,
+      email: vendor.email,
+      payment_terms: vendor.paymentTerms,
+      credit_limit: vendor.creditLimit,
+      bank_name: vendor.bankName,
+      bank_account_no: vendor.bankAccountNo,
+      opening_balance: vendor.openingBalance,
+      opening_balance_date: vendor.openingBalanceDate,
+      status: vendor.status,
+      remarks: vendor.remarks,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
   if (error) return { error: error.message };
 
   // Sync opening balance to vendor_transactions OPENING_BALANCE entry
-  const { data: existingOb } = await supabase.from("vendor_transactions").select("id, debit, credit").eq("vendor_id", id).eq("transaction_type", "OPENING_BALANCE").maybeSingle();
+  const { data: existingOb } = await supabase
+    .from("vendor_transactions")
+    .select("id, debit, credit")
+    .eq("vendor_id", id)
+    .eq("transaction_type", "OPENING_BALANCE")
+    .maybeSingle();
   if (existingOb) {
-    const oldDebit = (existingOb as Record<string, unknown>)['debit'] as number;
-    const oldCredit = (existingOb as Record<string, unknown>)['credit'] as number;
+    const oldDebit = (existingOb as Record<string, unknown>)["debit"] as number;
+    const oldCredit = (existingOb as Record<string, unknown>)["credit"] as number;
     const oldBalance = oldDebit - oldCredit;
     if (vendor.openingBalance !== oldBalance) {
-      await supabase.from("vendor_transactions").update({
-        debit: vendor.openingBalance > 0 ? vendor.openingBalance : 0,
-        credit: vendor.openingBalance < 0 ? Math.abs(vendor.openingBalance) : 0,
-        balance: vendor.openingBalance,
-        transaction_date: vendor.openingBalanceDate || new Date().toISOString().slice(0, 10),
-      }).eq("id", (existingOb as Record<string, unknown>)['id'] as string);
+      await supabase
+        .from("vendor_transactions")
+        .update({
+          debit: vendor.openingBalance > 0 ? vendor.openingBalance : 0,
+          credit: vendor.openingBalance < 0 ? Math.abs(vendor.openingBalance) : 0,
+          balance: vendor.openingBalance,
+          transaction_date: vendor.openingBalanceDate || new Date().toISOString().slice(0, 10),
+        })
+        .eq("id", (existingOb as Record<string, unknown>)["id"] as string);
     }
   } else if (vendor.openingBalance !== 0 && vendor.openingBalanceDate) {
     // Create opening balance entry if it doesn't exist
@@ -2019,7 +2209,7 @@ export async function updateVendor(
       credit: vendor.openingBalance < 0 ? Math.abs(vendor.openingBalance) : 0,
       balance: vendor.openingBalance,
       remarks: "Opening balance",
-      store_id: _currentStoreId,
+      // store_id intentionally omitted — vendor transactions are global
     });
   }
 
@@ -2042,7 +2232,7 @@ export async function addVendorDocument(
     file_type: fileType,
     file_size: fileSize,
     file_data: fileData,
-    store_id: _currentStoreId,
+    // store_id intentionally omitted — vendor documents are global
   });
   if (error) return { error: error.message };
   await reload();
@@ -2075,21 +2265,27 @@ export async function addVendorPayment(
   const opKey = `addVendorPayment:${vendorId}:${paymentDate}`;
   if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const paymentNo = await nextVendorPaymentNo();
 
-    const { data: inserted, error } = await supabase.from("vendor_payments").insert({
-      payment_no: paymentNo,
-      vendor_id: vendorId,
-      payment_date: paymentDate,
-      payment_method: paymentMethod,
-      amount,
-      bank_name: bankName,
-      reference_no: referenceNo,
-      remarks,
-      created_by: user?.id ?? null,
-      store_id: _currentStoreId,
-    }).select("id").single();
+    const { data: inserted, error } = await supabase
+      .from("vendor_payments")
+      .insert({
+        payment_no: paymentNo,
+        vendor_id: vendorId,
+        payment_date: paymentDate,
+        payment_method: paymentMethod,
+        amount,
+        bank_name: bankName,
+        reference_no: referenceNo,
+        remarks,
+        created_by: user?.id ?? null,
+        // store_id intentionally omitted — vendor payments are global
+      })
+      .select("id")
+      .single();
 
     if (error) return { error: error.message };
     const paymentId = inserted!.id as string;
@@ -2102,7 +2298,7 @@ export async function addVendorPayment(
           purchase_header_id: allocType === "bill" ? alloc.purchaseHeaderId : null,
           amount: alloc.amount,
           allocation_type: allocType,
-          store_id: _currentStoreId,
+          // store_id intentionally omitted — vendor payment allocations are global
         });
         if (allocType === "bill" && alloc.purchaseHeaderId) {
           await supabase.rpc("adjust_purchase_balance", {
@@ -2123,10 +2319,13 @@ export async function addVendorPayment(
       p_debit: 0,
       p_credit: amount,
       p_remarks: remarks || `Payment ${paymentNo}`,
-      p_store_id: _currentStoreId,
     });
 
-    await logAudit("INSERT", "vendor_payments", paymentId, null, { payment_no: paymentNo, vendor_id: vendorId, amount });
+    await logAudit("INSERT", "vendor_payments", paymentId, null, {
+      payment_no: paymentNo,
+      vendor_id: vendorId,
+      amount,
+    });
     await reload();
     return {};
   } finally {
@@ -2156,7 +2355,9 @@ export async function addPurchaseReturn(
   const opKey = `addPurchaseReturn:${lotId}:${imei}`;
   if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const returnNo = await nextPurchaseReturnNo();
 
     const { error } = await supabase.from("purchase_returns").insert({
@@ -2183,7 +2384,10 @@ export async function addPurchaseReturn(
     }
 
     try {
-      await supabase.rpc("reconcile_stock_from_lots", { p_item_name: itemName, p_store_id: _currentStoreId });
+      await supabase.rpc("reconcile_stock_from_lots", {
+        p_item_name: itemName,
+        p_store_id: _currentStoreId,
+      });
     } catch (err) {
       console.error("[store] addPurchaseReturn reconcile failed:", err);
     }
@@ -2198,7 +2402,6 @@ export async function addPurchaseReturn(
         p_debit: 0,
         p_credit: refundAmount,
         p_remarks: reason || `Return ${returnNo}`,
-        p_store_id: _currentStoreId,
       });
     }
 
@@ -2212,16 +2415,29 @@ export async function addPurchaseReturn(
 
     if (imei) {
       try {
-        const { data: piRow } = await supabase.from("purchase_items").select("id").eq("item_code", itemCode).eq("purchase_header_id", purchaseHeaderId).maybeSingle();
+        const { data: piRow } = await supabase
+          .from("purchase_items")
+          .select("id")
+          .eq("item_code", itemCode)
+          .eq("purchase_header_id", purchaseHeaderId)
+          .maybeSingle();
         if (piRow) {
-          await supabase.from("purchase_item_imeis").delete().eq("purchase_item_id", piRow.id).eq("imei", imei);
+          await supabase
+            .from("purchase_item_imeis")
+            .delete()
+            .eq("purchase_item_id", piRow.id)
+            .eq("imei", imei);
         }
       } catch (err) {
         console.error("[store] addPurchaseReturn IMEI cleanup failed:", err);
       }
     }
 
-    await logAudit("INSERT", "purchase_returns", undefined, null, { return_no: returnNo, vendor_id: vendorId, qty });
+    await logAudit("INSERT", "purchase_returns", undefined, null, {
+      return_no: returnNo,
+      vendor_id: vendorId,
+      qty,
+    });
     await reload();
     return {};
   } finally {
@@ -2232,7 +2448,11 @@ export async function addPurchaseReturn(
 export function getVendorBalance(vendorId: string): number {
   const txns = state.vendorTransactions
     .filter((t) => t.vendorId === vendorId)
-    .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
+    .sort(
+      (a, b) =>
+        a.transactionDate.localeCompare(b.transactionDate) ||
+        a.createdAt.localeCompare(b.createdAt),
+    );
 
   // Balance = sum of all debits - sum of all credits
   // Each transaction type correctly places amount in either debit or credit column
@@ -2258,7 +2478,11 @@ export function getVendorPayments(vendorId: string) {
 export function getVendorLedger(vendorId: string) {
   return state.vendorTransactions
     .filter((t) => t.vendorId === vendorId)
-    .sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.createdAt.localeCompare(b.createdAt));
+    .sort(
+      (a, b) =>
+        a.transactionDate.localeCompare(b.transactionDate) ||
+        a.createdAt.localeCompare(b.createdAt),
+    );
 }
 
 export function getVendorAdvance(vendorId: string): number {
@@ -2277,21 +2501,27 @@ export async function applyVendorAdvance(
   const advance = getVendorAdvance(vendorId);
   if (amount > advance) return { error: `Advance available is Rs. ${advance.toFixed(2)}` };
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const paymentNo = await nextVendorPaymentNo();
 
-  const { data: inserted, error } = await supabase.from("vendor_payments").insert({
-    payment_no: paymentNo,
-    vendor_id: vendorId,
-    payment_date: paymentDate,
-    payment_method: "Cash",
-    amount,
-    bank_name: "",
-    reference_no: "",
-    remarks: `Advance applied to purchase`,
-    created_by: user?.id ?? null,
-    store_id: _currentStoreId,
-  }).select("id").single();
+  const { data: inserted, error } = await supabase
+    .from("vendor_payments")
+    .insert({
+      payment_no: paymentNo,
+      vendor_id: vendorId,
+      payment_date: paymentDate,
+      payment_method: "Cash",
+      amount,
+      bank_name: "",
+      reference_no: "",
+      remarks: `Advance applied to purchase`,
+      created_by: user?.id ?? null,
+      // store_id intentionally omitted — vendor payments are global
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: error.message };
   const paymentId = inserted!.id as string;
@@ -2301,7 +2531,7 @@ export async function applyVendorAdvance(
     purchase_header_id: purchaseHeaderId,
     amount,
     allocation_type: "bill",
-    store_id: _currentStoreId,
+    // store_id intentionally omitted — vendor payment allocations are global
   });
 
   await supabase.rpc("adjust_purchase_balance", {
@@ -2319,10 +2549,12 @@ export async function applyVendorAdvance(
     p_debit: 0,
     p_credit: amount,
     p_remarks: `Advance applied to purchase`,
-    p_store_id: _currentStoreId,
   });
 
-  await logAudit("INSERT", "vendor_payments", paymentId, null, { advance_applied: amount, purchase_header_id: purchaseHeaderId });
+  await logAudit("INSERT", "vendor_payments", paymentId, null, {
+    advance_applied: amount,
+    purchase_header_id: purchaseHeaderId,
+  });
   await reload();
   return {};
 }
@@ -2336,7 +2568,16 @@ export async function getNextTransferNo(): Promise<string> {
 export async function createTransfer(
   fromStoreId: string,
   toStoreId: string,
-  items: Array<{ itemCode: string; itemName: string; lotId: string; qty: number; imei?: string; purchasePrice: number; destItemCode?: string; destItemName?: string }>,
+  items: Array<{
+    itemCode: string;
+    itemName: string;
+    lotId: string;
+    qty: number;
+    imei?: string;
+    purchasePrice: number;
+    destItemCode?: string;
+    destItemName?: string;
+  }>,
   remarks: string = "",
 ): Promise<{ error?: string; transferNo?: string }> {
   if (fromStoreId === toStoreId) return { error: "Source and destination cannot be the same" };
@@ -2345,32 +2586,49 @@ export async function createTransfer(
   const opKey = `createTransfer:${fromStoreId}:${toStoreId}:${Date.now()}`;
   if (!acquireOp(opKey)) return { error: "Operation already in progress" };
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const transferNo = await getNextTransferNo();
 
     for (const item of items) {
-      const { data: lot, error: lotErr } = await supabase.from("stock_lots").select("qty").eq("id", item.lotId).maybeSingle();
-      if (lotErr) return { error: `Failed to verify lot for "${item.itemName}": ${lotErr.message}` };
+      const { data: lot, error: lotErr } = await supabase
+        .from("stock_lots")
+        .select("qty")
+        .eq("id", item.lotId)
+        .maybeSingle();
+      if (lotErr)
+        return { error: `Failed to verify lot for "${item.itemName}": ${lotErr.message}` };
       if (!lot) return { error: `Lot not found for "${item.itemName}"` };
-      const lotQty = (lot as Record<string, unknown>)['qty'] as number;
-      if (lotQty < item.qty) return { error: `Insufficient qty in lot for "${item.itemName}". Available: ${lotQty}, requested: ${item.qty}` };
+      const lotQty = (lot as Record<string, unknown>)["qty"] as number;
+      if (lotQty < item.qty)
+        return {
+          error: `Insufficient qty in lot for "${item.itemName}". Available: ${lotQty}, requested: ${item.qty}`,
+        };
     }
 
-    const { data: transferRow, error: tErr } = await supabase.from("stock_transfers").insert({
-      transfer_no: transferNo,
-      date: new Date().toISOString().slice(0, 10),
-      from_store_id: fromStoreId,
-      to_store_id: toStoreId,
-      status: "COMPLETED",
-      remarks,
-      created_by: user?.id ?? null,
-    }).select("id").single();
+    const { data: transferRow, error: tErr } = await supabase
+      .from("stock_transfers")
+      .insert({
+        transfer_no: transferNo,
+        date: new Date().toISOString().slice(0, 10),
+        from_store_id: fromStoreId,
+        to_store_id: toStoreId,
+        status: "COMPLETED",
+        remarks,
+        created_by: user?.id ?? null,
+      })
+      .select("id")
+      .single();
 
     if (tErr) return { error: `Failed to create transfer record: ${tErr.message}` };
-    const transferId = (transferRow as Record<string, unknown>)['id'] as string;
+    const transferId = (transferRow as Record<string, unknown>)["id"] as string;
 
     for (const item of items) {
-      const { error: srcErr } = await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: -item.qty });
+      const { error: srcErr } = await supabase.rpc("adjust_lot_qty", {
+        p_lot_id: item.lotId,
+        p_delta: -item.qty,
+      });
       if (srcErr) {
         console.error("[store] createTransfer: source lot decrement failed:", srcErr);
         await supabase.from("stock_transfers").delete().eq("id", transferId);
@@ -2380,7 +2638,8 @@ export async function createTransfer(
       let destLotId: string | null = null;
       const destName = item.destItemName || item.itemName;
       const destCode = item.destItemCode || item.itemCode;
-      let destLotQuery = supabase.from("stock_lots")
+      let destLotQuery = supabase
+        .from("stock_lots")
         .select("id, qty")
         .eq("store_id", toStoreId)
         .eq("purchase_price", item.purchasePrice);
@@ -2393,29 +2652,39 @@ export async function createTransfer(
       const { data: existingDestLot } = await destLotQuery.maybeSingle();
 
       if (existingDestLot) {
-        destLotId = (existingDestLot as Record<string, unknown>)['id'] as string;
-        const { error: destErr } = await supabase.rpc("adjust_lot_qty", { p_lot_id: destLotId, p_delta: item.qty });
+        destLotId = (existingDestLot as Record<string, unknown>)["id"] as string;
+        const { error: destErr } = await supabase.rpc("adjust_lot_qty", {
+          p_lot_id: destLotId,
+          p_delta: item.qty,
+        });
         if (destErr) {
           console.error("[store] createTransfer: dest lot increment failed:", destErr);
           await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: item.qty });
           await supabase.from("stock_transfers").delete().eq("id", transferId);
-          return { error: `Failed to add stock to destination for "${item.itemName}": ${destErr.message}` };
+          return {
+            error: `Failed to add stock to destination for "${item.itemName}": ${destErr.message}`,
+          };
         }
       } else {
         const destLotNo = await getNextLotNo();
-        const { data: newDestLotId, error: destInsertErr } = await supabase.rpc("create_transfer_dest_lot", {
-          p_lot_no: destLotNo,
-          p_item_code: destCode,
-          p_item_name: destName,
-          p_qty: item.qty,
-          p_purchase_price: item.purchasePrice,
-          p_store_id: toStoreId,
-        });
+        const { data: newDestLotId, error: destInsertErr } = await supabase.rpc(
+          "create_transfer_dest_lot",
+          {
+            p_lot_no: destLotNo,
+            p_item_code: destCode,
+            p_item_name: destName,
+            p_qty: item.qty,
+            p_purchase_price: item.purchasePrice,
+            p_store_id: toStoreId,
+          },
+        );
         if (destInsertErr || !newDestLotId) {
           console.error("[store] createTransfer: dest lot insert failed:", destInsertErr);
           await supabase.rpc("adjust_lot_qty", { p_lot_id: item.lotId, p_delta: item.qty });
           await supabase.from("stock_transfers").delete().eq("id", transferId);
-          return { error: `Failed to create destination lot for "${item.itemName}": ${destInsertErr?.message ?? "unknown error"}` };
+          return {
+            error: `Failed to create destination lot for "${item.itemName}": ${destInsertErr?.message ?? "unknown error"}`,
+          };
         }
         destLotId = newDestLotId as string;
       }
@@ -2437,13 +2706,20 @@ export async function createTransfer(
 
       if (item.imei) {
         await supabase.from("purchase_item_imeis").delete().eq("imei", item.imei);
-        const { data: newLot } = await supabase.from("stock_lots").select("id").eq("item_name", destName).eq("store_id", toStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const { data: newLot } = await supabase
+          .from("stock_lots")
+          .select("id")
+          .eq("item_name", destName)
+          .eq("store_id", toStoreId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
         if (newLot) {
           await supabase.from("purchase_item_imeis").insert({
             imei: item.imei,
             item_code: destCode,
             item_name: destName,
-            lot_id: (newLot as Record<string, unknown>)['id'],
+            lot_id: (newLot as Record<string, unknown>)["id"],
             is_sold: false,
             store_id: toStoreId,
           });
@@ -2451,9 +2727,22 @@ export async function createTransfer(
       }
     }
 
-    try { await supabase.rpc("reconcile_store_stock", { p_store_id: fromStoreId }); } catch (e) { console.error("[store] createTransfer: reconcile fromStore failed:", e); }
-    try { await supabase.rpc("reconcile_store_stock", { p_store_id: toStoreId }); } catch (e) { console.error("[store] createTransfer: reconcile toStore failed:", e); }
-    await logAudit("INSERT", "stock_transfers", transferId, null, { transfer_no: transferNo, from: fromStoreId, to: toStoreId, items: items.length });
+    try {
+      await supabase.rpc("reconcile_store_stock", { p_store_id: fromStoreId });
+    } catch (e) {
+      console.error("[store] createTransfer: reconcile fromStore failed:", e);
+    }
+    try {
+      await supabase.rpc("reconcile_store_stock", { p_store_id: toStoreId });
+    } catch (e) {
+      console.error("[store] createTransfer: reconcile toStore failed:", e);
+    }
+    await logAudit("INSERT", "stock_transfers", transferId, null, {
+      transfer_no: transferNo,
+      from: fromStoreId,
+      to: toStoreId,
+      items: items.length,
+    });
     await reload();
     return { transferNo };
   } finally {
@@ -2462,7 +2751,10 @@ export async function createTransfer(
 }
 
 async function reconcileStockQty(storeId: string) {
-  const { data: lots, error: lotsErr } = await supabase.from("stock_lots").select("item_name, qty").eq("store_id", storeId);
+  const { data: lots, error: lotsErr } = await supabase
+    .from("stock_lots")
+    .select("item_name, qty")
+    .eq("store_id", storeId);
   if (lotsErr) {
     console.error("[store] reconcileStockQty: failed to fetch lots for store:", storeId, lotsErr);
     return;
@@ -2470,11 +2762,14 @@ async function reconcileStockQty(storeId: string) {
   if (!lots) return;
   const qtyMap = new Map<string, number>();
   for (const l of lots) {
-    const name = (l as Record<string, unknown>)['item_name'] as string;
-    const qty = (l as Record<string, unknown>)['qty'] as number;
+    const name = (l as Record<string, unknown>)["item_name"] as string;
+    const qty = (l as Record<string, unknown>)["qty"] as number;
     qtyMap.set(name, (qtyMap.get(name) || 0) + qty);
   }
-  const { data: stockItems, error: stockErr } = await supabase.from("stock").select("name, code").eq("store_id", storeId);
+  const { data: stockItems, error: stockErr } = await supabase
+    .from("stock")
+    .select("name, code")
+    .eq("store_id", storeId);
   if (stockErr) {
     console.error("[store] reconcileStockQty: failed to fetch stock for store:", storeId, stockErr);
     return;
@@ -2482,10 +2777,14 @@ async function reconcileStockQty(storeId: string) {
   const existingNames = new Set<string>();
   if (stockItems) {
     for (const s of stockItems) {
-      const name = (s as Record<string, unknown>)['name'] as string;
+      const name = (s as Record<string, unknown>)["name"] as string;
       existingNames.add(name);
       const totalQty = qtyMap.get(name) || 0;
-      const { error: updErr } = await supabase.from("stock").update({ qty: totalQty }).eq("name", name).eq("store_id", storeId);
+      const { error: updErr } = await supabase
+        .from("stock")
+        .update({ qty: totalQty })
+        .eq("name", name)
+        .eq("store_id", storeId);
       if (updErr) console.error("[store] reconcileStockQty: stock update failed for", name, updErr);
     }
   }
@@ -2506,33 +2805,46 @@ async function reconcileStockQty(storeId: string) {
         selling_price: 0,
         store_id: storeId,
       });
-      if (insertErr) console.error("[store] reconcileStockQty: new stock insert failed for", itemName, insertErr);
+      if (insertErr)
+        console.error(
+          "[store] reconcileStockQty: new stock insert failed for",
+          itemName,
+          insertErr,
+        );
     }
   }
 }
 
 export async function deleteTransfer(transferId: string): Promise<{ error?: string }> {
-  const { data: items } = await supabase.from("stock_transfer_items").select("*").eq("transfer_id", transferId);
+  const { data: items } = await supabase
+    .from("stock_transfer_items")
+    .select("*")
+    .eq("transfer_id", transferId);
   if (!items || items.length === 0) return { error: "Transfer not found" };
 
-  const { data: transfer } = await supabase.from("stock_transfers").select("from_store_id, to_store_id").eq("id", transferId).maybeSingle();
+  const { data: transfer } = await supabase
+    .from("stock_transfers")
+    .select("from_store_id, to_store_id")
+    .eq("id", transferId)
+    .maybeSingle();
   if (!transfer) return { error: "Transfer not found" };
 
-  const fromStoreId = (transfer as Record<string, unknown>)['from_store_id'] as string;
-  const toStoreId = (transfer as Record<string, unknown>)['to_store_id'] as string;
+  const fromStoreId = (transfer as Record<string, unknown>)["from_store_id"] as string;
+  const toStoreId = (transfer as Record<string, unknown>)["to_store_id"] as string;
 
   for (const item of items) {
     const ti = item as Record<string, unknown>;
-    const lotId = ti['lot_id'] as string;
-    const qty = ti['qty'] as number;
-    const itemName = ti['item_name'] as string;
-    const itemCode = ti['item_code'] as string;
-    const purchasePrice = ti['purchase_price'] as number;
-    const imei = ti['imei'] as string | null;
+    const lotId = ti["lot_id"] as string;
+    const qty = ti["qty"] as number;
+    const itemName = ti["item_name"] as string;
+    const itemCode = ti["item_code"] as string;
+    const purchasePrice = ti["purchase_price"] as number;
+    const imei = ti["imei"] as string | null;
 
     await supabase.rpc("adjust_lot_qty", { p_lot_id: lotId, p_delta: -qty });
 
-    const { data: srcLots } = await supabase.from("stock_lots")
+    const { data: srcLots } = await supabase
+      .from("stock_lots")
       .select("id, qty")
       .eq("item_name", itemName)
       .eq("store_id", fromStoreId)
@@ -2542,7 +2854,10 @@ export async function deleteTransfer(transferId: string): Promise<{ error?: stri
       .maybeSingle();
 
     if (srcLots) {
-      await supabase.rpc("adjust_lot_qty", { p_lot_id: (srcLots as Record<string, unknown>)['id'] as string, p_delta: qty });
+      await supabase.rpc("adjust_lot_qty", {
+        p_lot_id: (srcLots as Record<string, unknown>)["id"] as string,
+        p_delta: qty,
+      });
     } else {
       const srcLotNo = await getNextLotNo();
       await supabase.from("stock_lots").insert({
@@ -2559,13 +2874,20 @@ export async function deleteTransfer(transferId: string): Promise<{ error?: stri
     }
 
     if (imei) {
-      const { data: restoredLot } = await supabase.from("stock_lots").select("id").eq("item_name", itemName).eq("store_id", fromStoreId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const { data: restoredLot } = await supabase
+        .from("stock_lots")
+        .select("id")
+        .eq("item_name", itemName)
+        .eq("store_id", fromStoreId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (restoredLot) {
         await supabase.from("purchase_item_imeis").insert({
           imei,
           item_code: itemCode,
           item_name: itemName,
-          lot_id: (restoredLot as Record<string, unknown>)['id'],
+          lot_id: (restoredLot as Record<string, unknown>)["id"],
           is_sold: false,
           store_id: fromStoreId,
         });
@@ -2575,8 +2897,16 @@ export async function deleteTransfer(transferId: string): Promise<{ error?: stri
 
   await supabase.from("stock_transfer_items").delete().eq("transfer_id", transferId);
   await supabase.from("stock_transfers").delete().eq("id", transferId);
-  try { await supabase.rpc("reconcile_store_stock", { p_store_id: fromStoreId }); } catch (e) { console.error("[store] deleteTransfer: reconcile fromStore failed:", e); }
-  try { await supabase.rpc("reconcile_store_stock", { p_store_id: toStoreId }); } catch (e) { console.error("[store] deleteTransfer: reconcile toStore failed:", e); }
+  try {
+    await supabase.rpc("reconcile_store_stock", { p_store_id: fromStoreId });
+  } catch (e) {
+    console.error("[store] deleteTransfer: reconcile fromStore failed:", e);
+  }
+  try {
+    await supabase.rpc("reconcile_store_stock", { p_store_id: toStoreId });
+  } catch (e) {
+    console.error("[store] deleteTransfer: reconcile toStore failed:", e);
+  }
   await logAudit("DELETE", "stock_transfers", transferId);
   await reload();
   return {};
@@ -2589,40 +2919,47 @@ export async function getStoreStock(storeId: string): Promise<{ code: string; na
     return [];
   }
   return (data ?? []).map((r: Record<string, unknown>) => ({
-    code: r['code'] as string,
-    name: r['name'] as string,
+    code: r["code"] as string,
+    name: r["name"] as string,
   }));
 }
 
 export async function getTransfers(): Promise<StockTransfer[]> {
-  const { data } = await supabase.from("stock_transfers").select("*").order("created_at", { ascending: false }).limit(500);
+  const { data } = await supabase
+    .from("stock_transfers")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(500);
   return (data ?? []).map((r: Record<string, unknown>) => ({
-    id: r['id'] as string,
-    transferNo: r['transfer_no'] as string,
-    date: r['date'] as string,
-    fromStoreId: r['from_store_id'] as string | null,
-    toStoreId: r['to_store_id'] as string | null,
-    status: r['status'] as string,
-    remarks: r['remarks'] as string,
-    createdBy: r['created_by'] as string | null,
-    createdAt: r['created_at'] as string,
+    id: r["id"] as string,
+    transferNo: r["transfer_no"] as string,
+    date: r["date"] as string,
+    fromStoreId: r["from_store_id"] as string | null,
+    toStoreId: r["to_store_id"] as string | null,
+    status: r["status"] as string,
+    remarks: r["remarks"] as string,
+    createdBy: r["created_by"] as string | null,
+    createdAt: r["created_at"] as string,
   }));
 }
 
 export async function getTransferItems(transferId: string): Promise<StockTransferItem[]> {
-  const { data } = await supabase.from("stock_transfer_items").select("*").eq("transfer_id", transferId);
+  const { data } = await supabase
+    .from("stock_transfer_items")
+    .select("*")
+    .eq("transfer_id", transferId);
   return (data ?? []).map((r: Record<string, unknown>) => ({
-    id: r['id'] as string,
-    transferId: r['transfer_id'] as string,
-    itemCode: r['item_code'] as string,
-    itemName: r['item_name'] as string,
-    destItemCode: (r['dest_item_code'] as string) ?? null,
-    destItemName: (r['dest_item_name'] as string) ?? null,
-    lotId: r['lot_id'] as string | null,
-    qty: r['qty'] as number,
-    imei: r['imei'] as string | null,
-    purchasePrice: r['purchase_price'] as number,
-    createdAt: r['created_at'] as string,
+    id: r["id"] as string,
+    transferId: r["transfer_id"] as string,
+    itemCode: r["item_code"] as string,
+    itemName: r["item_name"] as string,
+    destItemCode: (r["dest_item_code"] as string) ?? null,
+    destItemName: (r["dest_item_name"] as string) ?? null,
+    lotId: r["lot_id"] as string | null,
+    qty: r["qty"] as number,
+    imei: r["imei"] as string | null,
+    purchasePrice: r["purchase_price"] as number,
+    createdAt: r["created_at"] as string,
   }));
 }
 
@@ -2630,8 +2967,16 @@ async function reload() {
   nextStockCode = null; // Reset so next insert reads fresh MAX(code) from DB
 
   let stockQuery = supabase.from("stock").select("*").order("name");
-  let salesQuery = supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(5000);
-  let purchasesQuery = supabase.from("purchases").select("*").order("created_at", { ascending: false }).limit(5000);
+  let salesQuery = supabase
+    .from("sales")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(5000);
+  let purchasesQuery = supabase
+    .from("purchases")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(5000);
 
   if (_currentStoreId) {
     stockQuery = stockQuery.eq("store_id", _currentStoreId);
@@ -2649,9 +2994,17 @@ async function reload() {
   let allocs: SaleAllocation[] = [];
   let adjustments: StockAdjustment[] = [];
   try {
-    let lotsQuery = supabase.from("stock_lots").select("*").order("created_at", { ascending: false }).limit(10000);
+    let lotsQuery = supabase
+      .from("stock_lots")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10000);
     let allocQuery = supabase.from("sale_lot_allocations").select("*").limit(10000);
-    let adjQuery = supabase.from("stock_adjustments").select("*").order("created_at", { ascending: false }).limit(10000);
+    let adjQuery = supabase
+      .from("stock_adjustments")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10000);
 
     if (_currentStoreId) {
       lotsQuery = lotsQuery.eq("store_id", _currentStoreId);
@@ -2659,11 +3012,7 @@ async function reload() {
       adjQuery = adjQuery.eq("store_id", _currentStoreId);
     }
 
-    const [lotsRes, allocRes, adjRes] = await Promise.all([
-      lotsQuery,
-      allocQuery,
-      adjQuery,
-    ]);
+    const [lotsRes, allocRes, adjRes] = await Promise.all([lotsQuery, allocQuery, adjQuery]);
     lots = (lotsRes.data ?? []).map(mapStockLotRow);
     allocs = (allocRes.data ?? []).map(mapSaleAllocationRow);
     adjustments = (adjRes.data ?? []).map(mapStockAdjustmentRow);
@@ -2676,8 +3025,16 @@ async function reload() {
   let pImeis: PurchaseItemImei[] = [];
   let pAttach: PurchaseAttachment[] = [];
   try {
-    let headersQuery = supabase.from("purchase_headers").select("*").order("created_at", { ascending: false }).limit(5000);
-    let itemsQuery = supabase.from("purchase_items").select("*").order("sn", { ascending: true }).limit(10000);
+    let headersQuery = supabase
+      .from("purchase_headers")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    let itemsQuery = supabase
+      .from("purchase_items")
+      .select("*")
+      .order("sn", { ascending: true })
+      .limit(10000);
     let imeisQuery = supabase.from("purchase_item_imeis").select("*").limit(20000);
     let attachQuery = supabase.from("purchase_attachments").select("*").limit(10000);
 
@@ -2706,17 +3063,18 @@ async function reload() {
   let salesReturns: SalesReturn[] = [];
   try {
     let saleImeiQuery = supabase.from("sale_item_imeis").select("*").limit(20000);
-    let returnsQuery = supabase.from("sales_returns").select("*").order("created_at", { ascending: false }).limit(5000);
+    let returnsQuery = supabase
+      .from("sales_returns")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5000);
 
     if (_currentStoreId) {
       saleImeiQuery = saleImeiQuery.eq("store_id", _currentStoreId);
       returnsQuery = returnsQuery.eq("store_id", _currentStoreId);
     }
 
-    const [saleImeiRes, returnsRes] = await Promise.all([
-      saleImeiQuery,
-      returnsQuery,
-    ]);
+    const [saleImeiRes, returnsRes] = await Promise.all([saleImeiQuery, returnsQuery]);
     saleImeis = (saleImeiRes.data ?? []).map(mapSaleImeiRow);
     salesReturns = (returnsRes.data ?? []).map(mapSalesReturnRow);
   } catch (err) {
@@ -2731,19 +3089,29 @@ async function reload() {
   let vendorDocs: VendorDocument[] = [];
   try {
     let vendorsQuery = supabase.from("vendors").select("*").order("vendor_name");
-    let txnsQuery = supabase.from("vendor_transactions").select("*").order("transaction_date", { ascending: true }).limit(20000);
-    let vpQuery = supabase.from("vendor_payments").select("*").order("created_at", { ascending: false }).limit(5000);
+    let txnsQuery = supabase
+      .from("vendor_transactions")
+      .select("*")
+      .order("transaction_date", { ascending: true })
+      .limit(20000);
+    let vpQuery = supabase
+      .from("vendor_payments")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5000);
     let vpaQuery = supabase.from("vendor_payment_allocations").select("*").limit(10000);
-    let prQuery = supabase.from("purchase_returns").select("*").order("created_at", { ascending: false }).limit(5000);
+    let prQuery = supabase
+      .from("purchase_returns")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5000);
     let vdQuery = supabase.from("vendor_documents").select("*").limit(10000);
 
+    // Vendors, vendor_transactions, vendor_payments, vendor_payment_allocations,
+    // vendor_documents are GLOBAL — not filtered by store_id
+    // (purchase_returns stays per-store)
     if (_currentStoreId) {
-      vendorsQuery = vendorsQuery.eq("store_id", _currentStoreId);
-      txnsQuery = txnsQuery.eq("store_id", _currentStoreId);
-      vpQuery = vpQuery.eq("store_id", _currentStoreId);
-      vpaQuery = vpaQuery.eq("store_id", _currentStoreId);
       prQuery = prQuery.eq("store_id", _currentStoreId);
-      vdQuery = vdQuery.eq("store_id", _currentStoreId);
     }
 
     const [vendorsRes, txnsRes, vpRes, vpaRes, prRes, vdRes] = await Promise.all([
