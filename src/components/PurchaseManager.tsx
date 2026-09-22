@@ -344,6 +344,14 @@ export function PurchaseManager() {
       }
     });
 
+    let finalVendorId = selectedVendorId;
+    if (!finalVendorId && supplierName.trim()) {
+      const matched = vendors.find(
+        (v) => v.vendorName.trim().toLowerCase() === supplierName.trim().toLowerCase()
+      );
+      if (matched) finalVendorId = matched.id;
+    }
+
     const header: Omit<PurchaseHeader, "id" | "createdAt"> = {
       purchaseNo: "",
       supplierInvoiceNo: supplierInvoiceNo.trim(),
@@ -365,7 +373,7 @@ export function PurchaseManager() {
       grandTotal: headerTotals.grandTotal,
       paidAmount,
       remainingBalance: headerTotals.remainingBalance,
-      vendorId: selectedVendorId || "",
+      vendorId: finalVendorId || "",
     };
 
     const result = await addPurchaseHeader(header, items, imeisByItem, destinationStoreId);

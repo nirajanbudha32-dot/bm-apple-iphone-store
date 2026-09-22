@@ -1374,6 +1374,62 @@ async function rollbackPurchaseItems(
   }
 }
 
+export async function recordVendorTxnSafe(params: {
+  vendorId: string;
+  txnType: string;
+  refNo: string;
+  refId: string | null;
+  txnDate: string;
+  debit: number;
+  credit: number;
+  remarks: string;
+  storeId?: string | null;
+}): Promise<void> {
+  // 1. Try atomic RPC first
+  try {
+    const { error: rpcErr } = await supabase.rpc("insert_vendor_txn", {
+      p_vendor_id: params.vendorId,
+      p_txn_type: params.txnType,
+      p_ref_no: params.refNo,
+      p_ref_id: params.refId,
+      p_txn_date: params.txnDate,
+      p_debit: params.debit,
+      p_credit: params.credit,
+      p_remarks: params.remarks,
+      p_store_id: params.storeId ?? null,
+    });
+    if (!rpcErr) {
+      return;
+    }
+    console.warn("[store] insert_vendor_txn RPC failed, falling back to direct table insert:", rpcErr.message);
+  } catch (rpcEx) {
+    console.warn("[store] insert_vendor_txn RPC exception, falling back to direct table insert:", rpcEx);
+  }
+
+  // 2. Direct table insert fallback
+  try {
+    const prevBalance = getVendorBalance(params.vendorId);
+    const newBalance = prevBalance + params.debit - params.credit;
+    const { error: insErr } = await supabase.from("vendor_transactions").insert({
+      vendor_id: params.vendorId,
+      transaction_type: params.txnType,
+      reference_no: params.refNo,
+      reference_id: params.refId,
+      transaction_date: params.txnDate,
+      debit: params.debit,
+      credit: params.credit,
+      balance: newBalance,
+      remarks: params.remarks,
+      store_id: params.storeId ?? null,
+    });
+    if (insErr) {
+      console.error("[store] Direct vendor_transactions insert fallback failed:", insErr.message);
+    }
+  } catch (err) {
+    console.error("[store] recordVendorTxnSafe fallback error:", err);
+  }
+}
+
 export async function addPurchaseHeader(
   header: Omit<PurchaseHeader, "id" | "createdAt">,
   items: Omit<PurchaseItem, "id" | "purchaseHeaderId">[],
@@ -1554,18 +1610,26 @@ export async function addPurchaseHeader(
       });
     }
 
-    const vendorIdForTxn = (header as Record<string, unknown>)["vendorId"] as string | undefined;
+    let vendorIdForTxn = (header as Record<string, unknown>)["vendorId"] as string | undefined;
+    if (!vendorIdForTxn && header.supplierName) {
+      const matched = state.vendors.find(
+        (v) => v.vendorName.trim().toLowerCase() === header.supplierName.trim().toLowerCase()
+      );
+      if (matched) vendorIdForTxn = matched.id;
+    }
+
     if (vendorIdForTxn && header.grandTotal > 0) {
       const paidAmt = header.paidAmount ?? 0;
-      await supabase.rpc("insert_vendor_txn", {
-        p_vendor_id: vendorIdForTxn,
-        p_txn_type: "PURCHASE",
-        p_ref_no: purchaseNo,
-        p_ref_id: headerId,
-        p_txn_date: header.date,
-        p_debit: header.grandTotal,
-        p_credit: 0,
-        p_remarks: `Purchase ${purchaseNo}`,
+      await recordVendorTxnSafe({
+        vendorId: vendorIdForTxn,
+        txnType: "PURCHASE",
+        refNo: purchaseNo,
+        refId: headerId,
+        txnDate: header.date,
+        debit: header.grandTotal,
+        credit: 0,
+        remarks: `Purchase ${purchaseNo}`,
+        storeId: targetStoreId,
       });
 
       if (paidAmt > 0) {
@@ -1597,15 +1661,16 @@ export async function addPurchaseHeader(
           });
         }
 
-        await supabase.rpc("insert_vendor_txn", {
-          p_vendor_id: vendorIdForTxn,
-          p_txn_type: "PAYMENT",
-          p_ref_no: purchasePaymentNo,
-          p_ref_id: paymentInserted?.id ?? headerId,
-          p_txn_date: header.date,
-          p_debit: 0,
-          p_credit: paidAmt,
-          p_remarks: `Payment at purchase ${purchaseNo}`,
+        await recordVendorTxnSafe({
+          vendorId: vendorIdForTxn,
+          txnType: "PAYMENT",
+          refNo: purchasePaymentNo,
+          refId: paymentInserted?.id ?? headerId,
+          txnDate: header.date,
+          debit: 0,
+          credit: paidAmt,
+          remarks: `Payment at purchase ${purchaseNo}`,
+          storeId: targetStoreId,
         });
       }
     }
@@ -2310,15 +2375,15 @@ export async function addVendorPayment(
       }
     }
 
-    await supabase.rpc("insert_vendor_txn", {
-      p_vendor_id: vendorId,
-      p_txn_type: "PAYMENT",
-      p_ref_no: paymentNo,
-      p_ref_id: paymentId,
-      p_txn_date: paymentDate,
-      p_debit: 0,
-      p_credit: amount,
-      p_remarks: remarks || `Payment ${paymentNo}`,
+    await recordVendorTxnSafe({
+      vendorId: vendorId,
+      txnType: "PAYMENT",
+      refNo: paymentNo,
+      refId: paymentId,
+      txnDate: paymentDate,
+      debit: 0,
+      credit: amount,
+      remarks: remarks || `Payment ${paymentNo}`,
     });
 
     await logAudit("INSERT", "vendor_payments", paymentId, null, {
@@ -2393,15 +2458,15 @@ export async function addPurchaseReturn(
     }
 
     if (vendorId) {
-      await supabase.rpc("insert_vendor_txn", {
-        p_vendor_id: vendorId,
-        p_txn_type: "PURCHASE_RETURN",
-        p_ref_no: returnNo,
-        p_ref_id: purchaseHeaderId || null,
-        p_txn_date: returnDate,
-        p_debit: 0,
-        p_credit: refundAmount,
-        p_remarks: reason || `Return ${returnNo}`,
+      await recordVendorTxnSafe({
+        vendorId: vendorId,
+        txnType: "PURCHASE_RETURN",
+        refNo: returnNo,
+        refId: purchaseHeaderId || null,
+        txnDate: returnDate,
+        debit: 0,
+        credit: refundAmount,
+        remarks: reason || `Return ${returnNo}`,
       });
     }
 
@@ -2540,15 +2605,15 @@ export async function applyVendorAdvance(
     p_remaining_delta: -amount,
   });
 
-  await supabase.rpc("insert_vendor_txn", {
-    p_vendor_id: vendorId,
-    p_txn_type: "ADVANCE_APPLIED",
-    p_ref_no: paymentNo,
-    p_ref_id: paymentId,
-    p_txn_date: paymentDate,
-    p_debit: 0,
-    p_credit: amount,
-    p_remarks: `Advance applied to purchase`,
+  await recordVendorTxnSafe({
+    vendorId: vendorId,
+    txnType: "ADVANCE_APPLIED",
+    refNo: paymentNo,
+    refId: paymentId,
+    txnDate: paymentDate,
+    debit: 0,
+    credit: amount,
+    remarks: `Advance applied to purchase`,
   });
 
   await logAudit("INSERT", "vendor_payments", paymentId, null, {
