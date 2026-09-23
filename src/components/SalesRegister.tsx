@@ -44,7 +44,7 @@ function esc(s: string) {
 }
 
 export function SalesRegister() {
-  const { stock, sales, saleImeis, stockLots } = useStore();
+  const { stock, sales, salesHeaders, saleImeis, stockLots } = useStore();
   const { currentStore } = useStoreContext();
   const [invoiceNo, setInvoiceNo] = useState("BM-AIS-0001");
 
@@ -478,51 +478,63 @@ export function SalesRegister() {
       toast.error("No sales to export");
       return;
     }
+    const seenInvoice = new Set<string>();
+    const headerMap = new Map<string, any>((salesHeaders || []).map((h) => [h.invoiceNo, h]));
     exportRows(
-      sales.map((s) => ({
-        Date: s.date,
-        "Invoice No": s.invoiceNo,
-        Customer: s.customer,
-        "PAN Number": s.customerPan,
-        "Has VAT/PAN": s.hasVatPan ? "Yes" : "No",
-        "Contact Number": s.customerContact,
-        Location: s.customerLocation,
-        "Item Code": s.itemCode,
-        Item: s.itemName,
-        "HS Code": "",
-        "Sub Category": s.subCategory,
-        Category: s.category,
-        Brand: s.brand,
-        Model: s.model,
-        Qty: s.qty,
-        Rate: s.rate,
-        Discount: s.discount,
-        Amount: s.amount,
-        "VAT 13%": s.vat,
-        Total: s.total,
-        "Sale Type": s.saleType,
-        "Payment Method": s.paymentMethod,
-        "Paid Amount": s.paidAmount,
-        Remaining: s.remaining,
-        Remarks: s.remarks,
-      })),
+      sales.map((s) => {
+        const isFirst = !seenInvoice.has(s.invoiceNo);
+        seenInvoice.add(s.invoiceNo);
+        const h = headerMap.get(s.invoiceNo);
+        const paid = isFirst ? (h ? h.paidAmount : s.paidAmount) : 0;
+        const remaining = isFirst ? (h ? h.remaining : s.remaining) : 0;
+        return {
+          Date: s.date,
+          "Invoice No": s.invoiceNo,
+          Customer: s.customer,
+          "PAN Number": s.customerPan,
+          "Has VAT/PAN": s.hasVatPan ? "Yes" : "No",
+          "Contact Number": s.customerContact,
+          Location: s.customerLocation,
+          "Item Code": s.itemCode,
+          Item: s.itemName,
+          "HS Code": "",
+          "Sub Category": s.subCategory,
+          Category: s.category,
+          Brand: s.brand,
+          Model: s.model,
+          Qty: s.qty,
+          Rate: s.rate,
+          Discount: s.discount,
+          Amount: s.amount,
+          "VAT 13%": s.vat,
+          Total: s.total,
+          "Sale Type": s.saleType,
+          "Payment Method": s.paymentMethod,
+          "Paid Amount": paid,
+          Remaining: remaining,
+          Remarks: s.remarks,
+        };
+      }),
       "Sales",
       `BM_Sales_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
   }
 
   const groupedSales = useMemo(() => {
+    const headerMap = new Map<string, any>((salesHeaders || []).map((h) => [h.invoiceNo, h]));
     const groups = new Map<string, { header: (typeof sales)[0]; items: typeof sales }>();
     for (const s of sales) {
       const existing = groups.get(s.invoiceNo);
       if (existing) {
         existing.items.push(s);
       } else {
-        groups.set(s.invoiceNo, { header: s, items: [s] });
+        const h = headerMap.get(s.invoiceNo);
+        const headerObj = h ? { ...s, paidAmount: h.paidAmount, remaining: h.remaining } : s;
+        groups.set(s.invoiceNo, { header: headerObj, items: [s] });
       }
     }
     return [...groups.values()];
-  }, [sales]);
+  }, [sales, salesHeaders]);
 
   const grand = sales.reduce((a, s) => a + s.total, 0);
 

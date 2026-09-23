@@ -320,6 +320,7 @@ export function BodDashboard() {
   const {
     stock,
     sales,
+    salesHeaders,
     stockLots,
     saleAllocations,
     purchaseHeaders,
@@ -367,6 +368,13 @@ export function BodDashboard() {
   const fSales = useMemo(
     () => (activeFilter ? sales.filter((s: any) => s.storeId === activeFilter) : sales),
     [sales, activeFilter],
+  );
+  const fSalesHeaders = useMemo(
+    () =>
+      activeFilter
+        ? salesHeaders.filter((h: any) => h.storeId === activeFilter)
+        : salesHeaders,
+    [salesHeaders, activeFilter],
   );
   const fStockLots = useMemo(
     () => (activeFilter ? stockLots.filter((l: any) => l.storeId === activeFilter) : stockLots),
@@ -519,6 +527,7 @@ export function BodDashboard() {
         <TabsContent value="sales">
           <TabSales
             sales={fSales}
+            salesHeaders={fSalesHeaders}
             stockLots={fStockLots}
             saleAllocations={fSaleAllocations}
             salesReturns={fSalesReturns}
@@ -556,6 +565,7 @@ export function BodDashboard() {
         <TabsContent value="cashflow">
           <TabCashFlow
             sales={fSales}
+            salesHeaders={fSalesHeaders}
             purchaseHeaders={fPurchaseHeaders}
             vendorPayments={fVendorPayments}
           />
@@ -896,7 +906,7 @@ function TabOverview({
 
 // ─── TAB 2: SALES ANALYTICS ──────────────────────────────────────────────────
 
-function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
+function TabSales({ sales, salesHeaders, stockLots, saleAllocations, salesReturns }: any) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
@@ -918,6 +928,7 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
   }, [sales, dateFrom, dateTo, q]);
 
   const grouped = useMemo(() => {
+    const headerMap = new Map<string, any>((salesHeaders || []).map((h: any) => [h.invoiceNo, h]));
     const map = new Map<
       string,
       {
@@ -946,8 +957,11 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
         .join(", ");
       if (existing) {
         existing.items.push({ ...s, lotInfo });
-        existing.grandTotal += s.total;
+        if (!headerMap.has(s.invoiceNo)) {
+          existing.grandTotal += s.total;
+        }
       } else {
+        const h = headerMap.get(s.invoiceNo);
         map.set(s.invoiceNo, {
           invoiceNo: s.invoiceNo,
           date: s.date,
@@ -955,16 +969,16 @@ function TabSales({ sales, stockLots, saleAllocations, salesReturns }: any) {
           saleType: s.saleType,
           status: s.status,
           items: [{ ...s, lotInfo }],
-          grandTotal: s.total,
-          paidAmount: s.paidAmount,
-          remaining: s.remaining,
+          grandTotal: h ? h.grandTotal : s.total,
+          paidAmount: h ? h.paidAmount : s.paidAmount,
+          remaining: h ? h.remaining : s.remaining,
           paymentMethod: s.paymentMethod,
           storeId: s.storeId,
         });
       }
     }
     return Array.from(map.values());
-  }, [filtered, saleAllocations, stockLots]);
+  }, [filtered, salesHeaders, saleAllocations, stockLots]);
 
   const a = useMemo(() => {
     const totalGrand = grouped.reduce((a, r) => a + r.grandTotal, 0);
@@ -2695,12 +2709,24 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
 
 // ─── TAB 7: CASH FLOW ─────────────────────────────────────────────────────────
 
-function TabCashFlow({ sales, purchaseHeaders, vendorPayments }: any) {
+function TabCashFlow({ sales, salesHeaders, purchaseHeaders, vendorPayments }: any) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
   const a = useMemo(() => {
-    let sFiltered = sales;
+    let sFiltered: any[];
+    if (salesHeaders && salesHeaders.length > 0) {
+      sFiltered = salesHeaders;
+    } else {
+      const seen = new Set<string>();
+      sFiltered = [];
+      for (const s of sales) {
+        if (!seen.has(s.invoiceNo)) {
+          seen.add(s.invoiceNo);
+          sFiltered.push(s);
+        }
+      }
+    }
     let pFiltered = purchaseHeaders;
     let vpFiltered = vendorPayments;
     if (dateFrom) {

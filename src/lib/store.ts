@@ -140,6 +140,30 @@ export type Sale = {
   storeId?: string;
 };
 
+export type SalesHeader = {
+  id: string;
+  invoiceNo: string;
+  date: string;
+  customer: string;
+  customerPan: string;
+  hasVatPan: boolean;
+  customerType: string;
+  customerContact: string;
+  customerLocation: string;
+  saleType: string;
+  paymentMethod: PaymentMethod;
+  grossTotal: number;
+  headerDiscount: number;
+  otherCharges: number;
+  grandTotal: number;
+  paidAmount: number;
+  remaining: number;
+  remarks: string;
+  status: string;
+  warrantyOriginalInvoice: string;
+  storeId: string;
+};
+
 export type Purchase = {
   id: string;
   billNo: string;
@@ -413,6 +437,7 @@ export const VAT_RATE = 0.13;
 type State = {
   stock: StockItem[];
   sales: Sale[];
+  salesHeaders: SalesHeader[];
   purchases: Purchase[];
   stockLots: StockLot[];
   saleAllocations: SaleAllocation[];
@@ -435,6 +460,7 @@ const listeners = new Set<() => void>();
 let state: State = {
   stock: [],
   sales: [],
+  salesHeaders: [],
   purchases: [],
   stockLots: [],
   saleAllocations: [],
@@ -506,6 +532,32 @@ function mapSaleRow(r: Record<string, unknown>): Sale {
     isFree: (r["is_free"] as boolean) ?? false,
     warrantyOriginalInvoice: (r["warranty_original_invoice"] as string) ?? "",
     status: (r["status"] as string) ?? "CONFIRMED",
+    storeId: (r["store_id"] as string) ?? "",
+  };
+}
+
+function mapSalesHeaderRow(r: Record<string, unknown>): SalesHeader {
+  return {
+    id: r["id"] as string,
+    invoiceNo: r["invoice_no"] as string,
+    date: r["date"] as string,
+    customer: (r["customer"] as string) ?? "",
+    customerPan: (r["customer_pan"] as string) ?? "",
+    hasVatPan: (r["has_vat_pan"] as boolean) ?? false,
+    customerType: (r["customer_type"] as string) ?? "Individual",
+    customerContact: (r["customer_contact"] as string) ?? "",
+    customerLocation: (r["customer_location"] as string) ?? "",
+    saleType: (r["sale_type"] as string) ?? "Cash",
+    paymentMethod: (r["payment_method"] as PaymentMethod) ?? "Cash",
+    grossTotal: Number(r["gross_total"] ?? 0),
+    headerDiscount: Number(r["header_discount"] ?? 0),
+    otherCharges: Number(r["other_charges"] ?? 0),
+    grandTotal: Number(r["grand_total"] ?? 0),
+    paidAmount: Number(r["paid_amount"] ?? 0),
+    remaining: Number(r["remaining"] ?? 0),
+    remarks: (r["remarks"] as string) ?? "",
+    status: (r["status"] as string) ?? "CONFIRMED",
+    warrantyOriginalInvoice: (r["warranty_original_invoice"] as string) ?? "",
     storeId: (r["store_id"] as string) ?? "",
   };
 }
@@ -965,6 +1017,33 @@ export async function addBill(
         invoice_no: invoiceNo,
         items: items.length,
       });
+
+      // Insert one row into sales_headers for this invoice
+      const { error: shErr } = await supabase.from("sales_headers").insert({
+        invoice_no: invoiceNo,
+        date,
+        customer,
+        customer_pan: customerPan,
+        has_vat_pan: hasVatPan,
+        customer_type: customerType,
+        customer_contact: customerContact,
+        customer_location: customerLocation,
+        sale_type: saleType,
+        payment_method: paymentMethod,
+        gross_total: grossTotal,
+        header_discount: headerDiscount,
+        other_charges: otherCharges,
+        grand_total: grossTotal - headerDiscount + otherCharges,
+        paid_amount: paidAmount,
+        remaining,
+        remarks,
+        status,
+        warranty_original_invoice: saleType === "Warranty" ? warrantyOriginalInvoice : "",
+        created_by: user?.id ?? null,
+        store_id: _currentStoreId,
+      });
+      if (shErr) console.error("[store] sales_headers insert failed:", shErr);
+
       await reload();
     }
     return { error: salesError };
@@ -1060,6 +1139,7 @@ export async function deleteInvoice(invoiceNo: string) {
   }
 
   await supabase.from("sales").delete().eq("invoice_no", invoiceNo);
+  await supabase.from("sales_headers").delete().eq("invoice_no", invoiceNo);
 
   const nonRepairItems = items.filter((item) => item.saleType !== "Repair");
 
@@ -3037,6 +3117,11 @@ async function reload() {
     .select("*")
     .order("created_at", { ascending: false })
     .limit(5000);
+  let salesHeadersQuery = supabase
+    .from("sales_headers")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(5000);
   let purchasesQuery = supabase
     .from("purchases")
     .select("*")
@@ -3046,12 +3131,14 @@ async function reload() {
   if (_currentStoreId) {
     stockQuery = stockQuery.eq("store_id", _currentStoreId);
     salesQuery = salesQuery.eq("store_id", _currentStoreId);
+    salesHeadersQuery = salesHeadersQuery.eq("store_id", _currentStoreId);
     purchasesQuery = purchasesQuery.eq("store_id", _currentStoreId);
   }
 
-  const [stockRes, salesRes, purchasesRes] = await Promise.all([
+  const [stockRes, salesRes, salesHeadersRes, purchasesRes] = await Promise.all([
     stockQuery,
     salesQuery,
+    salesHeadersQuery,
     purchasesQuery,
   ]);
 
@@ -3200,6 +3287,7 @@ async function reload() {
   state = {
     stock: (stockRes.data ?? []).map(mapStockRow),
     sales: (salesRes.data ?? []).map(mapSaleRow),
+    salesHeaders: (salesHeadersRes.data ?? []).map(mapSalesHeaderRow),
     purchases: (purchasesRes.data ?? []).map(mapPurchaseRow),
     stockLots: lots,
     saleAllocations: allocs,
