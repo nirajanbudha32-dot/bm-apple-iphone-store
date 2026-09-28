@@ -76,18 +76,29 @@ export function VendorDashboard() {
     return purchaseReturns.filter((r) => r.vendorId === selectedVendorId);
   }, [selectedVendorId, purchaseReturns]);
 
-  const totalPurchases = useMemo(
-    () => vendorPurchases.reduce((s, p) => s + (p.grandTotal ?? 0), 0),
-    [vendorPurchases]
-  );
-  const totalPayments = useMemo(
-    () => vendorPayList.reduce((s, p) => s + (p.amount ?? 0), 0),
-    [vendorPayList]
-  );
-  const totalReturns = useMemo(
-    () => vendorReturns.reduce((s, r) => s + (r.refundAmount ?? 0), 0),
-    [vendorReturns]
-  );
+  const totalPurchases = useMemo(() => {
+    const fromHeaders = vendorPurchases.reduce((s, p) => s + (p.grandTotal ?? 0), 0);
+    if (fromHeaders > 0) return fromHeaders;
+    return vendorTransactions
+      .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PURCHASE")
+      .reduce((s, t) => s + (t.debit || 0), 0);
+  }, [vendorPurchases, vendorTransactions, selectedVendorId]);
+
+  const totalPayments = useMemo(() => {
+    const fromPayments = vendorPayList.reduce((s, p) => s + (p.amount ?? 0), 0);
+    if (fromPayments > 0) return fromPayments;
+    return vendorTransactions
+      .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PAYMENT")
+      .reduce((s, t) => s + (t.credit || 0), 0);
+  }, [vendorPayList, vendorTransactions, selectedVendorId]);
+
+  const totalReturns = useMemo(() => {
+    const fromReturns = vendorReturns.reduce((s, r) => s + (r.refundAmount ?? 0), 0);
+    if (fromReturns > 0) return fromReturns;
+    return vendorTransactions
+      .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PURCHASE_RETURN")
+      .reduce((s, t) => s + (t.credit || 0), 0);
+  }, [vendorReturns, vendorTransactions, selectedVendorId]);
 
   const selectedVendor = useMemo(
     () => vendors.find((v) => v.id === selectedVendorId) ?? null,
@@ -148,9 +159,15 @@ export function VendorDashboard() {
       const purchases = getVendorPurchases(v.id);
       const payments = getVendorPayments(v.id);
       const returns = purchaseReturns.filter((r) => r.vendorId === v.id);
-      const totalP = purchases.reduce((s, p) => s + p.grandTotal, 0);
-      const totalPay = payments.reduce((s, p) => s + p.amount, 0);
-      const totalR = returns.reduce((s, r) => s + r.refundAmount, 0);
+      const vTxns = vendorTransactions.filter((t) => t.vendorId === v.id);
+
+      const totalPFromTxns = vTxns.filter((t) => t.transactionType === "PURCHASE").reduce((s, t) => s + (t.debit || 0), 0);
+      const totalPayFromTxns = vTxns.filter((t) => t.transactionType === "PAYMENT").reduce((s, t) => s + (t.credit || 0), 0);
+      const totalRFromTxns = vTxns.filter((t) => t.transactionType === "PURCHASE_RETURN").reduce((s, t) => s + (t.credit || 0), 0);
+
+      const totalP = Math.max(purchases.reduce((s, p) => s + p.grandTotal, 0), totalPFromTxns);
+      const totalPay = Math.max(payments.reduce((s, p) => s + p.amount, 0), totalPayFromTxns);
+      const totalR = Math.max(returns.reduce((s, r) => s + r.refundAmount, 0), totalRFromTxns);
       return {
         vendor: v,
         totalPurchases: totalP,
@@ -161,7 +178,7 @@ export function VendorDashboard() {
         balance,
       };
     });
-  }, [vendors, purchaseHeaders, vendorPayments, purchaseReturns]);
+  }, [vendors, purchaseHeaders, vendorPayments, purchaseReturns, vendorTransactions]);
 
   if (!selectedVendorId) {
     return (
