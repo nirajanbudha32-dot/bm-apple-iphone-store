@@ -41,6 +41,12 @@ const TYPE_LABELS: Record<string, string> = {
   ADJUSTMENT: "Adjustment",
 };
 
+function formatBalance(bal: number): string {
+  if (!bal || Math.abs(bal) < 0.005) return "0.00";
+  if (bal > 0) return `${money(bal)} Cr`;
+  return `${money(Math.abs(bal))} Dr`;
+}
+
 export function VendorLedger() {
   const { vendors } = useStore();
   const { currentStore } = useStoreContext();
@@ -203,8 +209,8 @@ export function VendorLedger() {
       <tr style="background:#f0f7ff;font-weight:600">
         <td colspan="4">Opening Balance (carried forward)</td>
         <td class="num">-</td>
-        <td class="num">${selectedVendor?.openingBalance ? money(selectedVendor.openingBalance) : "-"}</td>
-        <td class="num">${money(selectedVendor?.openingBalance ?? 0)} Cr</td>
+        <td class="num">${selectedVendor?.openingBalance ? money(Math.abs(selectedVendor.openingBalance)) : "-"}</td>
+        <td class="num">${formatBalance(selectedVendor?.openingBalance ?? 0)}</td>
       </tr>
       ${ledgerRows.map((r) => `<tr>
         <td>${esc(r.transactionDate)}</td>
@@ -213,14 +219,14 @@ export function VendorLedger() {
         <td>${esc(r.remarks)}</td>
         <td class="num">${r.standardDebit > 0 ? money(r.standardDebit) : "-"}</td>
         <td class="num">${r.standardCredit > 0 ? money(r.standardCredit) : "-"}</td>
-        <td class="num">${money(r.runningBalance)} Cr</td>
+        <td class="num">${formatBalance(r.runningBalance)}</td>
       </tr>`).join("")}
     </tbody>
   </table>
   <div class="summary">
     <div class="summary-row"><span>Total Payments (Debit):</span> <span>${money(totalDebit)}</span></div>
     <div class="summary-row"><span>Total Purchases (Credit):</span> <span>${money(totalCredit)}</span></div>
-    <div class="summary-row"><span>Closing Balance:</span> <span>${money(closingBalance)} Cr</span></div>
+    <div class="summary-row"><span>Closing Balance:</span> <span>${formatBalance(closingBalance)}</span></div>
   </div>
   <p class="footnote">This is a computer-generated ledger statement.</p>
 </div>
@@ -345,9 +351,9 @@ export function VendorLedger() {
                   <td className="px-3 py-2 font-medium" colSpan={4}>Opening Balance (carried forward)</td>
                   <td className="px-3 py-2 text-right text-muted-foreground">-</td>
                   <td className="px-3 py-2 text-right font-medium text-blue-600">
-                    {selectedVendor?.openingBalance ? money(selectedVendor.openingBalance) : "-"}
+                    {selectedVendor?.openingBalance ? money(Math.abs(selectedVendor.openingBalance)) : "-"}
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold">{money(selectedVendor?.openingBalance ?? 0)} Cr</td>
+                  <td className="px-3 py-2 text-right font-semibold">{formatBalance(selectedVendor?.openingBalance ?? 0)}</td>
                 </tr>
                 {ledgerRows.map((r) => (
                   <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30">
@@ -365,7 +371,7 @@ export function VendorLedger() {
                     <td className="px-3 py-2 text-right font-medium text-blue-600">
                       {r.standardCredit > 0 ? money(r.standardCredit) : "-"}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold">{money(r.runningBalance)} Cr</td>
+                    <td className="px-3 py-2 text-right font-semibold">{formatBalance(r.runningBalance)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -374,7 +380,7 @@ export function VendorLedger() {
                   <td className="px-3 py-2" colSpan={4}>Summary (Payments Dr / Purchases Cr)</td>
                   <td className="px-3 py-2 text-right text-emerald-600">{money(totalDebit)}</td>
                   <td className="px-3 py-2 text-right text-blue-600">{money(totalCredit)}</td>
-                  <td className="px-3 py-2 text-right">{money(closingBalance)} Cr</td>
+                  <td className="px-3 py-2 text-right font-semibold">{formatBalance(closingBalance)}</td>
                 </tr>
               </tfoot>
             </table>

@@ -757,17 +757,17 @@ function mapVendorRow(r: Record<string, unknown>): Vendor {
 
 function mapVendorTransactionRow(r: Record<string, unknown>): VendorTransaction {
   return {
-    id: r["id"] as string,
-    vendorId: r["vendor_id"] as string,
-    transactionType: r["transaction_type"] as string,
+    id: (r["id"] as string) ?? "",
+    vendorId: (r["vendor_id"] as string) ?? "",
+    transactionType: (r["transaction_type"] as string) ?? "",
     referenceNo: (r["reference_no"] as string) ?? "",
     referenceId: (r["reference_id"] as string) ?? "",
-    transactionDate: r["transaction_date"] as string,
+    transactionDate: (r["transaction_date"] as string) ?? "",
     debit: Number(r["debit"] ?? 0),
     credit: Number(r["credit"] ?? 0),
     balance: Number(r["balance"] ?? 0),
     remarks: (r["remarks"] as string) ?? "",
-    createdAt: r["created_at"] as string,
+    createdAt: (r["created_at"] as string) ?? "",
     storeId: (r["store_id"] as string) ?? "",
   };
 }
@@ -2624,11 +2624,17 @@ export function getVendorLedger(vendorId: string) {
   return state.vendorTransactions
     .filter((t) => t.vendorId === vendorId)
     .sort((a, b) => {
-      const dateCmp = a.transactionDate.localeCompare(b.transactionDate);
+      const dateA = a.transactionDate ? String(a.transactionDate) : "";
+      const dateB = b.transactionDate ? String(b.transactionDate) : "";
+      const dateCmp = dateA.localeCompare(dateB);
       if (dateCmp !== 0) return dateCmp;
-      if (a.transactionType === "PURCHASE" && b.transactionType !== "PURCHASE") return -1;
-      if (b.transactionType === "PURCHASE" && a.transactionType !== "PURCHASE") return 1;
-      return a.createdAt.localeCompare(b.createdAt);
+      const typeA = a.transactionType || "";
+      const typeB = b.transactionType || "";
+      if (typeA === "PURCHASE" && typeB !== "PURCHASE") return -1;
+      if (typeB === "PURCHASE" && typeA !== "PURCHASE") return 1;
+      const createdA = a.createdAt ? String(a.createdAt) : "";
+      const createdB = b.createdAt ? String(b.createdAt) : "";
+      return createdA.localeCompare(createdB);
     });
 }
 

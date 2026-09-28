@@ -49,6 +49,12 @@ function StatusBadge({ outstanding }: { outstanding: number }) {
   );
 }
 
+function formatBalance(bal: number): string {
+  if (!bal || Math.abs(bal) < 0.005) return "0.00";
+  if (bal > 0) return `${money(bal)} Cr`;
+  return `${money(Math.abs(bal))} Dr`;
+}
+
 export function VendorDashboard() {
   const {
     vendors,
@@ -92,24 +98,30 @@ export function VendorDashboard() {
   const processedTransactions = useMemo(() => {
     if (!selectedVendorId) return [];
     // Sort chronologically: Oldest first, with purchases appearing before payments on same day
-    const sorted = [...vendorTransactions]
-      .filter((t) => t.vendorId === selectedVendorId && t.transactionType !== "OPENING_BALANCE")
+    const sorted = [...(vendorTransactions || [])]
+      .filter((t) => t && t.vendorId === selectedVendorId && t.transactionType !== "OPENING_BALANCE")
       .sort((a, b) => {
-        const dateCmp = a.transactionDate.localeCompare(b.transactionDate);
+        const dateA = a.transactionDate ? String(a.transactionDate) : "";
+        const dateB = b.transactionDate ? String(b.transactionDate) : "";
+        const dateCmp = dateA.localeCompare(dateB);
         if (dateCmp !== 0) return dateCmp;
         // On same day, PURCHASE comes before PAYMENT
-        if (a.transactionType === "PURCHASE" && b.transactionType !== "PURCHASE") return -1;
-        if (b.transactionType === "PURCHASE" && a.transactionType !== "PURCHASE") return 1;
-        return a.createdAt.localeCompare(b.createdAt);
+        const typeA = a.transactionType || "";
+        const typeB = b.transactionType || "";
+        if (typeA === "PURCHASE" && typeB !== "PURCHASE") return -1;
+        if (typeB === "PURCHASE" && typeA !== "PURCHASE") return 1;
+        const createdA = a.createdAt ? String(a.createdAt) : "";
+        const createdB = b.createdAt ? String(b.createdAt) : "";
+        return createdA.localeCompare(createdB);
       });
 
     // In standard vendor accounting:
     // Vendor is a Creditor. Opening balance & Purchases are Credit (increases payable).
     // Payments & Returns are Debit (decreases payable).
-    let running = openingBalance;
+    let running = Number(openingBalance || 0);
     const withBalances = sorted.map((t) => {
-      const standardCredit = t.debit; // Purchases / Invoices (Increases payable)
-      const standardDebit = t.credit; // Payments / Returns (Decreases payable)
+      const standardCredit = Number(t.debit || 0); // Purchases / Invoices (Increases payable)
+      const standardDebit = Number(t.credit || 0); // Payments / Returns (Decreases payable)
       running = running + standardCredit - standardDebit;
       return {
         ...t,
@@ -361,10 +373,10 @@ export function VendorDashboard() {
                     <td className="p-2.5 font-mono text-xs text-muted-foreground">-</td>
                     <td className="p-2.5 text-right text-muted-foreground">-</td>
                     <td className="p-2.5 text-right font-medium text-blue-600">
-                      {money(openingBalance)}
+                      {money(Math.abs(openingBalance))}
                     </td>
                     <td className="p-2.5 text-right font-semibold">
-                      {money(openingBalance)} Cr
+                      {formatBalance(openingBalance)}
                     </td>
                     <td className="p-2.5 text-muted-foreground">
                       Opening balance brought forward
@@ -395,7 +407,7 @@ export function VendorDashboard() {
                       )}
                     </td>
                     <td className="p-2.5 text-right font-semibold">
-                      {money(txn.runningBalance)} {txn.runningBalance >= 0 ? "Cr" : "Dr"}
+                      {formatBalance(txn.runningBalance)}
                     </td>
                     <td className="p-2.5 text-muted-foreground max-w-[200px] truncate">
                       {txn.remarks || "-"}
@@ -448,7 +460,7 @@ export function VendorDashboard() {
             </div>
             <div>
               <span className="text-muted-foreground">Credit Limit: </span>
-              <span className="font-medium">{money(selectedVendor.creditLimit)}</span>
+              <span className="font-medium">{money(selectedVendor.creditLimit ?? 0)}</span>
             </div>
           </div>
         </Card>
