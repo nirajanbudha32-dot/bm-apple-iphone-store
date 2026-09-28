@@ -6,7 +6,7 @@ import {
   getVendorPayments,
   type Vendor,
 } from "@/lib/store";
-import { money } from "@/lib/utils";
+import { money, formatBalance } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import {
   Select,
@@ -49,12 +49,6 @@ function StatusBadge({ outstanding }: { outstanding: number }) {
   );
 }
 
-function formatBalance(bal: number): string {
-  if (!bal || Math.abs(bal) < 0.005) return "0.00";
-  if (bal > 0) return `${money(bal)} Cr`;
-  return `${money(Math.abs(bal))} Dr`;
-}
-
 export function VendorDashboard() {
   const {
     vendors,
@@ -82,6 +76,19 @@ export function VendorDashboard() {
     return purchaseReturns.filter((r) => r.vendorId === selectedVendorId);
   }, [selectedVendorId, purchaseReturns]);
 
+  const totalPurchases = useMemo(
+    () => vendorPurchases.reduce((s, p) => s + (p.grandTotal ?? 0), 0),
+    [vendorPurchases]
+  );
+  const totalPayments = useMemo(
+    () => vendorPayList.reduce((s, p) => s + (p.amount ?? 0), 0),
+    [vendorPayList]
+  );
+  const totalReturns = useMemo(
+    () => vendorReturns.reduce((s, r) => s + (r.refundAmount ?? 0), 0),
+    [vendorReturns]
+  );
+
   const selectedVendor = useMemo(
     () => vendors.find((v) => v.id === selectedVendorId) ?? null,
     [vendors, selectedVendorId]
@@ -98,8 +105,8 @@ export function VendorDashboard() {
   const processedTransactions = useMemo(() => {
     if (!selectedVendorId) return [];
     // Sort chronologically: Oldest first, with purchases appearing before payments on same day
-    const sorted = [...(vendorTransactions || [])]
-      .filter((t) => t && t.vendorId === selectedVendorId && t.transactionType !== "OPENING_BALANCE")
+    const sorted = [...vendorTransactions]
+      .filter((t) => t.vendorId === selectedVendorId && t.transactionType !== "OPENING_BALANCE")
       .sort((a, b) => {
         const dateA = a.transactionDate ? String(a.transactionDate) : "";
         const dateB = b.transactionDate ? String(b.transactionDate) : "";
@@ -118,10 +125,10 @@ export function VendorDashboard() {
     // In standard vendor accounting:
     // Vendor is a Creditor. Opening balance & Purchases are Credit (increases payable).
     // Payments & Returns are Debit (decreases payable).
-    let running = Number(openingBalance || 0);
+    let running = openingBalance;
     const withBalances = sorted.map((t) => {
-      const standardCredit = Number(t.debit || 0); // Purchases / Invoices (Increases payable)
-      const standardDebit = Number(t.credit || 0); // Payments / Returns (Decreases payable)
+      const standardCredit = t.debit; // Purchases / Invoices (Increases payable)
+      const standardDebit = t.credit; // Payments / Returns (Decreases payable)
       running = running + standardCredit - standardDebit;
       return {
         ...t,

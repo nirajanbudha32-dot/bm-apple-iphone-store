@@ -8,6 +8,13 @@ export function cn(...inputs: ClassValue[]) {
 export const money = (n: number) =>
   n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+export function formatBalance(bal: number | null | undefined): string {
+  const n = bal ?? 0;
+  if (Math.abs(n) < 0.005) return "0.00";
+  if (n > 0) return `${money(n)} Cr`;
+  return `${money(Math.abs(n))} Dr`;
+}
+
 const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
   "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
 const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];

@@ -18,7 +18,7 @@ import {
   type Vendor,
   type VendorTransaction,
 } from "@/lib/store";
-import { money } from "@/lib/utils";
+import { money, formatBalance } from "@/lib/utils";
 import { exportRows } from "@/lib/excel";
 import { useStoreContext } from "@/lib/store-context";
 
@@ -40,12 +40,6 @@ const TYPE_LABELS: Record<string, string> = {
   DEBIT_NOTE: "Debit Note",
   ADJUSTMENT: "Adjustment",
 };
-
-function formatBalance(bal: number): string {
-  if (!bal || Math.abs(bal) < 0.005) return "0.00";
-  if (bal > 0) return `${money(bal)} Cr`;
-  return `${money(Math.abs(bal))} Dr`;
-}
 
 export function VendorLedger() {
   const { vendors } = useStore();
@@ -128,7 +122,7 @@ export function VendorLedger() {
           Remarks: "Carried forward",
           Debit: 0,
           Credit: selectedVendor?.openingBalance ?? 0,
-          Balance: selectedVendor?.openingBalance ?? 0,
+          Balance: formatBalance(selectedVendor?.openingBalance ?? 0),
         },
         ...ledgerRows.map((r) => ({
           Date: r.transactionDate,
@@ -137,7 +131,7 @@ export function VendorLedger() {
           Remarks: r.remarks,
           Debit: r.standardDebit,
           Credit: r.standardCredit,
-          Balance: r.runningBalance,
+          Balance: formatBalance(r.runningBalance),
         })),
       ],
       "Vendor Ledger",
