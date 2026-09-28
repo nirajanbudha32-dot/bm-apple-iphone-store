@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Building2,
   TrendingUp,
@@ -23,6 +24,7 @@ import {
   Wallet,
   ShoppingCart,
   AlertCircle,
+  ArrowUpDown,
 } from "lucide-react";
 
 function StatusBadge({ outstanding }: { outstanding: number }) {
@@ -57,6 +59,7 @@ export function VendorDashboard() {
   } = useStore();
 
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const vendorPurchases = useMemo(() => {
     if (!selectedVendorId) return [];
@@ -73,32 +76,6 @@ export function VendorDashboard() {
     return purchaseReturns.filter((r) => r.vendorId === selectedVendorId);
   }, [selectedVendorId, purchaseReturns]);
 
-  const vendorTxns = useMemo(() => {
-    if (!selectedVendorId) return [];
-    return vendorTransactions
-      .filter((t) => t.vendorId === selectedVendorId)
-      .sort(
-        (a, b) =>
-          b.transactionDate.localeCompare(a.transactionDate) ||
-          b.createdAt.localeCompare(a.createdAt)
-      );
-  }, [selectedVendorId, vendorTransactions]);
-
-  const totalPurchases = useMemo(
-    () => vendorPurchases.reduce((sum, p) => sum + p.grandTotal, 0),
-    [vendorPurchases]
-  );
-
-  const totalPayments = useMemo(
-    () => vendorPayList.reduce((sum, p) => sum + p.amount, 0),
-    [vendorPayList]
-  );
-
-  const totalReturns = useMemo(
-    () => vendorReturns.reduce((sum, r) => sum + r.refundAmount, 0),
-    [vendorReturns]
-  );
-
   const selectedVendor = useMemo(
     () => vendors.find((v) => v.id === selectedVendorId) ?? null,
     [vendors, selectedVendorId]
@@ -111,7 +88,40 @@ export function VendorDashboard() {
     return getVendorBalance(selectedVendorId);
   }, [selectedVendorId, vendorTransactions]);
 
-  const recentTransactions = vendorTxns.slice(0, 10);
+  // Standard accounting: chronological order with correctly computed running balance
+  const processedTransactions = useMemo(() => {
+    if (!selectedVendorId) return [];
+    // Sort chronologically: Oldest first, with purchases appearing before payments on same day
+    const sorted = [...vendorTransactions]
+      .filter((t) => t.vendorId === selectedVendorId && t.transactionType !== "OPENING_BALANCE")
+      .sort((a, b) => {
+        const dateCmp = a.transactionDate.localeCompare(b.transactionDate);
+        if (dateCmp !== 0) return dateCmp;
+        // On same day, PURCHASE comes before PAYMENT
+        if (a.transactionType === "PURCHASE" && b.transactionType !== "PURCHASE") return -1;
+        if (b.transactionType === "PURCHASE" && a.transactionType !== "PURCHASE") return 1;
+        return a.createdAt.localeCompare(b.createdAt);
+      });
+
+    // In standard vendor accounting:
+    // Vendor is a Creditor. Opening balance & Purchases are Credit (increases payable).
+    // Payments & Returns are Debit (decreases payable).
+    let running = openingBalance;
+    const withBalances = sorted.map((t) => {
+      const standardCredit = t.debit; // Purchases / Invoices (Increases payable)
+      const standardDebit = t.credit; // Payments / Returns (Decreases payable)
+      running = running + standardCredit - standardDebit;
+      return {
+        ...t,
+        standardCredit,
+        standardDebit,
+        runningBalance: running,
+      };
+    });
+
+    const recent = withBalances.slice(-10);
+    return sortOrder === "desc" ? [...recent].reverse() : recent;
+  }, [selectedVendorId, vendorTransactions, openingBalance, sortOrder]);
 
   const allVendorOverviews = useMemo(() => {
     return vendors.map((v) => {
@@ -299,14 +309,28 @@ export function VendorDashboard() {
 
       {/* Recent Transactions */}
       <Card className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Wallet className="size-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Recent Transactions (Last 10)
-          </h3>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Wallet className="size-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Recent Transactions (Last 10)
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Order:</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
+            >
+              <ArrowUpDown className="size-3 mr-1" />
+              {sortOrder === "asc" ? "Oldest First (Ledger)" : "Newest First"}
+            </Button>
+          </div>
         </div>
 
-        {recentTransactions.length === 0 ? (
+        {processedTransactions.length === 0 && openingBalance === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
             <ShoppingCart className="size-8 mb-2 opacity-40" />
             <p className="text-sm">No transactions recorded for this vendor yet.</p>
@@ -319,15 +343,36 @@ export function VendorDashboard() {
                   <th className="p-2.5">Date</th>
                   <th className="p-2.5">Type</th>
                   <th className="p-2.5">Reference</th>
-                  <th className="p-2.5 text-right">Debit</th>
-                  <th className="p-2.5 text-right">Credit</th>
+                  <th className="p-2.5 text-right">Debit (Paid)</th>
+                  <th className="p-2.5 text-right">Credit (Billed)</th>
                   <th className="p-2.5 text-right">Balance</th>
                   <th className="p-2.5">Remarks</th>
                 </tr>
               </thead>
               <tbody>
-                {recentTransactions.map((txn) => (
-                  <tr key={txn.id} className="border-t border-border">
+                {sortOrder === "asc" && openingBalance !== 0 && (
+                  <tr className="border-t border-border bg-blue-50/40 font-medium">
+                    <td className="p-2.5 whitespace-nowrap text-muted-foreground">-</td>
+                    <td className="p-2.5">
+                      <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                        OPENING
+                      </Badge>
+                    </td>
+                    <td className="p-2.5 font-mono text-xs text-muted-foreground">-</td>
+                    <td className="p-2.5 text-right text-muted-foreground">-</td>
+                    <td className="p-2.5 text-right font-medium text-blue-600">
+                      {money(openingBalance)}
+                    </td>
+                    <td className="p-2.5 text-right font-semibold">
+                      {money(openingBalance)} Cr
+                    </td>
+                    <td className="p-2.5 text-muted-foreground">
+                      Opening balance brought forward
+                    </td>
+                  </tr>
+                )}
+                {processedTransactions.map((txn) => (
+                  <tr key={txn.id} className="border-t border-border hover:bg-muted/30">
                     <td className="p-2.5 whitespace-nowrap">{txn.transactionDate}</td>
                     <td className="p-2.5">
                       <Badge variant="outline" className="text-[10px]">
@@ -336,20 +381,22 @@ export function VendorDashboard() {
                     </td>
                     <td className="p-2.5 font-mono text-xs">{txn.referenceNo || "-"}</td>
                     <td className="p-2.5 text-right">
-                      {txn.debit > 0 ? (
-                        <span className="font-medium">{money(txn.debit)}</span>
+                      {txn.standardDebit > 0 ? (
+                        <span className="font-medium text-emerald-600">{money(txn.standardDebit)}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="p-2.5 text-right">
-                      {txn.credit > 0 ? (
-                        <span className="font-medium text-green-600">{money(txn.credit)}</span>
+                      {txn.standardCredit > 0 ? (
+                        <span className="font-medium text-blue-600">{money(txn.standardCredit)}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </td>
-                    <td className="p-2.5 text-right font-semibold">{money(txn.balance)}</td>
+                    <td className="p-2.5 text-right font-semibold">
+                      {money(txn.runningBalance)} {txn.runningBalance >= 0 ? "Cr" : "Dr"}
+                    </td>
                     <td className="p-2.5 text-muted-foreground max-w-[200px] truncate">
                       {txn.remarks || "-"}
                     </td>

@@ -2623,11 +2623,13 @@ export function getVendorPayments(vendorId: string) {
 export function getVendorLedger(vendorId: string) {
   return state.vendorTransactions
     .filter((t) => t.vendorId === vendorId)
-    .sort(
-      (a, b) =>
-        a.transactionDate.localeCompare(b.transactionDate) ||
-        a.createdAt.localeCompare(b.createdAt),
-    );
+    .sort((a, b) => {
+      const dateCmp = a.transactionDate.localeCompare(b.transactionDate);
+      if (dateCmp !== 0) return dateCmp;
+      if (a.transactionType === "PURCHASE" && b.transactionType !== "PURCHASE") return -1;
+      if (b.transactionType === "PURCHASE" && a.transactionType !== "PURCHASE") return 1;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
 }
 
 export function getVendorAdvance(vendorId: string): number {

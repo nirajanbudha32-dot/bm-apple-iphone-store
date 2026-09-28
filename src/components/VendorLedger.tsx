@@ -83,17 +83,22 @@ export function VendorLedger() {
         .reduce((a, t) => a + t.debit - t.credit, 0);
     }
     return filteredTransactions.map((t) => {
-      runningBalance = runningBalance + t.debit - t.credit;
-      return { ...t, runningBalance };
+      // In standard vendor accounting:
+      // Credit = Purchases/Bills (increases payable)
+      // Debit = Payments/Returns (decreases payable)
+      const standardCredit = t.debit;
+      const standardDebit = t.credit;
+      runningBalance = runningBalance + standardCredit - standardDebit;
+      return { ...t, standardDebit, standardCredit, runningBalance };
     });
   }, [filteredTransactions, selectedVendor, allTransactions, fromDate]);
 
   const totalDebit = useMemo(
-    () => ledgerRows.reduce((a, r) => a + r.debit, 0),
+    () => ledgerRows.reduce((a, r) => a + r.standardDebit, 0),
     [ledgerRows]
   );
   const totalCredit = useMemo(
-    () => ledgerRows.reduce((a, r) => a + r.credit, 0),
+    () => ledgerRows.reduce((a, r) => a + r.standardCredit, 0),
     [ledgerRows]
   );
   const closingBalance = useMemo(() => {
@@ -116,7 +121,7 @@ export function VendorLedger() {
           "Reference No": "",
           Remarks: "Carried forward",
           Debit: 0,
-          Credit: 0,
+          Credit: selectedVendor?.openingBalance ?? 0,
           Balance: selectedVendor?.openingBalance ?? 0,
         },
         ...ledgerRows.map((r) => ({
@@ -124,8 +129,8 @@ export function VendorLedger() {
           Type: TYPE_LABELS[r.transactionType] || r.transactionType,
           "Reference No": r.referenceNo,
           Remarks: r.remarks,
-          Debit: r.debit,
-          Credit: r.credit,
+          Debit: r.standardDebit,
+          Credit: r.standardCredit,
           Balance: r.runningBalance,
         })),
       ],
@@ -192,30 +197,30 @@ export function VendorLedger() {
   <table class="items">
     <thead><tr>
       <th>Date</th><th>Type</th><th>Reference No</th><th>Remarks</th>
-      <th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th>
+      <th style="text-align:right">Debit (Paid)</th><th style="text-align:right">Credit (Billed)</th><th style="text-align:right">Balance</th>
     </tr></thead>
     <tbody>
       <tr style="background:#f0f7ff;font-weight:600">
         <td colspan="4">Opening Balance (carried forward)</td>
         <td class="num">-</td>
-        <td class="num">-</td>
-        <td class="num">${money(selectedVendor?.openingBalance ?? 0)}</td>
+        <td class="num">${selectedVendor?.openingBalance ? money(selectedVendor.openingBalance) : "-"}</td>
+        <td class="num">${money(selectedVendor?.openingBalance ?? 0)} Cr</td>
       </tr>
       ${ledgerRows.map((r) => `<tr>
         <td>${esc(r.transactionDate)}</td>
         <td>${esc(TYPE_LABELS[r.transactionType] || r.transactionType)}</td>
         <td>${esc(r.referenceNo)}</td>
         <td>${esc(r.remarks)}</td>
-        <td class="num">${r.debit > 0 ? money(r.debit) : "-"}</td>
-        <td class="num">${r.credit > 0 ? money(r.credit) : "-"}</td>
-        <td class="num">${money(r.runningBalance)}</td>
+        <td class="num">${r.standardDebit > 0 ? money(r.standardDebit) : "-"}</td>
+        <td class="num">${r.standardCredit > 0 ? money(r.standardCredit) : "-"}</td>
+        <td class="num">${money(r.runningBalance)} Cr</td>
       </tr>`).join("")}
     </tbody>
   </table>
   <div class="summary">
-    <div class="summary-row"><span>Total Debit:</span> <span>${money(totalDebit)}</span></div>
-    <div class="summary-row"><span>Total Credit:</span> <span>${money(totalCredit)}</span></div>
-    <div class="summary-row"><span>Closing Balance:</span> <span>${money(closingBalance)}</span></div>
+    <div class="summary-row"><span>Total Payments (Debit):</span> <span>${money(totalDebit)}</span></div>
+    <div class="summary-row"><span>Total Purchases (Credit):</span> <span>${money(totalCredit)}</span></div>
+    <div class="summary-row"><span>Closing Balance:</span> <span>${money(closingBalance)} Cr</span></div>
   </div>
   <p class="footnote">This is a computer-generated ledger statement.</p>
 </div>
@@ -330,17 +335,19 @@ export function VendorLedger() {
                   <th className="px-3 py-2 text-left font-semibold">Type</th>
                   <th className="px-3 py-2 text-left font-semibold">Reference No</th>
                   <th className="px-3 py-2 text-left font-semibold">Remarks</th>
-                  <th className="px-3 py-2 text-right font-semibold">Debit</th>
-                  <th className="px-3 py-2 text-right font-semibold">Credit</th>
+                  <th className="px-3 py-2 text-right font-semibold">Debit (Paid)</th>
+                  <th className="px-3 py-2 text-right font-semibold">Credit (Billed)</th>
                   <th className="px-3 py-2 text-right font-semibold">Balance</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-b border-border bg-blue-50/50">
                   <td className="px-3 py-2 font-medium" colSpan={4}>Opening Balance (carried forward)</td>
-                  <td className="px-3 py-2 text-right text-red-600">-</td>
-                  <td className="px-3 py-2 text-right text-green-600">-</td>
-                  <td className="px-3 py-2 text-right font-semibold">{money(selectedVendor?.openingBalance ?? 0)}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">-</td>
+                  <td className="px-3 py-2 text-right font-medium text-blue-600">
+                    {selectedVendor?.openingBalance ? money(selectedVendor.openingBalance) : "-"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold">{money(selectedVendor?.openingBalance ?? 0)} Cr</td>
                 </tr>
                 {ledgerRows.map((r) => (
                   <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30">
@@ -352,22 +359,22 @@ export function VendorLedger() {
                     </td>
                     <td className="px-3 py-2 font-mono text-[11px] sm:text-xs">{r.referenceNo}</td>
                     <td className="px-3 py-2 max-w-[200px] truncate text-muted-foreground">{r.remarks}</td>
-                    <td className="px-3 py-2 text-right font-medium text-red-600">
-                      {r.debit > 0 ? money(r.debit) : "-"}
+                    <td className="px-3 py-2 text-right font-medium text-emerald-600">
+                      {r.standardDebit > 0 ? money(r.standardDebit) : "-"}
                     </td>
-                    <td className="px-3 py-2 text-right font-medium text-green-600">
-                      {r.credit > 0 ? money(r.credit) : "-"}
+                    <td className="px-3 py-2 text-right font-medium text-blue-600">
+                      {r.standardCredit > 0 ? money(r.standardCredit) : "-"}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold">{money(r.runningBalance)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{money(r.runningBalance)} Cr</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border bg-muted/50 font-semibold">
-                  <td className="px-3 py-2" colSpan={4}>Summary</td>
-                  <td className="px-3 py-2 text-right text-red-600">{money(totalDebit)}</td>
-                  <td className="px-3 py-2 text-right text-green-600">{money(totalCredit)}</td>
-                  <td className="px-3 py-2 text-right">{money(closingBalance)}</td>
+                  <td className="px-3 py-2" colSpan={4}>Summary (Payments Dr / Purchases Cr)</td>
+                  <td className="px-3 py-2 text-right text-emerald-600">{money(totalDebit)}</td>
+                  <td className="px-3 py-2 text-right text-blue-600">{money(totalCredit)}</td>
+                  <td className="px-3 py-2 text-right">{money(closingBalance)} Cr</td>
                 </tr>
               </tfoot>
             </table>
