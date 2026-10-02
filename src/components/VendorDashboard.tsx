@@ -77,39 +77,89 @@ export function VendorDashboard() {
   }, [selectedVendorId, purchaseReturns]);
 
   const totalPurchases = useMemo(() => {
+    const purchTxns = vendorTransactions.filter(
+      (t) =>
+        t.vendorId === selectedVendorId &&
+        (t.transactionType === "PURCHASE" || t.referenceNo?.startsWith("PUR-"))
+    );
+    const fromTxns = purchTxns.reduce((s, t) => s + (t.debit || 0), 0);
+
+    const knownRefNos = new Set(
+      purchTxns.map((t) => t.referenceNo?.trim().toLowerCase()).filter(Boolean)
+    );
+    const knownRefIds = new Set(
+      purchTxns.map((t) => t.referenceId?.trim().toLowerCase()).filter(Boolean)
+    );
+    const unrecordedPurchases = vendorPurchases
+      .filter((p) => {
+        const pNo = p.purchaseNo?.trim().toLowerCase();
+        const invNo = p.supplierInvoiceNo?.trim().toLowerCase();
+        const pId = p.id?.trim().toLowerCase();
+        return (
+          (!pNo || !knownRefNos.has(pNo)) &&
+          (!invNo || !knownRefNos.has(invNo)) &&
+          (!pId || !knownRefIds.has(pId))
+        );
+      })
+      .reduce((s, p) => s + (p.grandTotal ?? 0), 0);
+
     const fromHeaders = vendorPurchases.reduce((s, p) => s + (p.grandTotal ?? 0), 0);
-    const knownPurchaseIds = new Set(vendorPurchases.map((p) => p.id));
-    const knownPurchaseNos = new Set([
-      ...vendorPurchases.map((p) => p.purchaseNo),
-      ...vendorPurchases.map((p) => p.supplierInvoiceNo),
-    ].filter(Boolean));
-    const standalonePurchases = vendorTransactions
-      .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PURCHASE")
-      .filter((t) => !knownPurchaseIds.has(t.referenceId) && !knownPurchaseNos.has(t.referenceNo))
-      .reduce((s, t) => s + (t.debit || 0), 0);
-    return fromHeaders + standalonePurchases;
+    return Math.max(fromTxns + unrecordedPurchases, fromTxns, fromHeaders);
   }, [vendorPurchases, vendorTransactions, selectedVendorId]);
 
   const totalPayments = useMemo(() => {
-    const fromPayments = vendorPayList.reduce((s, p) => s + (p.amount ?? 0), 0);
-    const knownPaymentIds = new Set(vendorPayList.map((p) => p.id));
-    const knownPaymentNos = new Set(vendorPayList.map((p) => p.paymentNo).filter(Boolean));
-    const standalonePayments = vendorTransactions
-      .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PAYMENT")
-      .filter((t) => !knownPaymentIds.has(t.referenceId) && !knownPaymentNos.has(t.referenceNo))
-      .reduce((s, t) => s + (t.credit || 0), 0);
-    return fromPayments + standalonePayments;
+    const paymentTxns = vendorTransactions.filter(
+      (t) =>
+        t.vendorId === selectedVendorId &&
+        t.transactionType !== "PURCHASE" &&
+        t.transactionType !== "PURCHASE_RETURN" &&
+        t.transactionType !== "OPENING_BALANCE" &&
+        (t.credit || 0) > 0
+    );
+    const fromTxns = paymentTxns.reduce((s, t) => s + (t.credit || 0), 0);
+
+    const knownRefNos = new Set(
+      paymentTxns.map((t) => t.referenceNo?.trim().toLowerCase()).filter(Boolean)
+    );
+    const knownRefIds = new Set(
+      paymentTxns.map((t) => t.referenceId?.trim().toLowerCase()).filter(Boolean)
+    );
+    const unrecordedPayments = vendorPayList
+      .filter((p) => {
+        const payNo = p.paymentNo?.trim().toLowerCase();
+        const payId = p.id?.trim().toLowerCase();
+        return (!payNo || !knownRefNos.has(payNo)) && (!payId || !knownRefIds.has(payId));
+      })
+      .reduce((s, p) => s + (p.amount ?? 0), 0);
+
+    const fromPaymentsTable = vendorPayList.reduce((s, p) => s + (p.amount ?? 0), 0);
+    return Math.max(fromTxns + unrecordedPayments, fromTxns, fromPaymentsTable);
   }, [vendorPayList, vendorTransactions, selectedVendorId]);
 
   const totalReturns = useMemo(() => {
-    const fromReturns = vendorReturns.reduce((s, r) => s + (r.refundAmount ?? 0), 0);
-    const knownReturnIds = new Set(vendorReturns.map((r) => r.id));
-    const knownReturnNos = new Set(vendorReturns.map((r) => r.returnNo).filter(Boolean));
-    const standaloneReturns = vendorTransactions
-      .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PURCHASE_RETURN")
-      .filter((t) => !knownReturnIds.has(t.referenceId) && !knownReturnNos.has(t.referenceNo))
-      .reduce((s, t) => s + (t.credit || 0), 0);
-    return fromReturns + standaloneReturns;
+    const returnTxns = vendorTransactions.filter(
+      (t) =>
+        t.vendorId === selectedVendorId &&
+        (t.transactionType === "PURCHASE_RETURN" || t.referenceNo?.startsWith("PR-"))
+    );
+    const fromTxns = returnTxns.reduce((s, t) => s + (t.credit || 0), 0);
+
+    const knownRefNos = new Set(
+      returnTxns.map((t) => t.referenceNo?.trim().toLowerCase()).filter(Boolean)
+    );
+    const knownRefIds = new Set(
+      returnTxns.map((t) => t.referenceId?.trim().toLowerCase()).filter(Boolean)
+    );
+    const unrecordedReturns = vendorReturns
+      .filter((r) => {
+        const retNo = r.returnNo?.trim().toLowerCase();
+        const rId = r.id?.trim().toLowerCase();
+        return (!retNo || !knownRefNos.has(retNo)) && (!rId || !knownRefIds.has(rId));
+      })
+      .reduce((s, r) => s + (r.refundAmount ?? 0), 0);
+
+    const fromReturnsTable = vendorReturns.reduce((s, r) => s + (r.refundAmount ?? 0), 0);
+    return Math.max(fromTxns + unrecordedReturns, fromTxns, fromReturnsTable);
   }, [vendorReturns, vendorTransactions, selectedVendorId]);
 
   const selectedVendor = useMemo(
@@ -173,32 +223,76 @@ export function VendorDashboard() {
       const returns = purchaseReturns.filter((r) => r.vendorId === v.id);
       const vTxns = vendorTransactions.filter((t) => t.vendorId === v.id);
 
-      const knownPurchIds = new Set(purchases.map((p) => p.id));
-      const knownPurchNos = new Set([
-        ...purchases.map((p) => p.purchaseNo),
-        ...purchases.map((p) => p.supplierInvoiceNo),
-      ].filter(Boolean));
-      const standalonePurch = vTxns
-        .filter((t) => t.transactionType === "PURCHASE")
-        .filter((t) => !knownPurchIds.has(t.referenceId) && !knownPurchNos.has(t.referenceNo))
-        .reduce((s, t) => s + (t.debit || 0), 0);
-      const totalP = purchases.reduce((s, p) => s + p.grandTotal, 0) + standalonePurch;
+      const purchTxns = vTxns.filter(
+        (t) =>
+          t.transactionType === "PURCHASE" || t.referenceNo?.startsWith("PUR-")
+      );
+      const fromTxnsP = purchTxns.reduce((s, t) => s + (t.debit || 0), 0);
+      const knownRefNosP = new Set(
+        purchTxns.map((t) => t.referenceNo?.trim().toLowerCase()).filter(Boolean)
+      );
+      const knownRefIdsP = new Set(
+        purchTxns.map((t) => t.referenceId?.trim().toLowerCase()).filter(Boolean)
+      );
+      const unrecordedP = purchases
+        .filter((p) => {
+          const pNo = p.purchaseNo?.trim().toLowerCase();
+          const invNo = p.supplierInvoiceNo?.trim().toLowerCase();
+          const pId = p.id?.trim().toLowerCase();
+          return (
+            (!pNo || !knownRefNosP.has(pNo)) &&
+            (!invNo || !knownRefNosP.has(invNo)) &&
+            (!pId || !knownRefIdsP.has(pId))
+          );
+        })
+        .reduce((s, p) => s + (p.grandTotal ?? 0), 0);
+      const fromHeadersP = purchases.reduce((s, p) => s + (p.grandTotal ?? 0), 0);
+      const totalP = Math.max(fromTxnsP + unrecordedP, fromTxnsP, fromHeadersP);
 
-      const knownPayIds = new Set(payments.map((p) => p.id));
-      const knownPayNos = new Set(payments.map((p) => p.paymentNo).filter(Boolean));
-      const standalonePay = vTxns
-        .filter((t) => t.transactionType === "PAYMENT")
-        .filter((t) => !knownPayIds.has(t.referenceId) && !knownPayNos.has(t.referenceNo))
-        .reduce((s, t) => s + (t.credit || 0), 0);
-      const totalPay = payments.reduce((s, p) => s + p.amount, 0) + standalonePay;
+      const paymentTxns = vTxns.filter(
+        (t) =>
+          t.transactionType !== "PURCHASE" &&
+          t.transactionType !== "PURCHASE_RETURN" &&
+          t.transactionType !== "OPENING_BALANCE" &&
+          (t.credit || 0) > 0
+      );
+      const fromTxnsPay = paymentTxns.reduce((s, t) => s + (t.credit || 0), 0);
+      const knownRefNosPay = new Set(
+        paymentTxns.map((t) => t.referenceNo?.trim().toLowerCase()).filter(Boolean)
+      );
+      const knownRefIdsPay = new Set(
+        paymentTxns.map((t) => t.referenceId?.trim().toLowerCase()).filter(Boolean)
+      );
+      const unrecordedPay = payments
+        .filter((p) => {
+          const payNo = p.paymentNo?.trim().toLowerCase();
+          const payId = p.id?.trim().toLowerCase();
+          return (!payNo || !knownRefNosPay.has(payNo)) && (!payId || !knownRefIdsPay.has(payId));
+        })
+        .reduce((s, p) => s + (p.amount ?? 0), 0);
+      const fromTablePay = payments.reduce((s, p) => s + (p.amount ?? 0), 0);
+      const totalPay = Math.max(fromTxnsPay + unrecordedPay, fromTxnsPay, fromTablePay);
 
-      const knownRetIds = new Set(returns.map((r) => r.id));
-      const knownRetNos = new Set(returns.map((r) => r.returnNo).filter(Boolean));
-      const standaloneRet = vTxns
-        .filter((t) => t.transactionType === "PURCHASE_RETURN")
-        .filter((t) => !knownRetIds.has(t.referenceId) && !knownRetNos.has(t.referenceNo))
-        .reduce((s, t) => s + (t.credit || 0), 0);
-      const totalR = returns.reduce((s, r) => s + r.refundAmount, 0) + standaloneRet;
+      const returnTxns = vTxns.filter(
+        (t) =>
+          t.transactionType === "PURCHASE_RETURN" || t.referenceNo?.startsWith("PR-")
+      );
+      const fromTxnsRet = returnTxns.reduce((s, t) => s + (t.credit || 0), 0);
+      const knownRefNosRet = new Set(
+        returnTxns.map((t) => t.referenceNo?.trim().toLowerCase()).filter(Boolean)
+      );
+      const knownRefIdsRet = new Set(
+        returnTxns.map((t) => t.referenceId?.trim().toLowerCase()).filter(Boolean)
+      );
+      const unrecordedRet = returns
+        .filter((r) => {
+          const retNo = r.returnNo?.trim().toLowerCase();
+          const rId = r.id?.trim().toLowerCase();
+          return (!retNo || !knownRefNosRet.has(retNo)) && (!rId || !knownRefIdsRet.has(rId));
+        })
+        .reduce((s, r) => s + (r.refundAmount ?? 0), 0);
+      const fromTableRet = returns.reduce((s, r) => s + (r.refundAmount ?? 0), 0);
+      const totalR = Math.max(fromTxnsRet + unrecordedRet, fromTxnsRet, fromTableRet);
       return {
         vendor: v,
         totalPurchases: totalP,
