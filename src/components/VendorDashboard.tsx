@@ -78,26 +78,38 @@ export function VendorDashboard() {
 
   const totalPurchases = useMemo(() => {
     const fromHeaders = vendorPurchases.reduce((s, p) => s + (p.grandTotal ?? 0), 0);
-    if (fromHeaders > 0) return fromHeaders;
-    return vendorTransactions
+    const knownPurchaseIds = new Set(vendorPurchases.map((p) => p.id));
+    const knownPurchaseNos = new Set([
+      ...vendorPurchases.map((p) => p.purchaseNo),
+      ...vendorPurchases.map((p) => p.supplierInvoiceNo),
+    ].filter(Boolean));
+    const standalonePurchases = vendorTransactions
       .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PURCHASE")
+      .filter((t) => !knownPurchaseIds.has(t.referenceId) && !knownPurchaseNos.has(t.referenceNo))
       .reduce((s, t) => s + (t.debit || 0), 0);
+    return fromHeaders + standalonePurchases;
   }, [vendorPurchases, vendorTransactions, selectedVendorId]);
 
   const totalPayments = useMemo(() => {
     const fromPayments = vendorPayList.reduce((s, p) => s + (p.amount ?? 0), 0);
-    if (fromPayments > 0) return fromPayments;
-    return vendorTransactions
+    const knownPaymentIds = new Set(vendorPayList.map((p) => p.id));
+    const knownPaymentNos = new Set(vendorPayList.map((p) => p.paymentNo).filter(Boolean));
+    const standalonePayments = vendorTransactions
       .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PAYMENT")
+      .filter((t) => !knownPaymentIds.has(t.referenceId) && !knownPaymentNos.has(t.referenceNo))
       .reduce((s, t) => s + (t.credit || 0), 0);
+    return fromPayments + standalonePayments;
   }, [vendorPayList, vendorTransactions, selectedVendorId]);
 
   const totalReturns = useMemo(() => {
     const fromReturns = vendorReturns.reduce((s, r) => s + (r.refundAmount ?? 0), 0);
-    if (fromReturns > 0) return fromReturns;
-    return vendorTransactions
+    const knownReturnIds = new Set(vendorReturns.map((r) => r.id));
+    const knownReturnNos = new Set(vendorReturns.map((r) => r.returnNo).filter(Boolean));
+    const standaloneReturns = vendorTransactions
       .filter((t) => t.vendorId === selectedVendorId && t.transactionType === "PURCHASE_RETURN")
+      .filter((t) => !knownReturnIds.has(t.referenceId) && !knownReturnNos.has(t.referenceNo))
       .reduce((s, t) => s + (t.credit || 0), 0);
+    return fromReturns + standaloneReturns;
   }, [vendorReturns, vendorTransactions, selectedVendorId]);
 
   const selectedVendor = useMemo(
@@ -161,13 +173,32 @@ export function VendorDashboard() {
       const returns = purchaseReturns.filter((r) => r.vendorId === v.id);
       const vTxns = vendorTransactions.filter((t) => t.vendorId === v.id);
 
-      const totalPFromTxns = vTxns.filter((t) => t.transactionType === "PURCHASE").reduce((s, t) => s + (t.debit || 0), 0);
-      const totalPayFromTxns = vTxns.filter((t) => t.transactionType === "PAYMENT").reduce((s, t) => s + (t.credit || 0), 0);
-      const totalRFromTxns = vTxns.filter((t) => t.transactionType === "PURCHASE_RETURN").reduce((s, t) => s + (t.credit || 0), 0);
+      const knownPurchIds = new Set(purchases.map((p) => p.id));
+      const knownPurchNos = new Set([
+        ...purchases.map((p) => p.purchaseNo),
+        ...purchases.map((p) => p.supplierInvoiceNo),
+      ].filter(Boolean));
+      const standalonePurch = vTxns
+        .filter((t) => t.transactionType === "PURCHASE")
+        .filter((t) => !knownPurchIds.has(t.referenceId) && !knownPurchNos.has(t.referenceNo))
+        .reduce((s, t) => s + (t.debit || 0), 0);
+      const totalP = purchases.reduce((s, p) => s + p.grandTotal, 0) + standalonePurch;
 
-      const totalP = Math.max(purchases.reduce((s, p) => s + p.grandTotal, 0), totalPFromTxns);
-      const totalPay = Math.max(payments.reduce((s, p) => s + p.amount, 0), totalPayFromTxns);
-      const totalR = Math.max(returns.reduce((s, r) => s + r.refundAmount, 0), totalRFromTxns);
+      const knownPayIds = new Set(payments.map((p) => p.id));
+      const knownPayNos = new Set(payments.map((p) => p.paymentNo).filter(Boolean));
+      const standalonePay = vTxns
+        .filter((t) => t.transactionType === "PAYMENT")
+        .filter((t) => !knownPayIds.has(t.referenceId) && !knownPayNos.has(t.referenceNo))
+        .reduce((s, t) => s + (t.credit || 0), 0);
+      const totalPay = payments.reduce((s, p) => s + p.amount, 0) + standalonePay;
+
+      const knownRetIds = new Set(returns.map((r) => r.id));
+      const knownRetNos = new Set(returns.map((r) => r.returnNo).filter(Boolean));
+      const standaloneRet = vTxns
+        .filter((t) => t.transactionType === "PURCHASE_RETURN")
+        .filter((t) => !knownRetIds.has(t.referenceId) && !knownRetNos.has(t.referenceNo))
+        .reduce((s, t) => s + (t.credit || 0), 0);
+      const totalR = returns.reduce((s, r) => s + r.refundAmount, 0) + standaloneRet;
       return {
         vendor: v,
         totalPurchases: totalP,
