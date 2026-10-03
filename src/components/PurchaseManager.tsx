@@ -159,12 +159,16 @@ export function PurchaseManager() {
 
   const headerTotals = useMemo(() => {
     const grossAmount = purchaseItemsDraft.reduce((a, i) => a + i.amount, 0);
-    const totalVat = purchaseItemsDraft.reduce((a, i) => a + i.vatAmount, 0);
-    const taxableAmount = grossAmount;
-    const vatAmount = totalVat;
-    const grandTotal = taxableAmount + vatAmount + otherCharges - headerDiscount;
-    const remainingBalance = grandTotal - paidAmount;
-    return { grossAmount, taxableAmount, vatAmount, grandTotal, remainingBalance };
+    // Clamp discount so it never exceeds gross
+    const effectiveDiscount = Math.min(parseFloat(String(headerDiscount)) || 0, grossAmount);
+    // Step 1: taxable = gross - discount
+    const taxableAmount = Math.round((grossAmount - effectiveDiscount) * 100) / 100;
+    // Step 2: vat on taxable (not on gross)
+    const vatAmount = Math.round(taxableAmount * 0.13 * 100) / 100;
+    // Step 3: grand total = taxable + vat + other charges (discount already baked in taxable)
+    const grandTotal = Math.round((taxableAmount + vatAmount + otherCharges) * 100) / 100;
+    const remainingBalance = Math.round((grandTotal - paidAmount) * 100) / 100;
+    return { grossAmount, effectiveDiscount, taxableAmount, vatAmount, grandTotal, remainingBalance };
   }, [purchaseItemsDraft, headerDiscount, otherCharges, paidAmount]);
 
   function pick(name: string) {
@@ -760,7 +764,23 @@ export function PurchaseManager() {
                 </tr>
               </thead>
               <tbody>
-                {purchaseItemsDraft.map((item, idx) => (
+                {(() => {
+                  // Compute per-line VAT with proportional header-discount allocation
+                  const gross = headerTotals.grossAmount;
+                  const disc = headerTotals.effectiveDiscount;
+                  let runningLineVat = 0;
+                  const lineVats: number[] = purchaseItemsDraft.map((item, idx) => {
+                    const isLast = idx === purchaseItemsDraft.length - 1;
+                    const lineShare = gross > 0 ? (item.amount / gross) * disc : 0;
+                    const lineVat = Math.round((item.amount - lineShare) * 0.13 * 100) / 100;
+                    if (isLast) {
+                      // Put rounding difference on last line so sum == headerTotals.vatAmount
+                      return Math.round((headerTotals.vatAmount - runningLineVat) * 100) / 100;
+                    }
+                    runningLineVat += lineVat;
+                    return lineVat;
+                  });
+                  return purchaseItemsDraft.map((item, idx) => (
                   <>
                     <tr key={idx} className="border-t border-border">
                       <td className="p-2">{idx + 1}</td>
@@ -775,7 +795,7 @@ export function PurchaseManager() {
                       <td className="p-2 text-right">{money(item.rate)}</td>
                       <td className="p-2 text-right text-muted-foreground">{item.discount > 0 ? money(item.discount) : "-"}</td>
                       <td className="p-2 text-right">{money(item.amount)}</td>
-                      <td className="p-2 text-right text-muted-foreground">{money(item.vatAmount)}</td>
+                      <td className="p-2 text-right text-muted-foreground">{money(lineVats[idx] ?? item.vatAmount)}</td>
                       <td className="p-2 text-right font-medium">{money(item.total)}</td>
                       <td className="p-2 text-muted-foreground">{item.lotNo || "-"}</td>
                       <td className="p-2 text-right">
@@ -850,7 +870,8 @@ export function PurchaseManager() {
                       </tr>
                     )}
                   </>
-                ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
