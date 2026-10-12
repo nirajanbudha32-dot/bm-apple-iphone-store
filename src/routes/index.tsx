@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, Building2, Warehouse, ArrowRightLeft } from "lucide-react";
+import { BarChart3, Boxes, History, LogOut, PackageMinus, PackagePlus, ReceiptText, RotateCcw, Shield, ShieldAlert, TrendingUp, Truck, Users, LayoutDashboard, BookOpen, CreditCard, FileText, Building2, Warehouse, ArrowRightLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
