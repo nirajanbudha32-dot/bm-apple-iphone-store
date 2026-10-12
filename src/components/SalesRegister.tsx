@@ -384,6 +384,7 @@ export function SalesRegister() {
       <p>${esc(COMPANY.address)}</p>
       <p>Ph. No.: ${esc(COMPANY.phone)} &nbsp;|&nbsp; Email: ${esc(currentStore?.email || "")}</p>
       <p>VAT No.: ${esc(COMPANY.vatNo)}</p>
+      <p style="font-size:10px;color:#888;margin-top:4px">Powered by BM Store | \u00a9 2026 BM Electronic</p>
     </div>
   </div>
 
@@ -465,6 +466,10 @@ export function SalesRegister() {
   </div>
 
   <p class="footnote">This is a computer-generated invoice. So, it does not require a signature.</p>
+
+  <p style="text-align:center;font-size:9px;color:#999;font-style:italic;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:10px">
+    \u00a9 2026 BM Electronic. All Rights Reserved. | This is a computer-generated invoice. | BM Store \u2014 Birendranagar, Surkhet, Nepal
+  </p>
 
 </div>
 

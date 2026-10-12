@@ -41,6 +41,8 @@ async function logAudit(
       record_id: recordId,
       old_data: oldData ? JSON.stringify(oldData) : null,
       new_data: newData ? JSON.stringify(newData) : null,
+      app_version: "1.0.0",
+      app_owner: "BM Electronic",
     });
   } catch (err) {
     console.error("[store] audit log failed:", err);

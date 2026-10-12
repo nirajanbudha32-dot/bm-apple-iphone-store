@@ -26,6 +26,7 @@ import { StoreSwitcher } from "@/components/StoreSwitcher";
 import { StoreManager } from "@/components/StoreManager";
 import { CrossStoreSummary } from "@/components/CrossStoreSummary";
 import { WarehouseView } from "@/components/WarehouseView";
+import { AboutPage } from "@/components/AboutPage";
 import { TransferHistory } from "@/components/TransferHistory";
 import { BodDashboard } from "@/components/BodDashboard";
 import { StoreProvider, useStoreContext } from "@/lib/store-context";
@@ -83,7 +84,7 @@ function IndexInner() {
   const roleLabel = profile?.role === "admin" ? "Admin" : profile?.role === "bod" ? "BOD" : "Salesman";
 
   return (
-    <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
+    <main className="mx-auto max-w-7xl px-3 py-4 pb-12 sm:px-6 sm:py-8">
       <header className="mb-6 flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between sm:border-b-0 sm:pb-0">
         <div className="flex items-center gap-3">
           <img src="/bm-logo.jpeg" alt="BM Store" className="h-10 w-10 sm:h-12 sm:w-12 rounded-full" />
@@ -198,6 +199,9 @@ function IndexInner() {
                 <Warehouse className="mr-1.5 size-3.5 sm:size-4" /> Warehouse
               </TabsTrigger>
             )}
+            <TabsTrigger value="about" className="py-2 text-xs sm:py-1.5 sm:text-sm">
+              <Shield className="mr-1.5 size-3.5 sm:size-4" /> About
+            </TabsTrigger>
           </TabsList>
 
         {isAdmin && (
@@ -292,11 +296,38 @@ function IndexInner() {
             <WarehouseView />
           </TabsContent>
         )}
+        <TabsContent value="about">
+          <AboutPage />
+        </TabsContent>
       </Tabs>
       )}
 
       {isAdmin && <UserManager open={userManagerOpen} onOpenChange={setUserManagerOpen} />}
       {isAdmin && <StoreManager open={storeManagerOpen} onOpenChange={setStoreManagerOpen} />}
+
+      {/* Global Footer */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: "28px",
+          background: "#1A1A2E",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 50,
+          borderTop: "1px solid #2A2A4E",
+        }}
+      >
+        <span style={{ fontSize: "10px", color: "#8888AA", letterSpacing: "0.3px" }}>
+          © 2026 BM Electronic. All Rights Reserved.&nbsp;&nbsp;|&nbsp;&nbsp;
+          BM Store v1.0.0&nbsp;&nbsp;|&nbsp;&nbsp;
+          Birendranagar, Surkhet, Nepal&nbsp;&nbsp;|&nbsp;&nbsp;
+          Unauthorized use of this software is prohibited.
+        </span>
+      </div>
     </main>
   );
 }

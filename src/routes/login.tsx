@@ -77,6 +77,9 @@ function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <img src="/bm-logo.jpeg" alt="BM Store" className="mx-auto h-20 w-20 rounded-full" />
+          <p style={{ fontSize: "11px", color: "#9CA3AF", fontStyle: "italic", marginBottom: "8px" }}>
+            Restricted System — BM Electronic Staff Only
+          </p>
           <CardTitle className="text-xl">BM iPhone Store</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
@@ -136,6 +139,22 @@ function LoginPage() {
               </Link>
             </p>
           </form>
+          <div style={{
+            marginTop: "24px",
+            paddingTop: "16px",
+            borderTop: "1px solid #E5E7EB",
+            textAlign: "center",
+          }}>
+            <p style={{ fontSize: "11px", color: "#9CA3AF", margin: 0 }}>
+              © 2026 BM Electronic. All Rights Reserved.
+            </p>
+            <p style={{ fontSize: "10px", color: "#D1D5DB", margin: "4px 0 0 0" }}>
+              BM Store v1.0.0 — Authorized Personnel Only
+            </p>
+            <p style={{ fontSize: "10px", color: "#D1D5DB", margin: "4px 0 0 0" }}>
+              Birendranagar, Surkhet, Nepal
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
