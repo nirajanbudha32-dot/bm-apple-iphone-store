@@ -72,13 +72,36 @@ const PIE_COLORS = [
   "#84cc16",
   "#fb923c",
 ];
-const fmt = (d: string) => d?.slice(0, 10) || "";
-const today = () => new Date().toISOString().slice(0, 10);
-const shortMonth = (d: string) => {
-  const m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const dt = new Date(d);
-  return m[dt.getMonth()] + " " + dt.getDate();
-};
+export function cleanDate(d: string | null | undefined): string {
+  if (!d) return "";
+  return d.trim().slice(0, 10);
+}
+
+export function getLocalDateStr(d = new Date()): string {
+  try {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+const fmt = (d: string) => cleanDate(d);
+const today = () => getLocalDateStr();
+
+export function formatShortDate(d: string): string {
+  const cd = cleanDate(d);
+  if (!cd) return "";
+  const parts = cd.split("-");
+  if (parts.length < 3) return cd;
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const mIndex = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  return `${monthNames[mIndex] || parts[1]} ${day}`;
+}
+const shortMonth = formatShortDate;
 
 const ACCENT_MAP: Record<string, string> = {
   blue: "#3b82f6",
@@ -515,6 +538,7 @@ export function BodDashboard() {
           <TabOverview
             stock={fStock}
             sales={fSales}
+            salesHeaders={fSalesHeaders}
             stockLots={fStockLots}
             saleAllocations={fSaleAllocations}
             purchaseHeaders={fPurchaseHeaders}
@@ -542,6 +566,7 @@ export function BodDashboard() {
         </TabsContent>
         <TabsContent value="profitability">
           <TabProfitability
+            stock={fStock}
             sales={fSales}
             saleAllocations={fSaleAllocations}
             stockLots={fStockLots}
@@ -574,6 +599,7 @@ export function BodDashboard() {
           <TabStores
             stock={fStock}
             sales={fSales}
+            salesHeaders={fSalesHeaders}
             purchaseHeaders={fPurchaseHeaders}
             stockLots={fStockLots}
             saleAllocations={fSaleAllocations}
@@ -590,6 +616,7 @@ export function BodDashboard() {
 function TabOverview({
   stock,
   sales,
+  salesHeaders,
   stockLots,
   saleAllocations,
   purchaseHeaders,
@@ -598,52 +625,152 @@ function TabOverview({
   vendorTransactions,
   storeLabel,
 }: any) {
+  const [period, setPeriod] = useState<"all" | "today" | "yesterday" | "week" | "month" | "custom">("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const handlePeriodChange = (p: "all" | "today" | "yesterday" | "week" | "month" | "custom") => {
+    setPeriod(p);
+    const todayStr = getLocalDateStr();
+    if (p === "all") {
+      setDateFrom("");
+      setDateTo("");
+    } else if (p === "today") {
+      setDateFrom(todayStr);
+      setDateTo(todayStr);
+    } else if (p === "yesterday") {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      const yStr = getLocalDateStr(y);
+      setDateFrom(yStr);
+      setDateTo(yStr);
+    } else if (p === "week") {
+      const w = new Date();
+      w.setDate(w.getDate() - 6);
+      setDateFrom(getLocalDateStr(w));
+      setDateTo(todayStr);
+    } else if (p === "month") {
+      const now = new Date();
+      const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      setDateFrom(getLocalDateStr(mStart));
+      setDateTo(todayStr);
+    }
+  };
+
   const o = useMemo(() => {
-    const totalSales = sales.reduce((a: number, s: any) => a + s.amount, 0);
-    const totalPurchases = purchaseHeaders.reduce((a: number, p: any) => a + p.grandTotal, 0);
+    // 1. Filtered data slices according to active date range
+    let fHeaders = salesHeaders || [];
+    let fSalesList = sales || [];
+    let fPurchases = purchaseHeaders || [];
+    let fReturns = salesReturns || [];
+
+    if (dateFrom) {
+      fHeaders = fHeaders.filter((h: any) => cleanDate(h.date) >= dateFrom);
+      fSalesList = fSalesList.filter((s: any) => cleanDate(s.date) >= dateFrom);
+      fPurchases = fPurchases.filter((p: any) => cleanDate(p.date) >= dateFrom);
+      fReturns = fReturns.filter((r: any) => cleanDate(r.returnDate) >= dateFrom);
+    }
+    if (dateTo) {
+      fHeaders = fHeaders.filter((h: any) => cleanDate(h.date) <= dateTo);
+      fSalesList = fSalesList.filter((s: any) => cleanDate(s.date) <= dateTo);
+      fPurchases = fPurchases.filter((p: any) => cleanDate(p.date) <= dateTo);
+      fReturns = fReturns.filter((r: any) => cleanDate(r.returnDate) <= dateTo);
+    }
+
+    // 2. Sales Metrics (Exact Grand Total from sales_headers or line fallback)
+    const totalSales = fHeaders.length > 0
+      ? fHeaders.reduce((a: number, h: any) => a + Number(h.grandTotal || 0), 0)
+      : fSalesList.reduce((a: number, s: any) => a + Number(s.total || s.amount || 0), 0);
+
+    const totalVat = fSalesList.reduce((a: number, s: any) => a + Number(s.vat || 0), 0);
+    const taxableSales = Math.max(0, totalSales - totalVat);
+    const totalPaid = fHeaders.length > 0
+      ? fHeaders.reduce((a: number, h: any) => a + Number(h.paidAmount || 0), 0)
+      : fSalesList.reduce((a: number, s: any) => a + Number(s.paidAmount || 0), 0);
+    const totalRemaining = fHeaders.length > 0
+      ? fHeaders.reduce((a: number, h: any) => a + Number(h.remaining || 0), 0)
+      : fSalesList.reduce((a: number, s: any) => a + Number(s.remaining || 0), 0);
+    const invoiceCount = fHeaders.length > 0
+      ? fHeaders.length
+      : new Set(fSalesList.map((s: any) => s.invoiceNo)).size;
+
+    // 3. Purchase Metrics
+    const totalPurchases = fPurchases.reduce((a: number, p: any) => a + Number(p.grandTotal || 0), 0);
+    const totalPurchasePaid = fPurchases.reduce((a: number, p: any) => a + Number(p.paidAmount || 0), 0);
+    const totalPurchaseRemaining = fPurchases.reduce((a: number, p: any) => a + Number(p.remainingBalance || 0), 0);
+    const totalPurchaseVat = fPurchases.reduce((a: number, p: any) => a + Number(p.vatAmount || 0), 0);
+
+    // 4. Inventory Metrics
     const stockValue = stockLots
       .filter((l: any) => l.qty > 0)
       .reduce((a: number, l: any) => a + l.qty * l.purchasePrice, 0);
     const stockQty = stockLots
       .filter((l: any) => l.qty > 0)
       .reduce((a: number, l: any) => a + l.qty, 0);
-    const totalProfit = sales.reduce((a: number, s: any) => {
+
+    // 5. Profit Metrics (taxable sales minus COGS with stock purchase price fallback, minus return refunds)
+    const totalProfit = fSalesList.reduce((a: number, s: any) => {
+      if (s.saleType === "Warranty") return a;
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce(
-        (c: number, al: any) =>
-          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
-        0,
-      );
-      return a + (s.amount - cost);
-    }, 0);
+      let cost = 0;
+      if (allocs.length > 0) {
+        cost = allocs.reduce(
+          (c: number, al: any) =>
+            c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+          0,
+        );
+      } else {
+        const item = stock.find((it: any) => it.code === s.itemCode);
+        cost = (item?.purchasePrice || 0) * (s.qty || 1);
+      }
+      return a + (Number(s.amount || s.total || 0) - cost);
+    }, 0) - fReturns.reduce((a: number, r: any) => a + Number(r.refundAmount || 0), 0);
+
     const vendorPayable = vendors.reduce((a: number, v: any) => {
       const outstanding = getVendorBalance(v.id);
       return a + Math.max(0, outstanding);
     }, 0);
-    const today = new Date().toISOString().slice(0, 10);
-    const todaySalesTotal = sales
-      .filter((s: any) => s.date === today)
-      .reduce((a: number, s: any) => a + s.amount, 0);
-    const invoiceCount = new Set(sales.map((s: any) => s.invoiceNo)).size;
-    const totalVat = sales.reduce((a: number, s: any) => a + s.vat, 0);
-    const totalReturnRefund = salesReturns.reduce((a: number, r: any) => a + r.refundAmount, 0);
+
+    // 6. Today's Sales (bulletproof local Nepal date comparison)
+    const localToday = getLocalDateStr();
+    const todayHeaders = (salesHeaders || []).filter((h: any) => cleanDate(h.date) === localToday);
+    const todaySalesTotal = todayHeaders.length > 0
+      ? todayHeaders.reduce((a: number, h: any) => a + Number(h.grandTotal || 0), 0)
+      : (sales || []).filter((s: any) => cleanDate(s.date) === localToday).reduce((a: number, s: any) => a + Number(s.total || s.amount || 0), 0);
+    const todayInvoiceCount = todayHeaders.length > 0
+      ? todayHeaders.length
+      : new Set((sales || []).filter((s: any) => cleanDate(s.date) === localToday).map((s: any) => s.invoiceNo)).size;
+
+    const totalReturnRefund = fReturns.reduce((a: number, r: any) => a + Number(r.refundAmount || 0), 0);
     const avgSaleValue = invoiceCount > 0 ? totalSales / invoiceCount : 0;
     const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
+    // 7. Monthly Trend (using sales_headers or line items)
     const monthMap = new Map<string, { sales: number; purchases: number }>();
-    for (const s of sales) {
-      const m = s.date?.slice(0, 7);
-      if (m) {
-        const e = monthMap.get(m) || { sales: 0, purchases: 0 };
-        e.sales += s.amount;
-        monthMap.set(m, e);
+    if (salesHeaders && salesHeaders.length > 0) {
+      for (const h of salesHeaders) {
+        const m = cleanDate(h.date).slice(0, 7);
+        if (m) {
+          const e = monthMap.get(m) || { sales: 0, purchases: 0 };
+          e.sales += Number(h.grandTotal || 0);
+          monthMap.set(m, e);
+        }
+      }
+    } else {
+      for (const s of sales) {
+        const m = cleanDate(s.date).slice(0, 7);
+        if (m) {
+          const e = monthMap.get(m) || { sales: 0, purchases: 0 };
+          e.sales += Number(s.total || s.amount || 0);
+          monthMap.set(m, e);
+        }
       }
     }
     for (const p of purchaseHeaders) {
-      const m = p.date?.slice(0, 7);
+      const m = cleanDate(p.date).slice(0, 7);
       if (m) {
         const e = monthMap.get(m) || { sales: 0, purchases: 0 };
-        e.purchases += p.grandTotal;
+        e.purchases += Number(p.grandTotal || 0);
         monthMap.set(m, e);
       }
     }
@@ -652,18 +779,26 @@ function TabOverview({
       .slice(-12)
       .map(([m, v]) => ({ month: m, label: m, sales: v.sales, purchases: v.purchases }));
 
+    // 8. Store Performance Matrix
     const storeMap = new Map<string, { name: string; sales: number; purchases: number }>();
     for (const [id, name] of Object.entries(LOCATION_LABELS)) {
       if (id === WAREHOUSE_ID) continue;
       storeMap.set(id, { name, sales: 0, purchases: 0 });
     }
-    for (const s of sales) {
-      const st = storeMap.get(s.storeId || "");
-      if (st) st.sales += s.amount;
+    if (fHeaders.length > 0) {
+      for (const h of fHeaders) {
+        const st = storeMap.get(h.storeId || "");
+        if (st) st.sales += Number(h.grandTotal || 0);
+      }
+    } else {
+      for (const s of fSalesList) {
+        const st = storeMap.get(s.storeId || "");
+        if (st) st.sales += Number(s.total || s.amount || 0);
+      }
     }
-    for (const p of purchaseHeaders) {
+    for (const p of fPurchases) {
       const st = storeMap.get(p.storeId || "");
-      if (st) st.purchases += p.grandTotal;
+      if (st) st.purchases += Number(p.grandTotal || 0);
     }
     const storePerf = Array.from(storeMap.values())
       .filter((s) => s.sales > 0 || s.purchases > 0)
@@ -673,10 +808,18 @@ function TabOverview({
         margin: s.sales > 0 ? ((s.sales - s.purchases) / s.sales) * 100 : 0,
       }));
 
+    // 9. Payment Methods Breakdown
     const methodMap = new Map<string, number>();
-    for (const s of sales) {
-      const m = s.paymentMethod || "Cash";
-      methodMap.set(m, (methodMap.get(m) || 0) + s.total);
+    if (fHeaders.length > 0) {
+      for (const h of fHeaders) {
+        const m = h.paymentMethod || "Cash";
+        methodMap.set(m, (methodMap.get(m) || 0) + Number(h.grandTotal || 0));
+      }
+    } else {
+      for (const s of fSalesList) {
+        const m = s.paymentMethod || "Cash";
+        methodMap.set(m, (methodMap.get(m) || 0) + Number(s.total || 0));
+      }
     }
     const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({
       name,
@@ -685,14 +828,21 @@ function TabOverview({
 
     return {
       totalSales,
+      taxableSales,
+      totalVat,
+      totalPaid,
+      totalRemaining,
       totalPurchases,
+      totalPurchasePaid,
+      totalPurchaseRemaining,
+      totalPurchaseVat,
       stockValue,
       stockQty,
       totalProfit,
       vendorPayable,
       todaySalesTotal,
+      todayInvoiceCount,
       invoiceCount,
-      totalVat,
       totalReturnRefund,
       avgSaleValue,
       profitMargin,
@@ -703,51 +853,150 @@ function TabOverview({
   }, [
     stock,
     sales,
+    salesHeaders,
     stockLots,
     saleAllocations,
     purchaseHeaders,
     salesReturns,
     vendors,
     vendorTransactions,
+    dateFrom,
+    dateTo,
   ]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground sm:text-sm">
-          {storeLabel} — Executive Overview
-        </p>
-        <ExportBtn
-          onExport={() => {
-            exportRows(
-              [
-                { Metric: "Total Sales", Value: o.totalSales },
-                { Metric: "Total Purchases", Value: o.totalPurchases },
-                { Metric: "Total Profit", Value: o.totalProfit },
-                { Metric: "Profit Margin", Value: o.profitMargin.toFixed(1) + "%" },
-                { Metric: "Stock Value", Value: o.stockValue },
-                { Metric: "Vendor Payable", Value: o.vendorPayable },
-                { Metric: "Total VAT", Value: o.totalVat },
-                { Metric: "Invoices", Value: o.invoiceCount },
-                { Metric: "Avg Sale Value", Value: o.avgSaleValue },
-              ],
-              "Overview KPIs",
-              `BOD_Overview_${today()}.xlsx`,
-            );
-          }}
-        />
-      </div>
+      {/* Executive Period Filter Bar */}
+      <Card className="p-3 sm:p-4 rounded-xl border border-border/40 bg-slate-50/80 dark:bg-slate-900/60 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mr-1">
+              Period:
+            </span>
+            <Button
+              variant={period === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handlePeriodChange("all")}
+              className="h-8 text-xs rounded-lg px-2.5 sm:px-3"
+            >
+              All Time
+            </Button>
+            <Button
+              variant={period === "today" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handlePeriodChange("today")}
+              className="h-8 text-xs rounded-lg px-2.5 sm:px-3"
+            >
+              Today
+            </Button>
+            <Button
+              variant={period === "yesterday" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handlePeriodChange("yesterday")}
+              className="h-8 text-xs rounded-lg px-2.5 sm:px-3"
+            >
+              Yesterday
+            </Button>
+            <Button
+              variant={period === "week" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handlePeriodChange("week")}
+              className="h-8 text-xs rounded-lg px-2.5 sm:px-3"
+            >
+              Last 7 Days
+            </Button>
+            <Button
+              variant={period === "month" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handlePeriodChange("month")}
+              className="h-8 text-xs rounded-lg px-2.5 sm:px-3"
+            >
+              This Month
+            </Button>
+            <Button
+              variant={period === "custom" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriod("custom")}
+              className="h-8 text-xs rounded-lg px-2.5 sm:px-3"
+            >
+              Custom
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {(period === "custom" || dateFrom || dateTo) && (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => {
+                    setDateFrom(e.target.value);
+                    setPeriod("custom");
+                  }}
+                  className="h-8 w-32 sm:w-36 text-xs rounded-lg"
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setDateTo(e.target.value);
+                    setPeriod("custom");
+                  }}
+                  className="h-8 w-32 sm:w-36 text-xs rounded-lg"
+                />
+              </div>
+            )}
+            <ExportBtn
+              onExport={() => {
+                exportRows(
+                  [
+                    { Metric: "Total Invoiced Sales", Value: o.totalSales },
+                    { Metric: "Taxable Sales (Ex-VAT)", Value: o.taxableSales },
+                    { Metric: "Sales VAT (13%)", Value: o.totalVat },
+                    { Metric: "Customer Cash Collected", Value: o.totalPaid },
+                    { Metric: "Customer Credit Due", Value: o.totalRemaining },
+                    { Metric: "Total Purchases", Value: o.totalPurchases },
+                    { Metric: "Purchases Paid", Value: o.totalPurchasePaid },
+                    { Metric: "Purchases Due", Value: o.totalPurchaseRemaining },
+                    { Metric: "Net Profit", Value: o.totalProfit },
+                    { Metric: "Profit Margin", Value: o.profitMargin.toFixed(1) + "%" },
+                    { Metric: "Stock Value", Value: o.stockValue },
+                    { Metric: "Stock Units", Value: o.stockQty },
+                    { Metric: "Vendor Payable", Value: o.vendorPayable },
+                    { Metric: "Today's Sales", Value: o.todaySalesTotal },
+                    { Metric: "Total Invoices", Value: o.invoiceCount },
+                    { Metric: "Avg Sale Value", Value: o.avgSaleValue },
+                  ],
+                  "Executive Overview",
+                  `BOD_Overview_${getLocalDateStr()}.xlsx`,
+                );
+              }}
+            />
+          </div>
+        </div>
+        {(dateFrom || dateTo) && (
+          <div className="mt-2 text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+            Showing metrics from <strong className="text-foreground">{dateFrom || "beginning"}</strong> to{" "}
+            <strong className="text-foreground">{dateTo || "today"}</strong>
+          </div>
+        )}
+      </Card>
+
+      {/* Primary KPI Row */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         <Kpi
-          label="Total Sales"
+          label="Total Sales (Invoiced)"
           value={money(o.totalSales)}
-          sub={`${o.invoiceCount} invoices`}
+          sub={`${o.invoiceCount} invoices • VAT: ${money(o.totalVat)}`}
           icon={ShoppingBag}
           color="blue"
         />
         <Kpi
           label="Total Purchases"
           value={money(o.totalPurchases)}
+          sub={`Paid: ${money(o.totalPurchasePaid)} • Due: ${money(o.totalPurchaseRemaining)}`}
           icon={PackagePlus}
           color="violet"
         />
@@ -761,18 +1010,47 @@ function TabOverview({
         <Kpi
           label="Stock Value"
           value={money(o.stockValue)}
-          sub={`${o.stockQty} units`}
+          sub={`${o.stockQty} units in stock`}
           icon={Boxes}
           color="amber"
         />
-        <Kpi label="Vendor Payable" value={money(o.vendorPayable)} icon={Users} color="rose" />
+        <Kpi
+          label="Vendor Payable"
+          value={money(o.vendorPayable)}
+          sub={`Bills Due: ${money(o.totalPurchaseRemaining)}`}
+          icon={Users}
+          color="rose"
+        />
       </div>
+
       <hr className="border-border/40" />
+
+      {/* Secondary Metric Row */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        <Kpi label="Today's Sales" value={money(o.todaySalesTotal)} icon={DollarSign} />
-        <Kpi label="Total VAT" value={money(o.totalVat)} icon={CreditCard} />
-        <Kpi label="Returns Refund" value={money(o.totalReturnRefund)} icon={RotateCcw} />
-        <Kpi label="Avg Sale Value" value={money(o.avgSaleValue)} icon={Target} />
+        <Kpi
+          label="Today's Sales"
+          value={money(o.todaySalesTotal)}
+          sub={`${o.todayInvoiceCount} invoices today`}
+          icon={DollarSign}
+        />
+        <Kpi
+          label="Cash Collected (Paid)"
+          value={money(o.totalPaid)}
+          sub={`Due Credit: ${money(o.totalRemaining)}`}
+          icon={CreditCard}
+        />
+        <Kpi
+          label="Taxable Sales (Ex-VAT)"
+          value={money(o.taxableSales)}
+          sub={`13% VAT: ${money(o.totalVat)}`}
+          icon={Banknote}
+        />
+        <Kpi
+          label="Avg Ticket Size"
+          value={money(o.avgSaleValue)}
+          sub="Per customer invoice"
+          icon={Target}
+        />
       </div>
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <ChartCard title="Monthly Sales vs Purchases" chartColor="#3b82f6">
@@ -913,8 +1191,8 @@ function TabSales({ sales, salesHeaders, stockLots, saleAllocations, salesReturn
 
   const filtered = useMemo(() => {
     let rows = sales;
-    if (dateFrom) rows = rows.filter((s: any) => s.date >= dateFrom);
-    if (dateTo) rows = rows.filter((s: any) => s.date <= dateTo);
+    if (dateFrom) rows = rows.filter((s: any) => cleanDate(s.date) >= dateFrom);
+    if (dateTo) rows = rows.filter((s: any) => cleanDate(s.date) <= dateTo);
     const t = q.trim().toLowerCase();
     if (t)
       rows = rows.filter(
@@ -990,8 +1268,9 @@ function TabSales({ sales, salesHeaders, stockLots, saleAllocations, salesReturn
     const creditPct = totalGrand > 0 ? (creditSales / totalGrand) * 100 : 0;
     const totalReturns = salesReturns
       .filter((r: any) => {
-        if (dateFrom && r.returnDate < dateFrom) return false;
-        if (dateTo && r.returnDate > dateTo) return false;
+        const rd = cleanDate(r.returnDate);
+        if (dateFrom && rd < dateFrom) return false;
+        if (dateTo && rd > dateTo) return false;
         return true;
       })
       .reduce((a: number, r: any) => a + r.refundAmount, 0);
@@ -999,8 +1278,8 @@ function TabSales({ sales, salesHeaders, stockLots, saleAllocations, salesReturn
 
     const dailyMap = new Map<string, number>();
     for (const s of filtered) {
-      const d = s.date?.slice(0, 10);
-      if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + s.amount);
+      const d = cleanDate(s.date);
+      if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + (s.total || s.amount || 0));
     }
     const dailyTrend = Array.from(dailyMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -1124,7 +1403,7 @@ function TabSales({ sales, salesHeaders, stockLots, saleAllocations, salesReturn
   }
 
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr();
   }
 
   return (
@@ -1375,8 +1654,8 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
 
   const filtered = useMemo(() => {
     let rows = purchaseHeaders;
-    if (dateFrom) rows = rows.filter((p: any) => p.date >= dateFrom);
-    if (dateTo) rows = rows.filter((p: any) => p.date <= dateTo);
+    if (dateFrom) rows = rows.filter((p: any) => cleanDate(p.date) >= dateFrom);
+    if (dateTo) rows = rows.filter((p: any) => cleanDate(p.date) <= dateTo);
     const t = q.trim().toLowerCase();
     if (t)
       rows = rows.filter(
@@ -1398,15 +1677,16 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
     const creditPct = totalGrand > 0 ? (creditPurchases / totalGrand) * 100 : 0;
     const totalReturns = purchaseReturns
       .filter((r: any) => {
-        if (dateFrom && r.returnDate < dateFrom) return false;
-        if (dateTo && r.returnDate > dateTo) return false;
+        const rd = cleanDate(r.returnDate);
+        if (dateFrom && rd < dateFrom) return false;
+        if (dateTo && rd > dateTo) return false;
         return true;
       })
       .reduce((a: number, r: any) => a + r.refundAmount, 0);
 
     const dailyMap = new Map<string, number>();
     for (const p of filtered) {
-      const d = p.date?.slice(0, 10);
+      const d = cleanDate(p.date);
       if (d) dailyMap.set(d, (dailyMap.get(d) || 0) + p.grandTotal);
     }
     const dailyTrend = Array.from(dailyMap.entries())
@@ -1472,7 +1752,7 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
   }, [filtered, purchaseItems, purchaseReturns, dateFrom, dateTo]);
 
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr();
   }
 
   return (
@@ -1636,15 +1916,15 @@ function TabPurchases({ purchaseHeaders, purchaseItems, purchaseReturns }: any) 
 
 // ─── TAB 4: PROFITABILITY DEEP DIVE ───────────────────────────────────────────
 
-function TabProfitability({ sales, saleAllocations, stockLots }: any) {
+function TabProfitability({ stock, sales, saleAllocations, stockLots }: any) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
     let rows = sales;
-    if (dateFrom) rows = rows.filter((s: any) => s.date >= dateFrom);
-    if (dateTo) rows = rows.filter((s: any) => s.date <= dateTo);
+    if (dateFrom) rows = rows.filter((s: any) => cleanDate(s.date) >= dateFrom);
+    if (dateTo) rows = rows.filter((s: any) => cleanDate(s.date) <= dateTo);
     const t = q.trim().toLowerCase();
     if (t)
       rows = rows.filter(
@@ -1670,11 +1950,17 @@ function TabProfitability({ sales, saleAllocations, stockLots }: any) {
 
     for (const s of filtered) {
       const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce(
-        (c: number, al: any) =>
-          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
-        0,
-      );
+      let cost = 0;
+      if (allocs.length > 0) {
+        cost = allocs.reduce(
+          (c: number, al: any) =>
+            c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+          0,
+        );
+      } else {
+        const item = (stock || []).find((it: any) => it.code === s.itemCode);
+        cost = (item?.purchasePrice || 0) * (s.qty || 1);
+      }
       const profit = s.amount - cost;
       totalRevenue += s.amount;
       totalCost += cost;
@@ -1787,7 +2073,7 @@ function TabProfitability({ sales, saleAllocations, stockLots }: any) {
   }, [filtered, saleAllocations, stockLots, dateFrom, dateTo]);
 
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr();
   }
 
   return (
@@ -2196,7 +2482,7 @@ function TabInventory({ stock, sales, stockLots, saleAllocations }: any) {
   }, [stock, stockLots, saleAllocations, q, statusFilter, sales]);
 
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr();
   }
 
   return (
@@ -2539,7 +2825,7 @@ function TabVendors({ vendors, vendorTransactions, vendorPayments }: any) {
   }, [vendors, vendorTransactions, vendorPayments, q]);
 
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr();
   }
 
   return (
@@ -2727,37 +3013,37 @@ function TabCashFlow({ sales, salesHeaders, purchaseHeaders, vendorPayments }: a
         }
       }
     }
-    let pFiltered = purchaseHeaders;
-    let vpFiltered = vendorPayments;
+    let pFiltered = purchaseHeaders || [];
+    let vpFiltered = vendorPayments || [];
     if (dateFrom) {
-      sFiltered = sFiltered.filter((s: any) => s.date >= dateFrom);
-      pFiltered = pFiltered.filter((p: any) => p.date >= dateFrom);
-      vpFiltered = vpFiltered.filter((p: any) => p.paymentDate >= dateFrom);
+      sFiltered = sFiltered.filter((s: any) => cleanDate(s.date) >= dateFrom);
+      pFiltered = pFiltered.filter((p: any) => cleanDate(p.date) >= dateFrom);
+      vpFiltered = vpFiltered.filter((p: any) => cleanDate(p.paymentDate) >= dateFrom);
     }
     if (dateTo) {
-      sFiltered = sFiltered.filter((s: any) => s.date <= dateTo);
-      pFiltered = pFiltered.filter((p: any) => p.date <= dateTo);
-      vpFiltered = vpFiltered.filter((p: any) => p.paymentDate <= dateTo);
+      sFiltered = sFiltered.filter((s: any) => cleanDate(s.date) <= dateTo);
+      pFiltered = pFiltered.filter((p: any) => cleanDate(p.date) <= dateTo);
+      vpFiltered = vpFiltered.filter((p: any) => cleanDate(p.paymentDate) <= dateTo);
     }
 
-    const totalInflows = sFiltered.reduce((a: number, s: any) => a + s.paidAmount, 0);
-    const totalOutflows = vpFiltered.reduce((a: number, p: any) => a + p.amount, 0);
+    const totalInflows = sFiltered.reduce((a: number, s: any) => a + Number(s.paidAmount || 0), 0);
+    const totalOutflows = vpFiltered.reduce((a: number, p: any) => a + Number(p.amount || 0), 0);
     const netCashFlow = totalInflows - totalOutflows;
 
     const monthlyMap = new Map<string, { inflow: number; outflow: number }>();
     for (const s of sFiltered) {
-      const m = s.date?.slice(0, 7);
+      const m = cleanDate(s.date).slice(0, 7);
       if (m) {
         const e = monthlyMap.get(m) || { inflow: 0, outflow: 0 };
-        e.inflow += s.paidAmount;
+        e.inflow += Number(s.paidAmount || 0);
         monthlyMap.set(m, e);
       }
     }
     for (const p of vpFiltered) {
-      const m = p.paymentDate?.slice(0, 7);
+      const m = cleanDate(p.paymentDate).slice(0, 7);
       if (m) {
         const e = monthlyMap.get(m) || { inflow: 0, outflow: 0 };
-        e.outflow += p.amount;
+        e.outflow += Number(p.amount || 0);
         monthlyMap.set(m, e);
       }
     }
@@ -2773,7 +3059,7 @@ function TabCashFlow({ sales, salesHeaders, purchaseHeaders, vendorPayments }: a
     const methodMap = new Map<string, number>();
     for (const s of sFiltered) {
       const m = s.paymentMethod || "Cash";
-      methodMap.set(m, (methodMap.get(m) || 0) + s.paidAmount);
+      methodMap.set(m, (methodMap.get(m) || 0) + Number(s.paidAmount || 0));
     }
     const paymentBreakdown = Array.from(methodMap.entries()).map(([name, value]) => ({
       name,
@@ -2781,11 +3067,11 @@ function TabCashFlow({ sales, salesHeaders, purchaseHeaders, vendorPayments }: a
     }));
 
     const receivables = sFiltered
-      .filter((s: any) => s.remaining > 0)
-      .reduce((a: number, s: any) => a + s.remaining, 0);
+      .filter((s: any) => Number(s.remaining || 0) > 0)
+      .reduce((a: number, s: any) => a + Number(s.remaining || 0), 0);
     const payables = pFiltered
-      .filter((p: any) => p.remainingBalance > 0)
-      .reduce((a: number, p: any) => a + p.remainingBalance, 0);
+      .filter((p: any) => Number(p.remainingBalance || 0) > 0)
+      .reduce((a: number, p: any) => a + Number(p.remainingBalance || 0), 0);
 
     return {
       totalInflows,
@@ -2796,10 +3082,10 @@ function TabCashFlow({ sales, salesHeaders, purchaseHeaders, vendorPayments }: a
       receivables,
       payables,
     };
-  }, [sales, purchaseHeaders, vendorPayments, dateFrom, dateTo]);
+  }, [sales, salesHeaders, purchaseHeaders, vendorPayments, dateFrom, dateTo]);
 
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr();
   }
 
   const netWorkingCapital = a.receivables - a.payables;
@@ -3038,7 +3324,7 @@ function TabCashFlow({ sales, salesHeaders, purchaseHeaders, vendorPayments }: a
 
 // ─── TAB 8: STORE COMPARISON ──────────────────────────────────────────────────
 
-function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, vendors }: any) {
+function TabStores({ stock, sales, salesHeaders, purchaseHeaders, stockLots, saleAllocations, vendors }: any) {
   const stores = useMemo(() => {
     const storeMap = new Map<
       string,
@@ -3056,6 +3342,8 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
         profit: number;
         avgSaleValue: number;
         cogs: number;
+        paid: number;
+        remaining: number;
       }
     >();
     for (const [id, name] of Object.entries(LOCATION_LABELS)) {
@@ -3074,40 +3362,85 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
         profit: 0,
         avgSaleValue: 0,
         cogs: 0,
+        paid: 0,
+        remaining: 0,
       });
     }
-    for (const s of stock) {
+    for (const s of stock || []) {
       const st = storeMap.get(s.storeId || "");
       if (st) {
         st.stockItems++;
         st.stockQty += s.qty;
       }
     }
-    for (const l of stockLots) {
+    for (const l of stockLots || []) {
       const st = storeMap.get(l.storeId || "");
       if (st && l.qty > 0) st.stockValue += l.qty * l.purchasePrice;
     }
-    for (const s of sales) {
-      const st = storeMap.get(s.storeId || "");
-      if (st) {
-        st.sales += s.amount;
-        st.salesCount++;
-        st.vat += s.vat;
+
+    if (salesHeaders && salesHeaders.length > 0) {
+      for (const h of salesHeaders) {
+        const st = storeMap.get(h.storeId || "");
+        if (st) {
+          st.sales += Number(h.grandTotal || 0);
+          st.salesCount++;
+          st.paid += Number(h.paidAmount || 0);
+          st.remaining += Number(h.remaining || 0);
+        }
       }
-      const allocs = saleAllocations.filter((al: any) => al.saleId === s.id);
-      const cost = allocs.reduce(
-        (c: number, al: any) =>
-          c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
-        0,
-      );
-      if (st) st.cogs += cost;
+      for (const s of sales || []) {
+        const st = storeMap.get(s.storeId || "");
+        if (st) {
+          st.vat += Number(s.vat || 0);
+        }
+        const allocs = (saleAllocations || []).filter((al: any) => al.saleId === s.id);
+        let cost = 0;
+        if (allocs.length > 0) {
+          cost = allocs.reduce(
+            (c: number, al: any) =>
+              c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+            0,
+          );
+        } else {
+          const item = (stock || []).find((it: any) => it.code === s.itemCode);
+          cost = (item?.purchasePrice || 0) * (s.qty || 1);
+        }
+        if (st) st.cogs += cost;
+      }
+    } else {
+      for (const s of sales || []) {
+        const st = storeMap.get(s.storeId || "");
+        if (st) {
+          st.sales += Number(s.total || s.amount || 0);
+          st.salesCount++;
+          st.vat += Number(s.vat || 0);
+        }
+        const allocs = (saleAllocations || []).filter((al: any) => al.saleId === s.id);
+        let cost = 0;
+        if (allocs.length > 0) {
+          cost = allocs.reduce(
+            (c: number, al: any) =>
+              c + al.qtyTaken * (stockLots.find((l: any) => l.id === al.lotId)?.purchasePrice || 0),
+            0,
+          );
+        } else {
+          const item = (stock || []).find((it: any) => it.code === s.itemCode);
+          cost = (item?.purchasePrice || 0) * (s.qty || 1);
+        }
+        if (st) st.cogs += cost;
+      }
     }
-    for (const p of purchaseHeaders) {
+
+    for (const p of purchaseHeaders || []) {
       const st = storeMap.get(p.storeId || "");
-      if (st) st.purchases += p.grandTotal;
+      if (st) {
+        st.purchases += Number(p.grandTotal || 0);
+        st.payable += Number(p.remainingBalance || 0);
+      }
     }
+
     const vendorStoreMap = new Map<string, Set<string>>();
-    for (const v of vendors) {
+    for (const v of vendors || []) {
       if (v.storeId) {
         if (!vendorStoreMap.has(v.storeId)) vendorStoreMap.set(v.storeId, new Set());
         vendorStoreMap.get(v.storeId)!.add(v.id);
@@ -3122,7 +3455,7 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
       st.avgSaleValue = st.salesCount > 0 ? st.sales / st.salesCount : 0;
     }
     return Array.from(storeMap.values());
-  }, [stock, sales, purchaseHeaders, stockLots, saleAllocations, vendors]);
+  }, [stock, sales, salesHeaders, purchaseHeaders, stockLots, saleAllocations, vendors]);
 
   const g = useMemo(() => {
     const total = stores.reduce(
@@ -3153,7 +3486,7 @@ function TabStores({ stock, sales, purchaseHeaders, stockLots, saleAllocations, 
   }, [stores]);
 
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr();
   }
 
   const bestStore =
